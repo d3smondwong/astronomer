@@ -24,7 +24,7 @@ Key Function:
 
 from lunar_python import Solar, Lunar
 from datetime import datetime
-from src.solar_lunar_time import get_true_solar_time
+from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
 
 # --- STEM & BRANCH PARTNERSHIPS ---
 # Yin-Yang stem partnerships (for derived stars like 天德合)
@@ -939,7 +939,7 @@ if __name__ == "__main__":
     # Corinne's birthday example
     solar_birthday = Solar.fromYmdHms(1987, 6, 3, 12, 6, 0)
     datetime_birthday = datetime(1987, 6, 3, 12, 6, 0)
-    tst_birthday, _ = get_true_solar_time(datetime_birthday, 1.4759, 103.808053)
+    tst_birthday, _ = get_true_solar_time(datetime_birthday, 1.3253, 103.808053)
 
     print("阳历生日: " + solar_birthday.toYmdHms())  # Print solar birthday
     print("真太阳时生日: " + tst_birthday.toYmdHms())  # Print true solar time birthday
