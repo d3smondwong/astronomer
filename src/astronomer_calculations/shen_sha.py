@@ -919,52 +919,45 @@ def get_shen_sha(lunar_birthday):
             if zhis[i] in "卯辰未":
                 add_shen(i, "童子煞", strs, all_found_shens)
 
-    return strs, all_found_shens, gans, zhis
+    # Build structured JSON output
+    pillar_names_cn = ["年柱", "月柱", "日柱", "时柱"]
+    pillar_dynamics = {
+        pillar_names_cn[i]: {
+            "天干": gans[i],
+            "地支": zhis[i],
+            "神煞": strs[i].split() if strs[i] else [],
+        }
+        for i in range(4)
+    }
+
+    result = {
+        "柱位神煞": pillar_dynamics,
+    }
+
+    return {"神煞": result}
 
 
 # --- EXECUTION ---
 
 if __name__ == "__main__":
-    # python -m src.shen_sha
+    import json
 
-    # # Desmond's birthday example
-    # solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)  # Create solar date
-    # datetime_birthday = datetime(
-    #     1985, 11, 25, 17, 7, 0
-    # )  # Create datetime object for the birthday
-    # tst_birthday, _ = get_true_solar_time(
-    #     datetime_birthday, 1.3253, 103.8415
-    # )  # Get true solar time for the birthday
+    # python -m src.astronomer_calculations.shen_sha
 
     # Corinne's birthday example
     solar_birthday = Solar.fromYmdHms(1987, 6, 3, 12, 6, 0)
     datetime_birthday = datetime(1987, 6, 3, 12, 6, 0)
     tst_birthday, _ = get_true_solar_time(datetime_birthday, 1.3253, 103.808053)
 
-    print("阳历生日: " + solar_birthday.toYmdHms())  # Print solar birthday
-    print("真太阳时生日: " + tst_birthday.toYmdHms())  # Print true solar time birthday
+    print("=" * 60)
+    print("阳历生日: " + solar_birthday.toYmdHms())
+    print("真太阳时生日: " + tst_birthday.toYmdHms())
+    print("=" * 60)
 
-    # 节气表 Jiéqì Biǎo Solar terms (24 seasonal division points)
-    lunar_birthday = (
-        tst_birthday.getLunar()
-    )  # Convert true solar time birthday to lunar calendar
+    lunar_birthday = tst_birthday.getLunar()
+    result = get_shen_sha(lunar_birthday)
 
-    # Get basic stars only
-    basic_strs, basic_shens, gans, zhis = get_shen_sha(lunar_birthday)
-
-    pillar_names = ["Year", "Month", "Day", "Hour"]
-    print(f"Eight Char: {' '.join(gans)} / {' '.join(zhis)}\n")
-
-    print("--- Shen Sha Stars ---")
-    for i in range(4):
-        stars = basic_strs[i]
-        print(f"{pillar_names[i]}: {gans[i]}{zhis[i]}")
-        if stars:
-            print(f"  └─ {stars}")
-        else:
-            print(f"  └─ None")
-        print()
-
-    print(f"\n--- Summary of All Stars Found ---")
-    print(f"Total Unique Stars: {len(basic_shens)}")
-    print(f"Stars: {', '.join(sorted(basic_shens))}")
+    # Print JSON output
+    print("\n```json")
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print("```\n")
