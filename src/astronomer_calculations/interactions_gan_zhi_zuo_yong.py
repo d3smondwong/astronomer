@@ -631,7 +631,7 @@ def get_interactions(lunar_birthday):
         },
     }
 
-    return result
+    return {"作用": result}
 
 
 # --- EXECUTION ---
