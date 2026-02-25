@@ -56,7 +56,7 @@ Dependencies:
 
 from lunar_python import Solar, Lunar
 from datetime import datetime
-from src.solar_lunar_time import get_true_solar_time
+from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
 
 # Interactions: Key is one branch, value is its partner
 clash_map = {
@@ -645,7 +645,7 @@ if __name__ == "__main__":
     solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)  # Create solar date
     datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)  # Create datetime object
     tst_birthday, _ = get_true_solar_time(
-        datetime_birthday, 1.4759, 103.808053
+        datetime_birthday, 1.3253, 103.808053
     )  # Get true solar time
 
     print("阳历生日: " + solar_birthday.toYmdHms())
