@@ -782,12 +782,14 @@ class MingQiDynamicsCalculator:
                 raw = STATE_MULT.get(state, 0.40)
                 floored = VISIBLE_STEM_MULT.get(state, 0.50)
                 state_desc = state_descriptions.get(state, state)
-                visible_stem_mults.append({
-                    "柱": pillar_positions[p.position],
-                    "天干": p.stem.value,
-                    "季节状态": state_desc,
-                    "是否托底": floored != raw,
-                })
+                visible_stem_mults.append(
+                    {
+                        "柱": pillar_positions[p.position],
+                        "天干": p.stem.value,
+                        "季节状态": state_desc,
+                        "是否托底": floored != raw,
+                    }
+                )
 
         # Build the new "五行力量分析" structure
         wu_xing_analysis = {}
