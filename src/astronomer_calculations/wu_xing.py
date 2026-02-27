@@ -440,18 +440,18 @@ def get_seasonal_factors(month_branch: Branch) -> SeasonalFactors:
 # Branch temperature tendency (qualitative)
 # Standardized to 5 categories: very_cold, cold, neutral, warm, hot
 BRANCH_TEMP_QUAL = {
-    Branch.ZI: "very_cold",   # Water, mid-winter
-    Branch.HAI: "cold",       # Water, late autumn (cooler but not as cold as Zi)
-    Branch.CHOU: "neutral",   # Earth, late winter (transitional)
-    Branch.YIN: "warm",       # Wood, early spring
-    Branch.MAO: "warm",       # Wood, spring equinox
-    Branch.CHEN: "neutral",   # Earth, late spring
-    Branch.SI: "warm",         # Fire, early summer (though sometimes considered hot)
-    Branch.WU: "hot",         # Fire, midsummer
-    Branch.WEI: "neutral",    # Earth, late summer
-    Branch.SHEN: "cold",      # Metal, early autumn
-    Branch.YOU: "cold",       # Metal, autumn equinox
-    Branch.XU: "neutral",     # Earth, late autumn
+    Branch.ZI: "very_cold",  # Water, mid-winter
+    Branch.HAI: "cold",  # Water, late autumn (cooler but not as cold as Zi)
+    Branch.CHOU: "neutral",  # Earth, late winter (transitional)
+    Branch.YIN: "warm",  # Wood, early spring
+    Branch.MAO: "warm",  # Wood, spring equinox
+    Branch.CHEN: "neutral",  # Earth, late spring
+    Branch.SI: "warm",  # Fire, early summer (though sometimes considered hot)
+    Branch.WU: "hot",  # Fire, midsummer
+    Branch.WEI: "neutral",  # Earth, late summer
+    Branch.SHEN: "cold",  # Metal, early autumn
+    Branch.YOU: "cold",  # Metal, autumn equinox
+    Branch.XU: "neutral",  # Earth, late autumn
 }
 
 TEMP_SCORE = {
@@ -496,7 +496,7 @@ CLIMATE_MULT: Dict[Element, Dict[str, float]] = {
         "hot": 0.92,
     },
     Element.EARTH: {
-       "very_cold": 0.92,
+        "very_cold": 0.92,
         "cold": 0.96,
         "neutral": 1.00,
         "warm": 1.04,
