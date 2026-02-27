@@ -41,9 +41,12 @@ Key Functions:
                 "相冲减损": ["午"],                 # Clashed branches
                 "刑减损": ["开"],                   # Punished branches
                 "害减损": ["戌"],                   # Harmed branches
-                "天干透出系数": {                  # Visible stem seasonal protection
-                    "戊": {"季节状态": "囚 (受克)", "是否托底": false}
-                }
+                "天干透出系数": [                  # Visible stem seasonal protection (ordered: year, month, day, hour)
+                    {"柱": "年", "天干": "乙", "季节状态": "死 (极弱)", "是否托底": true},
+                    {"柱": "月", "天干": "丁", "季节状态": "囚 (受克)", "是否托底": true},
+                    {"柱": "日", "天干": "戊", "季节状态": "相 (次强)", "是否托底": false},
+                    {"柱": "时", "天干": "庚", "季节状态": "囚 (受克)", "是否托底": true}
+                ]
             }
         }
 
@@ -769,7 +772,9 @@ class MingQiDynamicsCalculator:
         }
 
         # Expose visible-stem seasonal multipliers so callers can inspect the floor effect
-        visible_stem_mults = {}
+        # Preserve all stems in order (year, month, day, hour), including duplicates
+        visible_stem_mults = []
+        pillar_positions = {"year": "年", "month": "月", "day": "日", "hour": "时"}
         for p in pillars:
             if p.stem:
                 elem = STEM_ELEMENT[p.stem]
@@ -777,10 +782,12 @@ class MingQiDynamicsCalculator:
                 raw = STATE_MULT.get(state, 0.40)
                 floored = VISIBLE_STEM_MULT.get(state, 0.50)
                 state_desc = state_descriptions.get(state, state)
-                visible_stem_mults[p.stem.value] = {
+                visible_stem_mults.append({
+                    "柱": pillar_positions[p.position],
+                    "天干": p.stem.value,
                     "季节状态": state_desc,
                     "是否托底": floored != raw,
-                }
+                })
 
         # Build the new "五行力量分析" structure
         wu_xing_analysis = {}
