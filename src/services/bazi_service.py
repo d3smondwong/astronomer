@@ -5,6 +5,7 @@ from src.astronomer_calculations import (
     yuan_tian_gang_bone_weight,
     bazi_pillars,
     wu_xing,
+    ten_gods_shi_shen,
 )
 
 
@@ -18,6 +19,7 @@ class BaziService:
         self.bone_weight = yuan_tian_gang_bone_weight
         self.bazi_pillars = bazi_pillars
         self.wu_xin = wu_xing
+        self.shi_shen = ten_gods_shi_shen
 
     def analyze_bazi(self, lunar_birthday: Lunar) -> dict:
         """Single entry point for complete analysis"""
@@ -29,5 +31,6 @@ class BaziService:
             "bone_weight": self.bone_weight.calculate_yuan_tian_gang_bone_weight(
                 lunar_birthday
             ),
+            "shi_shen": self.shi_shen.get_shi_shen(lunar_birthday),
             # Add luck, pillars, etc.
         }

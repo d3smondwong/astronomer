@@ -182,8 +182,8 @@ if analyze_button:
         st.markdown("---")
 
         # Results Tabs
-        tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs(
-            ["基本信息", "八字", "五行", "神煞", "作用", "袁天罡称骨歌"]
+        tab0, tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+            ["基本信息", "八字", "五行", "神煞", "作用", "袁天罡称骨歌", "十神"]
         )
 
         with tab0:
@@ -224,6 +224,13 @@ if analyze_button:
                 st.json(analysis_result["bone_weight"])
             else:
                 st.info("No Bone Weight data available")
+
+        with tab6:
+            st.subheader("🔯 十神 (Ten Gods)")
+            if "shi_shen" in analysis_result and analysis_result["shi_shen"]:
+                st.json(analysis_result["shi_shen"])
+            else:
+                st.info("No Ten Gods data available")
 
         # Raw JSON (for debugging)
         with st.expander("📊 View Raw Analysis Data (JSON)"):
