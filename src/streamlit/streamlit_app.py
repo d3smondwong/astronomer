@@ -12,7 +12,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.services.bazi_service import BaziService
 from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
-from src.astronomer_calculations.basic_info import get_basic_info
 from src.utils.logging import configure_logging, get_logger
 from lunar_python import Solar
 
@@ -142,9 +141,6 @@ if analyze_button:
             # Combine date and time
             birth_datetime = datetime.combine(birth_date, birth_time)
 
-            # Extract basic info
-            basic_info = get_basic_info(birth_datetime, latitude, longitude)
-
             # Convert solar to lunar time
             tst, conversion_details = get_true_solar_time(
                 birth_datetime, latitude, longitude
@@ -153,7 +149,9 @@ if analyze_button:
 
             # Initialize BaZi service and analyze
             service = BaziService()
-            analysis_result = service.analyze_bazi(lunar)
+            analysis_result = service.analyze_bazi(
+                lunar, birth_datetime=birth_datetime, latitude=latitude, longitude=longitude
+            )
 
         logger.info("✅ BaZi analysis completed successfully")
 
@@ -188,7 +186,10 @@ if analyze_button:
 
         with tab0:
             st.subheader("基本信息 (Basic Information)")
-            st.json(basic_info)
+            if "basic_info" in analysis_result and analysis_result["basic_info"]:
+                st.json(analysis_result["basic_info"])
+            else:
+                st.info("No basic information available")
 
         with tab1:
             st.subheader("八字 (BaZi - Four Pillars)")

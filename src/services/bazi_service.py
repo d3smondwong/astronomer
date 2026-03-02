@@ -7,6 +7,7 @@ from src.astronomer_calculations import (
     wu_xing,
     ten_gods_shi_shen,
     na_yin,
+    basic_info,
 )
 
 
@@ -22,10 +23,14 @@ class BaziService:
         self.wu_xin = wu_xing
         self.shi_shen = ten_gods_shi_shen
         self.na_yin = na_yin
+        self.basic_info = basic_info
 
-    def analyze_bazi(self, lunar_birthday: Lunar) -> dict:
+    def analyze_bazi(self, lunar_birthday: Lunar, birth_datetime, latitude, longitude) -> dict:
         """Single entry point for complete analysis"""
-        return {
+        result = {
+            "basic_info":self.basic_info.get_basic_info(
+                birth_datetime, latitude, longitude
+            ),
             "bazi": self.bazi_pillars.get_bazi_pillars(lunar_birthday),
             "wu_xing": self.wu_xin.get_wu_xing(lunar_birthday),
             "shen_sha": self.shen_sha.get_shen_sha(lunar_birthday),
@@ -35,5 +40,6 @@ class BaziService:
             ),
             "shi_shen": self.shi_shen.get_shi_shen(lunar_birthday),
             "na_yin": self.na_yin.get_na_yin(lunar_birthday),
-            # Add luck, pillars, etc.
         }
+
+        return result
