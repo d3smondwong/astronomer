@@ -63,7 +63,7 @@ with st.sidebar:
         st.markdown("**Birth Date**")
         birth_date = st.date_input(
             " ",
-            value=datetime(2000, 1, 1),
+            value=datetime(1985, 11, 25),
             min_value=datetime(1940, 1, 1),
             max_value=datetime.now(),
             help="Select your birth date",
@@ -77,7 +77,7 @@ with st.sidebar:
                 "Hour",
                 min_value=0,
                 max_value=23,
-                value=12,
+                value=17,
                 step=1,
             )
         with col_min:
@@ -85,7 +85,7 @@ with st.sidebar:
                 "Minute",
                 min_value=0,
                 max_value=59,
-                value=0,
+                value=7,
                 step=1,
             )
         birth_time = datetime.min.time().replace(

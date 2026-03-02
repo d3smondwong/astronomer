@@ -18,39 +18,89 @@ The Ten Gods represent the relationships between the Day Stem (日干) and other
 from lunar_python import Lunar
 
 
+def _parse_zhi_shi_shen(zhi_data) -> dict:
+    """
+    Parse Earthly Branch Ten Gods data into labeled components.
+
+    Args:
+        zhi_data: Raw data from getXxxShiShenZhi() methods
+
+    Returns:
+        dict: Formatted with labels "本气", "中气", "余气"
+    """
+    if isinstance(zhi_data, list):
+        result = {}
+        labels = ["本气", "中气", "余气"]
+        for i, label in enumerate(labels):
+            if i < len(zhi_data):
+                result[label] = zhi_data[i]
+        return result
+    elif isinstance(zhi_data, dict):
+        return zhi_data
+    else:
+        # Fallback for unknown formats
+        return {"raw": str(zhi_data)}
+
+
 def get_shi_shen(lunar_birthday: Lunar) -> dict:
     """
     Extract Ten Gods (十神) for each pillar (Year, Month, Day, Hour).
+    Includes both Heavenly Stem Ten Gods (天干十神) and Earthly Branch Ten Gods (地支十神).
 
     Args:
         lunar_birthday (Lunar): Lunar calendar object
 
     Returns:
-        dict: Ten Gods organized by pillar in Chinese with 天干十神:
+        dict: Ten Gods organized by pillar in Chinese:
         {
             "十神": {
-                "年干十神": "...",
-                "月干十神": "...",
-                "日干十神": "...",
-                "时干十神": "..."
+                "年": {
+                    "天干十神": "...",
+                    "地支十神": {
+                        "本气": "...",
+                        "中气": "...",
+                        "余气": "..."
+                    }
+                },
+                "月": {...},
+                "日": {...},
+                "时": {...}
             }
         }
     """
     # Get the EightChar object
     bazi = lunar_birthday.getEightChar()
 
-    # Extract Shi Shen for each pillar stem
-    year_shi_shen = bazi.getYearShiShenGan()
-    month_shi_shen = bazi.getMonthShiShenGan()
-    day_shi_shen = bazi.getDayShiShenGan()
-    time_shi_shen = bazi.getTimeShiShenGan()
+    # Extract Heavenly Stem Ten Gods (天干十神) for each pillar
+    year_gan_shi_shen = bazi.getYearShiShenGan()
+    month_gan_shi_shen = bazi.getMonthShiShenGan()
+    day_gan_shi_shen = bazi.getDayShiShenGan()
+    time_gan_shi_shen = bazi.getTimeShiShenGan()
+
+    # Extract Earthly Branch Ten Gods (地支十神) for each pillar
+    year_zhi_shi_shen = _parse_zhi_shi_shen(bazi.getYearShiShenZhi())
+    month_zhi_shi_shen = _parse_zhi_shi_shen(bazi.getMonthShiShenZhi())
+    day_zhi_shi_shen = _parse_zhi_shi_shen(bazi.getDayShiShenZhi())
+    time_zhi_shi_shen = _parse_zhi_shi_shen(bazi.getTimeShiShenZhi())
 
     return {
         "十神": {
-            "年干十神": year_shi_shen,
-            "月干十神": month_shi_shen,
-            "日干十神": day_shi_shen,
-            "时干十神": time_shi_shen,
+            "年": {
+                "天干十神": year_gan_shi_shen,
+                "地支十神": year_zhi_shi_shen,
+            },
+            "月": {
+                "天干十神": month_gan_shi_shen,
+                "地支十神": month_zhi_shi_shen,
+            },
+            "日": {
+                "天干十神": day_gan_shi_shen,
+                "地支十神": day_zhi_shi_shen,
+            },
+            "时": {
+                "天干十神": time_gan_shi_shen,
+                "地支十神": time_zhi_shi_shen,
+            },
         }
     }
 
@@ -79,12 +129,6 @@ if __name__ == "__main__":
 
     # Get Shi Shen in LLM-ready JSON format
     result = get_shi_shen(lunar_birthday)
-
-    print(f"\n--- Ten Gods (十神) ---")
-    print(f"年干十神: {result['十神']['年干十神']}")
-    print(f"月干十神: {result['十神']['月干十神']}")
-    print(f"日干十神: {result['十神']['日干十神']}")
-    print(f"时干十神: {result['十神']['时干十神']}")
 
     print(f"\n--- JSON Output for LLM ---")
     print(json.dumps(result, ensure_ascii=False, indent=2))
