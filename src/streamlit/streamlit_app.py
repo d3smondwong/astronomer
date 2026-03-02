@@ -182,8 +182,8 @@ if analyze_button:
         st.markdown("---")
 
         # Results Tabs
-        tab0, tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-            ["基本信息", "八字", "五行", "神煞", "作用", "袁天罡称骨歌", "十神"]
+        tab0, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+            ["基本信息", "八字", "五行", "神煞", "作用", "袁天罡称骨歌", "十神", "纳音"]
         )
 
         with tab0:
@@ -231,6 +231,13 @@ if analyze_button:
                 st.json(analysis_result["shi_shen"])
             else:
                 st.info("No Ten Gods data available")
+
+        with tab7:
+            st.subheader("🎵 纳音 (Na Yin - Five Elements)")
+            if "na_yin" in analysis_result and analysis_result["na_yin"]:
+                st.json(analysis_result["na_yin"])
+            else:
+                st.info("No Na Yin data available")
 
         # Raw JSON (for debugging)
         with st.expander("📊 View Raw Analysis Data (JSON)"):
