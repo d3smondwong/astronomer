@@ -1,3 +1,4 @@
+from datetime import datetime
 from lunar_python import Lunar
 from src.astronomer_calculations import (
     shen_sha,
@@ -25,11 +26,11 @@ class BaziService:
         self.na_yin = na_yin
         self.basic_info = basic_info
 
-    def analyze_bazi(self, lunar_birthday: Lunar, birth_datetime, latitude, longitude) -> dict:
+    def analyze_bazi(self, lunar_birthday: Lunar, birth_datetime: datetime, latitude: float, longitude: float, gender: int) -> dict:
         """Single entry point for complete analysis"""
         result = {
-            "basic_info":self.basic_info.get_basic_info(
-                birth_datetime, latitude, longitude
+            "basic_info": self.basic_info.get_basic_info(
+                birth_datetime, latitude, longitude, gender
             ),
             "bazi": self.bazi_pillars.get_bazi_pillars(lunar_birthday),
             "wu_xing": self.wu_xin.get_wu_xing(lunar_birthday),
