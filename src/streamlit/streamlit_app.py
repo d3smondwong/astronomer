@@ -150,7 +150,7 @@ if analyze_button:
             # Initialize BaZi service and analyze
             service = BaziService()
             analysis_result = service.analyze_bazi(
-                lunar, birth_datetime=birth_datetime, latitude=latitude, longitude=longitude
+                lunar, birth_datetime=birth_datetime, latitude=latitude, longitude=longitude, gender=gender
             )
 
         logger.info("✅ BaZi analysis completed successfully")
