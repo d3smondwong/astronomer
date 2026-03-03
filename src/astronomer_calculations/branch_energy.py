@@ -146,10 +146,10 @@ def get_branch_energy(lunar_birthday: Lunar) -> dict:
 
     # Extract branches
     branches = {
-        "年": bazi.getYearZhi(),
-        "月": bazi.getMonthZhi(),
-        "日": bazi.getDayZhi(),
-        "时": bazi.getTimeZhi(),
+        "年柱": bazi.getYearZhi(),
+        "月柱": bazi.getMonthZhi(),
+        "日柱": bazi.getDayZhi(),
+        "时柱": bazi.getTimeZhi(),
     }
 
     pillar_names = list(branches.keys())
@@ -166,39 +166,119 @@ def get_branch_energy(lunar_birthday: Lunar) -> dict:
         if partner:
             pair_key = (zhi, partner)
             elem = six_he_element_map.get(pair_key, {}).get("primary", "")
-            potential_map[name] = {"合": partner, "化": elem}
+            potential_map[name] = {"合": partner, "化": elem, "潜在": True}
 
     for i in range(len(zhis)):
         for j in range(i + 1, len(zhis)):
             if six_he_map.get(zhis[i]) == zhis[j]:
+
+                is_adjacent = j - i == 1
                 pair_key = (zhis[i], zhis[j])
                 elem = six_he_element_map.get(pair_key, {}).get("primary", "")
                 active_six_he.append(
                     {
                         "组合": f"{pillar_names[i]}-{pillar_names[j]}",
-                        "地支": [zhis[i], zhis[j]],
+                        "组合明细": {
+                            pillar_names[i]: zhis[i],
+                            pillar_names[j]: zhis[j],
+                        },
                         "结果": f"化{elem}",
+                        "紧贴": is_adjacent,
+                        "状态": "正合" if is_adjacent else "遥合",
                     }
                 )
 
     # Three Harmonies (Triangles)
+    # Define the Peak (Cardinal) branch for each trio
+    peak_branches = {"水": "子", "木": "卯", "火": "午", "金": "酉"}
+
+    # PRE-CALCULATE CLASH RELATIONSHIPS FOR INTERFERENCE DETECTION
+    # Map each pillar to its clashing partner (if any exists in chart)
+    clash_map_pillars = {}  # { index: (other_index, clashing_zhi, other_name) }
+    for i in range(len(zhis)):
+        for j in range(i + 1, len(zhis)):
+            if six_chong_map.get(zhis[i]) == zhis[j]:
+                clash_map_pillars[i] = (j, zhis[j], pillar_names[j])
+                clash_map_pillars[j] = (i, zhis[i], pillar_names[i])
+
     for element, group in san_he_groups.items():
+        # Get all matches and their original indices [0, 1, 2, 3]
         matches = [
-            {"name": pillar_names[k], "zhi": zhis[k]}
+            {"name": pillar_names[k], "zhi": zhis[k], "index": k}
             for k, zhi in enumerate(zhis)
             if zhi in group
         ]
+
         unique_zhis = set(m["zhi"] for m in matches)
+        peak = peak_branches[element]
+
+        # Only process if at least 2 unique branches from the trio are present
         if len(unique_zhis) >= 2:
-            status = "三合全局" if len(unique_zhis) == 3 else "半合局"
-            active_san_he.append(
-                {
-                    "元素": element,
-                    "组合": "-".join([m["name"] for m in matches]),
-                    "地支": [m["zhi"] for m in matches],
-                    "状态": status,
-                }
+            # CHECK FOR ADJACENCY:
+            # We look for at least one pair of matching pillars that are side-by-side
+            indices = sorted([m["index"] for m in matches])
+            adjacent = any(
+                indices[i + 1] - indices[i] == 1 for i in range(len(indices) - 1)
             )
+
+            # GAPPED COMBINATION (隔合) HANDLING:
+            # Include gapped combinations but mark them differently.
+            # They exist but are weakened by distance.
+            if not adjacent and len(unique_zhis) < 3:
+                # Include but label as gapped - these still have influence, just weaker
+                pass  # Continue to process with 隔合 status
+
+            # CHECK FOR CLASH INTERFERENCE (冲突干扰):
+            # If any member of this harmony is being clashed, the harmony is weakened/broken
+            interference_data = None
+            for match in matches:
+                if match["index"] in clash_map_pillars:
+                    other_idx, other_zhi, other_name = clash_map_pillars[match["index"]]
+                    interference_data = {
+                        "被冲支": match["zhi"],
+                        "所在柱": match["name"],
+                        "冲克者": other_zhi,
+                        "冲克者柱": other_name,
+                        "说明": "此通道被破坏，合局力量减弱",
+                    }
+                    break
+
+            # Determine Status
+            if len(unique_zhis) == 3:
+                status = "三合全局"
+            else:
+                if peak in unique_zhis:
+                    is_birth = group[0] in unique_zhis
+                    status = "生地半合" if is_birth else "墓地半合"
+                else:
+                    status = "拱合局"
+
+            # For non-adjacent 2-branch cases, add gapped label
+            if not adjacent and len(unique_zhis) < 3:
+                status = f"{status}(隔合)"
+
+            # Determine 邀出 (Invited) value based on status
+            if "拱合局" in status:
+                yao_chu = peak  # Show the invited (arched) peak branch
+            elif "三合全局" in status:
+                yao_chu = "已全"  # Frame is already complete
+            else:
+                yao_chu = "无"  # No branch being invited
+
+            result = {
+                "元素": element,
+                "组合": "-".join([m["name"] for m in matches]),
+                "组合明细": {m["name"]: m["zhi"] for m in matches},
+                "状态": status,
+                "邀出": yao_chu,
+                "紧贴": adjacent,  # True if branches are side-by-side
+            }
+
+            # Add interference info if any member is being clashed
+            if interference_data:
+                result["冲突干扰"] = interference_data
+
+            active_san_he.append(result)
 
     # Three Meetings (Directional Force)
     active_san_hui = []
@@ -215,12 +295,12 @@ def get_branch_energy(lunar_birthday: Lunar) -> dict:
                 {
                     "方位": direction,
                     "组合": "-".join([m["name"] for m in matches]),
-                    "地支": [m["zhi"] for m in matches],
+                    "组合明细": {m["name"]: m["zhi"] for m in matches},
                     "状态": status,
                 }
             )
 
-    # --- 2. CONFLICT (Clash, Harm, Punishment) + 1 Harmony (暗合) ---
+    # --- 2. CONFLICT (Clash, Harm, Punishment, Destruction) ---
     active_chong = []
     active_hai = []
     active_xing = []
@@ -232,45 +312,138 @@ def get_branch_energy(lunar_birthday: Lunar) -> dict:
             b1, b2 = zhis[i], zhis[j]
             p1_n, p2_n = pillar_names[i], pillar_names[j]
 
-            # 六冲 Clashes (Direct Opposition)
+            # ADJACENCY CHECK: index difference must be exactly 1
+            is_adjacent = j - i == 1
+
+            # 1. Six Clashes (六冲) - Show all, but label by proximity
+            # Direct Clash (正冲): Adjacent pillars with clash relationship
+            # Remote Clash (遥冲): Non-adjacent pillars with clash relationship
             if six_chong_map.get(b1) == b2:
-                active_chong.append({"组合": f"{p1_n}-{p2_n}", "地支": [b1, b2]})
+                active_chong.append(
+                    {
+                        "组合": f"{p1_n}-{p2_n}",
+                        "组合明细": {p1_n: b1, p2_n: b2},
+                        "紧贴": is_adjacent,
+                        "状态": "正冲" if is_adjacent else "遥冲",
+                    }
+                )
 
-            # Harms (Interference)
+            # 2. Six Harms (六害) - Show all, but label by proximity
+            # Direct Harm (正害): Adjacent pillars with harm relationship
+            # Remote Harm (遥害): Non-adjacent pillars with harm relationship
             if six_hai_map.get(b1) == b2:
-                active_hai.append({"组合": f"{p1_n}-{p2_n}", "地支": [b1, b2]})
+                active_hai.append(
+                    {
+                        "组合": f"{p1_n}-{p2_n}",
+                        "组合明细": {p1_n: b1, p2_n: b2},
+                        "紧贴": is_adjacent,
+                        "状态": "正害" if is_adjacent else "遥害",
+                    }
+                )
 
-            # 六破 (Destructive Friction) - Subtle but significant wear and tear on the branches' energy
+            # 3. Six Destructions (六破) - Show all, but label by proximity
+            # Direct Destruction (正破): Adjacent pillars with destruction relationship
+            # Remote Destruction (遥破): Non-adjacent pillars with destruction relationship
             if six_po_map.get(b1) == b2:
-                active_po.append({"组合": f"{p1_n}-{p2_n}", "地支": [b1, b2]})
+                active_po.append(
+                    {
+                        "组合": f"{p1_n}-{p2_n}",
+                        "组合明细": {p1_n: b1, p2_n: b2},
+                        "紧贴": is_adjacent,
+                        "状态": "正破" if is_adjacent else "遥破",
+                    }
+                )
 
-            # 暗合 Dark Harmonies (Underground Attractions)
+            # 4. Dark Harmonies (暗合) - Underground Attractions
+            # Note: These are positive, so we keep them regardless of adjacency
             if an_he_map.get(b1) == b2:
-                active_an_he.append({"组合": f"{p1_n}-{p2_n}", "地支": [b1, b2]})
+                active_an_he.append(
+                    {"组合": f"{p1_n}-{p2_n}", "组合明细": {p1_n: b1, p2_n: b2}}
+                )
 
-            # 三刑 Punishments (Friction)
+            # 5. Three Punishments (三刑)
+            # Note: Punishments are treated with high quality standards here.
+            # Self-punishment can occur anywhere in chart, but standard punishments
+            # require adjacency for practical relevance.
+            # 无恩之刑 and 恃势之刑 are handled by GLOBAL CHECK below (to avoid duplicates)
             for group in san_xing_groups:
                 if group["name"] == "自刑":
-                    # Only trigger if the same branch appears twice (b1 == b2)
+                    # Self-punishment: Only trigger if same branch appears twice
                     if b1 == b2 and b1 in group["zhis"]:
                         active_xing.append(
                             {
-                                "类型": group["name"],
+                                "类型": "自刑",
                                 "组合": f"{p1_n}-{p2_n}",
-                                "地支": [b1, b2],
+                                "组合明细": {p1_n: b1, p2_n: b2},
+                                "紧贴": is_adjacent,
+                                "状态": "正刑" if is_adjacent else "遥刑",
                             }
                         )
-                else:
-                    # Standard Punishments (寅巳申, 丑戌未, 子卯)
-                    # These are NOT self-punishments, so they can be different branches
+                elif group["name"] == "无礼之刑":
                     if b1 in group["zhis"] and b2 in group["zhis"]:
                         active_xing.append(
                             {
-                                "类型": group["name"],
+                                "类型": "无礼之刑",
                                 "组合": f"{p1_n}-{p2_n}",
-                                "地支": [b1, b2],
+                                "组合明细": {p1_n: b1, p2_n: b2},
+                                "紧贴": is_adjacent,
+                                "状态": "正刑" if is_adjacent else "遥刑",
                             }
                         )
+
+    # GLOBAL CHECK FOR TRIPLE PUNISHMENTS (无恩之刑, 恃势之刑)
+    # These are checked chart-wide, not pairwise, to detect complete/half patterns
+    unique_zhis_set = set(zhis)
+    for group in san_xing_groups:
+        if group["name"] in ["无恩之刑", "恃势之刑"]:
+            # Count how many of the 3 branches are present in the chart
+            matches = [z for z in group["zhis"] if z in unique_zhis_set]
+
+            if len(matches) == 3:
+                # TRIPLE PUNISHMENT COMPLETE
+                active_xing.append(
+                    {
+                        "类型": group["name"],
+                        "状态": "三刑全",
+                        "组合": "-".join(
+                            [
+                                pillar_names[k]
+                                for k, zhi in enumerate(zhis)
+                                if zhi in matches
+                            ]
+                        ),
+                        "组合明细": {
+                            pillar_names[k]: zhi
+                            for k, zhi in enumerate(zhis)
+                            if zhi in matches
+                        },
+                        "说明": "三刑支位全见，主能量系统剧烈变动",
+                    }
+                )
+            elif len(matches) == 2:
+                # HALF PUNISHMENT
+                missing = [z for z in group["zhis"] if z not in unique_zhis_set][0]
+                active_xing.append(
+                    {
+                        "类型": group["name"],
+                        "状态": "半刑",
+                        "组合": "-".join(
+                            [
+                                pillar_names[k]
+                                for k, zhi in enumerate(zhis)
+                                if zhi in matches
+                            ]
+                        ),
+                        "组合明细": {
+                            pillar_names[k]: zhi
+                            for k, zhi in enumerate(zhis)
+                            if zhi in matches
+                        },
+                        "邀位": missing,
+                        "说明": f"半刑局，逢{missing}岁运需注意能量波动",
+                    }
+                )
+
     return {
         "能量系统": {
             "共鸣": {
@@ -297,6 +470,7 @@ if __name__ == "__main__":
     from datetime import datetime
     from lunar_python import Solar
     from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
+    from src.astronomer_calculations.bazi_pillars import get_bazi_pillars
 
     # python -m src.astronomer_calculations.branch_energy
 
@@ -308,14 +482,19 @@ if __name__ == "__main__":
     # )  # Get true solar time
 
     # Sample birthday example
-    solar_birthday = Solar.fromYmdHms(1996, 8, 20, 9, 30, 0)  # Create solar date
-    datetime_birthday = datetime(1996, 8, 20, 9, 30, 0)  # Create datetime object
+    solar_birthday = Solar.fromYmdHms(1988, 2, 14, 10, 00, 0)  # Create solar date
+    datetime_birthday = datetime(1988, 2, 14, 10, 00, 0)  # Create datetime object
     tst_birthday, _ = get_true_solar_time(
         datetime_birthday, 1.3253, 103.808053
     )  # Get true solar time
 
     print("阳历生日: " + solar_birthday.toYmdHms())
     print("真太阳时生日: " + tst_birthday.toYmdHms())
+
+    print("")
+    print("八字")
+    bazi_json = get_bazi_pillars(tst_birthday.getLunar())
+    print(f"八字: {bazi_json}")
 
     lunar_birthday = tst_birthday.getLunar()  # Convert to lunar calendar
 
