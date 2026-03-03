@@ -150,7 +150,11 @@ if analyze_button:
             # Initialize BaZi service and analyze
             service = BaziService()
             analysis_result = service.analyze_bazi(
-                lunar, birth_datetime=birth_datetime, latitude=latitude, longitude=longitude, gender=gender
+                lunar,
+                birth_datetime=birth_datetime,
+                latitude=latitude,
+                longitude=longitude,
+                gender=gender,
             )
 
         logger.info("✅ BaZi analysis completed successfully")
@@ -180,8 +184,19 @@ if analyze_button:
         st.markdown("---")
 
         # Results Tabs
-        tab0, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
-            ["基本信息", "八字", "五行", "神煞", "作用", "袁天罡称骨歌", "十神", "纳音"]
+        tab0, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(
+            [
+                "基本信息",
+                "八字",
+                "五行",
+                "神煞",
+                "作用",
+                "袁天罡称骨歌",
+                "十神",
+                "纳音",
+                "地势",
+                "能量系统",
+            ]
         )
 
         with tab0:
@@ -239,6 +254,20 @@ if analyze_button:
                 st.json(analysis_result["na_yin"])
             else:
                 st.info("No Na Yin data available")
+
+        with tab8:
+            st.subheader("🌍 地势 (Di Shi - Earthly Position)")
+            if "di_shi" in analysis_result and analysis_result["di_shi"]:
+                st.json(analysis_result["di_shi"])
+            else:
+                st.info("No Di Shi data available")
+
+        with tab9:
+            st.subheader("⚡ 能量系统 (Branch Energy)")
+            if "branch_energy" in analysis_result and analysis_result["branch_energy"]:
+                st.json(analysis_result["branch_energy"])
+            else:
+                st.info("No Branch Energy data available")
 
         # Raw JSON (for debugging)
         with st.expander("📊 View Raw Analysis Data (JSON)"):
