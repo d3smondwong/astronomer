@@ -241,6 +241,20 @@ year_shens = {
         "戌": "丑",
         "亥": "寅",
     },
+    "破碎": {
+        "子": "巳",
+        "丑": "丑",
+        "寅": "酉",
+        "卯": "巳",
+        "辰": "丑",
+        "巳": "酉",
+        "午": "巳",
+        "未": "丑",
+        "申": "酉",
+        "酉": "巳",
+        "戌": "丑",
+        "亥": "酉",
+    },
 }
 
 month_shens = {
@@ -272,20 +286,6 @@ month_shens = {
         "酉": "庚",
         "戌": "丙",
         "亥": "甲",
-    },
-    "德秀": {
-        "亥": "甲乙丁壬",
-        "卯": "甲乙丁壬",
-        "未": "甲乙丁壬",
-        "巳": "庚辛乙庚",
-        "酉": "庚辛乙庚",
-        "丑": "庚辛乙庚",
-        "寅": "丙丁戊癸",
-        "午": "丙丁戊癸",
-        "戌": "丙丁戊癸",
-        "申": "壬癸戊癸丙辛甲己",
-        "子": "壬癸戊癸丙辛甲己",
-        "辰": "壬癸戊癸丙辛甲己",
     },
     # --- PROTECTION & HEALTH ---
     "天医": {
@@ -405,31 +405,45 @@ day_earthly_branches_shens = {
         "戌": "巳",
         "亥": "寅",
     },
+    "桃花": {
+        "子": "酉",
+        "丑": "午",
+        "寅": "卯",
+        "卯": "子",
+        "辰": "酉",
+        "巳": "午",
+        "午": "卯",
+        "未": "子",
+        "申": "酉",
+        "酉": "午",
+        "戌": "卯",
+        "亥": "子",
+    },
 }
 
 day_heavenly_stem_shens = {
     # --- NOBLES & ACADEMICS ---
     "昼天乙": {
-        "甲": "未",
-        "乙": "申",
-        "丙": "酉",
-        "丁": "亥",
-        "戊": "未",
-        "己": "申",
-        "庚": "丑",
-        "辛": "寅",
-        "壬": "卯",
-        "癸": "巳",
-    },
-    "夜天乙": {
         "甲": "丑",
-        "乙": "子",
+        "乙": "申",
         "丙": "亥",
         "丁": "酉",
         "戊": "丑",
         "己": "子",
         "庚": "未",
         "辛": "午",
+        "壬": "卯",
+        "癸": "巳",
+    },
+    "夜天乙": {
+        "甲": "未",
+        "乙": "子",
+        "丙": "酉",
+        "丁": "亥",
+        "戊": "未",
+        "己": "申",
+        "庚": "丑",
+        "辛": "寅",
         "壬": "巳",
         "癸": "卯",
     },
@@ -482,18 +496,6 @@ day_heavenly_stem_shens = {
         "壬": "亥",
         "癸": "子",
     },
-    "暗禄": {
-        "甲": "亥",
-        "乙": "戌",
-        "丙": "申",
-        "丁": "未",
-        "戊": "申",
-        "己": "未",
-        "庚": "巳",
-        "辛": "辰",
-        "壬": "寅",
-        "癸": "丑",
-    },
     "金舆": {
         "甲": "辰",
         "乙": "巳",
@@ -532,16 +534,18 @@ day_heavenly_stem_shens = {
     },
     # --- PERSONALITY & TALENT ---
     "词馆": {
-        "甲": "庚寅",
-        "乙": "辛卯",
-        "丙": "乙巳",
-        "丁": "甲午巳",
-        "戊": "乙巳庚申",
-        "己": "甲午",
-        "庚": "壬申",
-        "辛": "癸酉",
-        "壬": "丁亥",
-        "癸": "丙子",
+        # Values: Lists of full pillars (2 chars) or single branches (1 char)
+        # Full pillar = stem+branch check; Single branch = branch-only check
+        "甲": ["庚寅"],
+        "乙": ["辛卯"],
+        "丙": ["乙巳"],
+        "丁": ["甲午", "巳"],
+        "戊": ["乙巳", "庚申"],
+        "己": ["甲午"],
+        "庚": ["壬申"],
+        "辛": ["癸酉"],
+        "壬": ["丁亥"],
+        "癸": ["丙子"],
     },
     "红艳": {
         "甲": "午",
@@ -592,6 +596,13 @@ day_heavenly_stem_shens = {
         "癸": "午",
     },
     "阳刃": {"甲": "卯", "丙": "午", "戊": "午", "庚": "酉", "壬": "子"},
+    "阴刃": {
+        "乙": "辰",  # Guan Dai stage for Yin Wood
+        "丁": "未",  # Guan Dai stage for Yin Fire
+        "己": "未",  # Guan Dai stage for Yin Earth
+        "辛": "戌",  # Guan Dai stage for Yin Metal
+        "癸": "丑",  # Guan Dai stage for Yin Water
+    },
 }
 
 pillar_shens = {
@@ -708,6 +719,9 @@ pillar_shens = {
     },
 }
 
+# Stars that are NOT allowed to land on their own trigger pillar
+SELF_EXCLUSION_STARS = {"桃花", "孤辰", "寡宿", "驿马", "劫煞", "亡神"}
+
 
 def add_shen(pillar_idx, shen_name, strs, all_found_shens):
     """Helper to add shen to pillar and track unique shens"""
@@ -763,22 +777,25 @@ def get_shen_sha(lunar_birthday):
     # ============================================================
     for item, mapping in year_shens.items():
         lookup = mapping.get(zhis[0], "")
-        for i in (1, 2, 3):
+        for i in range(4):
+            # Skip if the star is in exclusion list and we are looking at the trigger pillar
+            if item in SELF_EXCLUSION_STARS and i == 0:
+                continue
+
             if zhis[i] in lookup:
-                add_shen(i, item, strs, all_found_shens)
+                # Special handling for Peach Blossom
+                if item == "桃花":
+                    wall_type = "墙内桃花" if i < 2 else "墙外桃花"
+                    add_shen(i, wall_type, strs, all_found_shens)
+                else:
+                    add_shen(i, item, strs, all_found_shens)
 
     # ============================================================
     # 2. MONTH BRANCH BASED (Month Branch -> All Pillars)
     # ============================================================
     for item, mapping in month_shens.items():
-        if item == "德秀":
-            required_stems = mapping.get(zhis[1], "")
-            for stem in required_stems:
-                if stem in gans:
-                    add_shen(1, "德秀", strs, all_found_shens)
-                    break
 
-        elif item == "天赦":
+        if item == "天赦":
             target_pillar = mapping.get(birth_season)
             for i in range(4):
                 if (gans[i] + zhis[i]) == target_pillar:
@@ -788,8 +805,14 @@ def get_shen_sha(lunar_birthday):
             lookup = mapping.get(zhis[1], "")
             if isinstance(lookup, str):
                 for i in range(4):
-                    if gans[i] in lookup or zhis[i] in lookup:
-                        add_shen(i, item, strs, all_found_shens)
+                    # Only check Branches for specific health/sha stars
+                    if item in ["天医", "血刃"]:
+                        if zhis[i] in lookup:
+                            add_shen(i, item, strs, all_found_shens)
+                    # Check Stems for Virtues
+                    else:
+                        if gans[i] in lookup or zhis[i] in lookup:
+                            add_shen(i, item, strs, all_found_shens)
 
     # --- Virtue Union (Tian De He) - Dynamic Computation ---
     # Logic: If a stem is the partner of the Heavenly Virtue (天德) for this month,
@@ -824,35 +847,96 @@ def get_shen_sha(lunar_birthday):
                     add_shen(i, "天月德合", strs, all_found_shens)
 
     # ============================================================
-    # 3. DAY BRANCH BASED (Day Branch & Year Branch -> All Pillars)
+    # 3. DAY BRANCH BASED (Day Branch -> All Pillars)
     # ============================================================
-    for branch_source in [zhis[0], zhis[2]]:
-        for item, mapping in day_earthly_branches_shens.items():
-            lookup = mapping.get(branch_source, "")
-            for i in range(4):
+    for item, mapping in day_earthly_branches_shens.items():
+        lookup = mapping.get(zhis[2], "")
+        for i in range(4):
+            # Skip if the star is in exclusion list and we are looking at the trigger pillar
+            if item in SELF_EXCLUSION_STARS and i == 2:
+                continue
+
+            if zhis[i] in lookup:
+                # Special handling for Peach Blossom
+                if item == "桃花":
+                    wall_type = "墙内桃花" if i < 2 else "墙外桃花"
+                    add_shen(i, wall_type, strs, all_found_shens)
+                else:
+                    add_shen(i, item, strs, all_found_shens)
+
+    # --- Peach Blossom "Bath" Activation ---
+    # Map Day Master (Stem) to its specific "Bath" (沐浴) branch
+    bath_map = {
+        "甲": "子",
+        "乙": "巳",
+        "丙": "卯",
+        "丁": "申",
+        "戊": "卯",
+        "己": "申",
+        "庚": "午",
+        "辛": "亥",
+        "壬": "酉",
+        "癸": "寅",
+    }
+    my_bath_branch = bath_map.get(me)
+
+    for i in range(4):
+        if "桃花" in strs[i] and zhis[i] == my_bath_branch:
+            # You can either rename it or add a special tag
+            add_shen(i, "沐浴桃花", strs, all_found_shens)
+
+    # ============================================================
+    # 4. STEM BASED (PROFESSIONAL: Day Stem as Primary Driver)
+    # ============================================================
+
+    # PRIMARY LOOP: Day Stem derived stars (Standard professional approach)
+    for item, mapping in day_heavenly_stem_shens.items():
+        lookup = mapping.get(me, "")  # Day Stem only
+        if not lookup:
+            continue
+        for i in range(4):
+            if item == "词馆":
+                pillar_str = gans[i] + zhis[i]
+                # lookup is now a list of pillars/branches
+                for entry in lookup:
+                    if len(entry) == 2:  # Full pillar match (e.g., "庚寅")
+                        if pillar_str == entry:
+                            add_shen(i, item, strs, all_found_shens)
+                    else:  # Single branch match (e.g., "巳")
+                        if zhis[i] == entry:
+                            add_shen(i, item, strs, all_found_shens)
+            else:
                 if zhis[i] in lookup:
                     add_shen(i, item, strs, all_found_shens)
 
-    # ============================================================
-    # 4. STEM BASED (Day Stem & Year Stem -> All Pillars)
-    # ============================================================
-    for stem_source in [year_stem, me]:
-        for item, mapping in day_heavenly_stem_shens.items():
-            lookup = mapping.get(stem_source, "")
-            if not lookup:
-                continue
-            for i in range(4):
-                if item == "词馆":
-                    pillar_str = gans[i] + zhis[i]
-                    # Check full pillar match (e.g., "甲午") or single branch match (e.g., "巳")
-                    if pillar_str in lookup or zhis[i] in lookup:
-                        add_shen(i, item, strs, all_found_shens)
-                else:
-                    if zhis[i] in lookup:
-                        add_shen(i, item, strs, all_found_shens)
+    # SECONDARY LOOP: Year Stem derived stars (Historical/optional, with distinct labeling)
+    # Only apply Year Stem to Heavenly Nobles - these traditionally recognize both sources
+    year_stem_only_stars = {"昼天乙", "夜天乙"}
+
+    for item, mapping in day_heavenly_stem_shens.items():
+        if item not in year_stem_only_stars:
+            continue
+        lookup = mapping.get(year_stem, "")  # Year Stem only, for specific stars
+        if not lookup:
+            continue
+        for i in range(4):
+            if zhis[i] in lookup:
+                # Label these distinctly to show they come from ancestry (Year Stem)
+                shen_name = f"年属{item}"
+                # Only add if not already present from Day Stem derivation
+                if shen_name not in strs[i]:
+                    add_shen(i, shen_name, strs, all_found_shens)
+
+    # --- Yin Blade (阴刃) ---
+    yin_blade_data = day_heavenly_stem_shens.get("阴刃", {}).get(me, "")
+    if yin_blade_data:
+        for i in range(4):
+            # Using 'in' allows for strings like "卯" or even multiple "卯辰"
+            if zhis[i] in yin_blade_data:
+                add_shen(i, "阴刃", strs, all_found_shens)
 
     # ============================================================
-    # 4.5 DERIVED STARS (Relationship-Based)
+    # 5 DERIVED STARS (Relationship-Based)
     # ============================================================
 
     # --- Yang Blade Pairing (阳刃伏藏) ---
@@ -865,16 +949,70 @@ def get_shen_sha(lunar_birthday):
                 if zhis[i] in yang_ren_branch and gans[i] == partner_stem:
                     add_shen(i, "阳刃伏藏", strs, all_found_shens)
 
-    # --- Fortune & Virtue Pairing (福禄双美) - Derived Logic ---
-    # Check if both 福星 and 禄神 appear in the same pillar
+    # --- Fortune & Virtue (福禄双美) ---
+    # Two activation pathways: inherited (pillar list) OR earned (Fu Xing + Lu Shen combo)
+    fu_lu_special_pillars = ["丁卯", "癸未", "甲寅"]  # Pillar-specific list
+
     for i in range(4):
-        has_fu = "福星" in strs[i]
-        has_lu = "禄神" in strs[i]
-        if has_fu and has_lu:
+        current_pillar = gans[i] + zhis[i]
+
+        # Path 1: Pillar-specific inheritance (Section 5 legacy check)
+        is_special_pillar = current_pillar in fu_lu_special_pillars
+
+        # Path 2: Operative combination check (both Fu Xing and Lu Shen present)
+        has_combo = "福星" in strs[i] and "禄神" in strs[i]
+
+        # Unified activation: Either pathway triggers the star
+        if is_special_pillar or has_combo:
             add_shen(i, "福禄双美", strs, all_found_shens)
 
+    # --- Three Wonders (三奇贵人) - Sequential Stem Patterns ---
+    # Check if three consecutive pillars have stems in specific sequential order
+    trios = [
+        (["甲", "戊", "庚"], "天上三奇"),  # Heaven's Three Wonders
+        (["乙", "丙", "丁"], "地下三奇"),  # Earth's Three Wonders
+        (["辛", "壬", "癸"], "人中三奇"),  # Human's Three Wonders
+    ]
+
+    # Check sequences: Year-Month-Day (0,1,2) or Month-Day-Hour (1,2,3)
+    for sequence in [(0, 1, 2), (1, 2, 3)]:
+        current_stems = [gans[i] for i in sequence]
+        for trio_stems, name in trios:
+            if current_stems == trio_stems:
+                for i in sequence:
+                    add_shen(i, name, strs, all_found_shens)
+
     # ============================================================
-    # 5. PILLAR & SPECIALS
+    # 6. SPECIAL SINGLE-PILLAR FORMATIONS
+    # ============================================================
+
+    special_formations_map = {
+        "戊辰": "巳命互禄",
+        "己未": "午命互禄",
+        "丙辰": "巳命互禄",
+        "丁未": "午命互禄",
+        "甲寅": "寅命自禄",
+        "乙卯": "卯命自禄",
+        "庚申": "申命自禄",
+        "辛酉": "酉命自禄",
+        "癸子": "子命自禄",
+        "壬亥": "亥命自禄",
+        "壬戌": "亥命互禄",
+        "庚戌": "申命互禄",
+        "甲辰": "寅命互禄",
+        "乙未": "卯命互禄",
+        "丁巳": "巳中藏丙",
+        "癸亥": "亥中藏壬",
+    }
+
+    for i in range(4):
+        current_pillar = gans[i] + zhis[i]
+        if current_pillar in special_formations_map:
+            formation_name = special_formations_map[current_pillar]
+            add_shen(i, formation_name, strs, all_found_shens)
+
+    # ============================================================
+    # 7. PILLAR & SPECIALS
     # ============================================================
 
     # --- Kong Wang (Void) ---
@@ -901,12 +1039,6 @@ def get_shen_sha(lunar_birthday):
     if hour_pillar in pillar_shens["金神"]:
         add_shen(3, "金神", strs, all_found_shens)
 
-    # --- Fortune & Virtue Pillar (Fu Lu Shuang Mei) ---
-    for i in range(4):
-        pillar = gans[i] + zhis[i]
-        if pillar in pillar_shens.get("福禄双美", []):
-            add_shen(i, "福禄双美", strs, all_found_shens)
-
     # --- Ten Spirits (Shi Ling) - Pillar Specific ---
     for i in range(4):
         pillar = gans[i] + zhis[i]
@@ -919,8 +1051,184 @@ def get_shen_sha(lunar_birthday):
             if zhis[i] in "卯辰未":
                 add_shen(i, "童子煞", strs, all_found_shens)
 
-    # Build structured JSON output
+    # ============================================================
+    # 8. RELATIONAL STARS (Inter-Pillar Interactions)
+    # ============================================================
+
+    hu_lu_results = []
+    jia_gong_lu_results = []  # Consolidated Virtual Lu
+    jia_gong_gui_results = []  # Consolidated Virtual Noble
+
     pillar_names_cn = ["年柱", "月柱", "日柱", "时柱"]
+    branch_order = [
+        "子",
+        "丑",
+        "寅",
+        "卯",
+        "辰",
+        "巳",
+        "午",
+        "未",
+        "申",
+        "酉",
+        "戌",
+        "亥",
+    ]
+    lu_map = day_heavenly_stem_shens["禄神"]
+    my_lu = lu_map.get(me)
+
+    # --- 1. Hu Lu (互禄) Check (Physical Exchange) ---
+    for i in range(4):
+        for j in range(i + 1, 4):
+            if lu_map.get(gans[i]) == zhis[j] and lu_map.get(gans[j]) == zhis[i]:
+                is_adj = abs(i - j) == 1
+                hu_lu_results.append(
+                    {
+                        "组合": f"{pillar_names_cn[i]}-{pillar_names_cn[j]}",
+                        "紧贴": is_adj,
+                        "状态": "正互" if is_adj else "遥互",
+                        "描述": f"{gans[i]}{zhis[i]}与{gans[j]}{zhis[j]}互换禄神",
+                    }
+                )
+
+    # --- 2. Virtual Lu Check (Jia/Gong Lu) ---
+    # Note: Classical recommendation - Only summon if not physically in the chart
+    if my_lu and my_lu not in zhis:
+        idx = branch_order.index(my_lu)
+        prev_n, next_n = branch_order[(idx - 1) % 12], branch_order[(idx + 1) % 12]
+
+        if prev_n in zhis and next_n in zhis:
+            p1, p2 = zhis.index(prev_n), zhis.index(next_n)
+            is_adj = abs(p1 - p2) == 1
+            # Methodology: Day-Hour is Gong (拱), others are Jia (夹)
+            is_gong = p1 >= 2 and p2 >= 2
+            label = "拱禄" if is_gong else "夹禄"
+            prefix = "正" if is_adj else "遥"
+
+            # Order pillars chronologically for description
+            p_min, p_max = min(p1, p2), max(p1, p2)
+
+            jia_gong_lu_results.append(
+                {
+                    "虚邀地支": my_lu,
+                    "紧贴": is_adj,
+                    "状态": f"{prefix}{label}",
+                    "来源柱": [pillar_names_cn[p_min], pillar_names_cn[p_max]],
+                    "说明": f"{pillar_names_cn[p_min]}与{pillar_names_cn[p_max]}{prefix}{label}出{my_lu}",
+                }
+            )
+
+    # --- 3. Virtual Noble Check (Jia/Gong Gui) ---
+    noble_branches = list(
+        set(
+            [
+                day_heavenly_stem_shens["昼天乙"].get(me),
+                day_heavenly_stem_shens["夜天乙"].get(me),
+            ]
+        )
+    )
+
+    for nb in noble_branches:
+        if nb and nb not in zhis:
+            idx = branch_order.index(nb)
+            p_nb, n_nb = branch_order[(idx - 1) % 12], branch_order[(idx + 1) % 12]
+
+            if p_nb in zhis and n_nb in zhis:
+                p1, p2 = zhis.index(p_nb), zhis.index(n_nb)
+                is_adj = abs(p1 - p2) == 1
+                is_gong = p1 >= 2 and p2 >= 2
+                label = "拱贵" if is_gong else "夹贵"
+                prefix = "正" if is_adj else "遥"
+
+                # Order pillars chronologically for description
+                p_min, p_max = min(p1, p2), max(p1, p2)
+
+                jia_gong_gui_results.append(
+                    {
+                        "虚邀贵人": nb,
+                        "紧贴": is_adj,
+                        "状态": f"{prefix}{label}",
+                        "说明": f"{pillar_names_cn[p_min]}与{pillar_names_cn[p_max]}{prefix}{label}出天乙贵人{nb}",
+                    }
+                )
+
+    # Final assembly into the relational_shens object
+    relational_shens = {
+        "互禄": hu_lu_results,
+        "虚邀禄": jia_gong_lu_results,
+        "虚邀贵": jia_gong_gui_results,
+    }
+
+    # ============================================================
+    # 9. ADVANCED RELATIONAL (De Xiu & An Lu)
+    # ============================================================
+
+    # --- De Xiu Gui Ren (德秀贵人) ---
+    de_xiu_result = {}
+    dexiu_map = {
+        "寅": "丙丁戊癸",
+        "午": "丙丁戊癸",
+        "戌": "丙丁戊癸",  # Fire
+        "申": "壬癸戊癸丙辛甲己",
+        "子": "壬癸戊癸丙辛甲己",
+        "辰": "壬癸戊癸丙辛甲己",  # Water
+        "亥": "甲乙丁壬",
+        "卯": "甲乙丁壬",
+        "未": "甲乙丁壬",  # Wood
+        "巳": "庚辛乙庚",
+        "酉": "庚辛乙庚",
+        "丑": "庚辛乙庚",  # Metal
+    }
+
+    month_req = dexiu_map.get(zhis[1], "")
+    dexiu_distribution = {}
+
+    if month_req:
+        for i in range(4):
+            if gans[i] in month_req:
+                add_shen(i, "德秀", strs, all_found_shens)
+                dexiu_distribution[pillar_names_cn[i]] = gans[i]
+
+    if dexiu_distribution:
+        de_xiu_result = {
+            "激活": True,
+            "触发月令": zhis[1],
+            "分布明细": dexiu_distribution,
+        }
+
+    # --- An Lu (暗禄) ---
+    an_lu_map = {
+        "甲": "亥",
+        "乙": "戌",
+        "丙": "申",
+        "丁": "未",
+        "戊": "申",
+        "己": "未",
+        "庚": "巳",
+        "辛": "辰",
+        "壬": "寅",
+        "癸": "丑",
+    }
+
+    target_zhi = an_lu_map.get(me)
+    an_lu_distribution = {}
+    an_lu_result = {}
+
+    if target_zhi:
+        for i in range(4):
+            if zhis[i] == target_zhi:
+                add_shen(i, "暗禄", strs, all_found_shens)
+                an_lu_distribution[pillar_names_cn[i]] = zhis[i]
+
+    if an_lu_distribution:
+        an_lu_result = {
+            "激活": True,
+            "触发日干": me,
+            "对应支": target_zhi,
+            "分布明细": an_lu_distribution,
+        }
+
+    # --- Build structured JSON output ---
     pillar_dynamics = {
         pillar_names_cn[i]: {
             "天干": gans[i],
@@ -930,8 +1238,24 @@ def get_shen_sha(lunar_birthday):
         for i in range(4)
     }
 
+    # Combine all findings into the final relational object
+    relational_shens = {
+        "互禄明细": hu_lu_results,
+        "虚邀禄": jia_gong_lu_results,  # From consolidated Section 6
+        "虚邀贵": jia_gong_gui_results,  # From consolidated Section 6
+    }
+
+    # Only add these if they were actually triggered
+    if de_xiu_result:
+        relational_shens["德秀贵人"] = de_xiu_result
+
+    if an_lu_result:
+        relational_shens["暗禄"] = an_lu_result
+
+    # Final structure
     result = {
         "柱位神煞": pillar_dynamics,
+        "关系神煞": relational_shens,
     }
 
     return {"神煞": result}
@@ -941,18 +1265,29 @@ def get_shen_sha(lunar_birthday):
 
 if __name__ == "__main__":
     import json
+    from src.astronomer_calculations.bazi_pillars import get_bazi_pillars
 
     # python -m src.astronomer_calculations.shen_sha
 
-    # Corinne's birthday example
-    solar_birthday = Solar.fromYmdHms(1987, 6, 3, 12, 6, 0)
-    datetime_birthday = datetime(1987, 6, 3, 12, 6, 0)
+    # Desmond's birthday example
+    solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)  # Create solar date
+    datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)  # Create datetime object
     tst_birthday, _ = get_true_solar_time(datetime_birthday, 1.3253, 103.808053)
+
+    # Sample birthday example
+    # solar_birthday = Solar.fromYmdHms(1990, 1, 30, 4, 0, 0)  # Create solar date
+    # datetime_birthday = datetime(1990, 1, 30, 4, 0, 0)  # Create datetime object
+    # tst_birthday, _ = get_true_solar_time(datetime_birthday, 1.3253, 103.808053)
 
     print("=" * 60)
     print("阳历生日: " + solar_birthday.toYmdHms())
     print("真太阳时生日: " + tst_birthday.toYmdHms())
     print("=" * 60)
+
+    print("")
+    print("八字")
+    bazi_json = get_bazi_pillars(tst_birthday.getLunar())
+    print(f"八字: {bazi_json}")
 
     lunar_birthday = tst_birthday.getLunar()
     result = get_shen_sha(lunar_birthday)
