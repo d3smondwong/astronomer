@@ -184,20 +184,23 @@ if analyze_button:
         st.markdown("---")
 
         # Results Tabs
-        tab0, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(
-            [
-                "基本信息",
-                "八字",
-                "五行",
-                "神煞",
-                "旬空",
-                "作用",
-                "袁天罡称骨歌",
-                "十神",
-                "纳音",
-                "地势",
-                "能量系统",
-            ]
+        tab0, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = (
+            st.tabs(
+                [
+                    "基本信息",
+                    "八字",
+                    "五行",
+                    "神煞",
+                    "旬空",
+                    "三垣",
+                    "作用",
+                    "袁天罡称骨歌",
+                    "十神",
+                    "纳音",
+                    "地势",
+                    "能量系统",
+                ]
+            )
         )
 
         with tab0:
@@ -236,41 +239,48 @@ if analyze_button:
                 st.info("No Xun Kong data available")
 
         with tab5:
+            st.subheader("👑 三垣 (San Yuan - Three Palaces)")
+            if "san_yuan" in analysis_result and analysis_result["san_yuan"]:
+                st.json(analysis_result["san_yuan"])
+            else:
+                st.info("No Three Palaces data available")
+
+        with tab6:
             st.subheader("⚡ 作用 (Gan Zhi Interactions)")
             if "interactions" in analysis_result and analysis_result["interactions"]:
                 st.json(analysis_result["interactions"])
             else:
                 st.info("No Interaction data available")
 
-        with tab6:
+        with tab7:
             st.subheader("⚖️ 袁天罡称骨歌 (Yuan Tian Gang Bone Weight)")
             if "bone_weight" in analysis_result and analysis_result["bone_weight"]:
                 st.json(analysis_result["bone_weight"])
             else:
                 st.info("No Bone Weight data available")
 
-        with tab7:
+        with tab8:
             st.subheader("🔯 十神 (Ten Gods)")
             if "shi_shen" in analysis_result and analysis_result["shi_shen"]:
                 st.json(analysis_result["shi_shen"])
             else:
                 st.info("No Ten Gods data available")
 
-        with tab8:
+        with tab9:
             st.subheader("🎵 纳音 (Na Yin - Five Elements)")
             if "na_yin" in analysis_result and analysis_result["na_yin"]:
                 st.json(analysis_result["na_yin"])
             else:
                 st.info("No Na Yin data available")
 
-        with tab9:
+        with tab10:
             st.subheader("🌍 地势 (Di Shi - Earthly Position)")
             if "di_shi" in analysis_result and analysis_result["di_shi"]:
                 st.json(analysis_result["di_shi"])
             else:
                 st.info("No Di Shi data available")
 
-        with tab10:
+        with tab11:
             st.subheader("⚡ 能量系统 (Branch Energy)")
             if "branch_energy" in analysis_result and analysis_result["branch_energy"]:
                 st.json(analysis_result["branch_energy"])

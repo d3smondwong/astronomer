@@ -12,6 +12,7 @@ from src.astronomer_calculations import (
     life_stage_di_shi,
     branch_energy,
     void_xun_kong,
+    three_palace_san_yuan,
 )
 
 
@@ -31,6 +32,7 @@ class BaziService:
         self.di_shi = life_stage_di_shi
         self.branch_energy = branch_energy
         self.xun_kong = void_xun_kong
+        self.san_yuan = three_palace_san_yuan
 
     def analyze_bazi(
         self,
@@ -49,6 +51,7 @@ class BaziService:
             "wu_xing": self.wu_xin.get_wu_xing(lunar_birthday),
             "shen_sha": self.shen_sha.get_shen_sha(lunar_birthday),
             "xun_kong": self.xun_kong.get_xun_kong(lunar_birthday),
+            "san_yuan": self.san_yuan.get_san_yuan(lunar_birthday),
             "interactions": self.interactions.get_interactions(lunar_birthday),
             "bone_weight": self.bone_weight.calculate_yuan_tian_gang_bone_weight(
                 lunar_birthday
