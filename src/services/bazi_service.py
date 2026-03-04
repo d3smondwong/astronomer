@@ -10,9 +10,9 @@ from src.astronomer_calculations import (
     na_yin,
     basic_info,
     life_stage_di_shi,
-    branch_energy
+    branch_energy,
+    void_xun_kong,
 )
-
 
 
 class BaziService:
@@ -30,8 +30,16 @@ class BaziService:
         self.basic_info = basic_info
         self.di_shi = life_stage_di_shi
         self.branch_energy = branch_energy
+        self.xun_kong = void_xun_kong
 
-    def analyze_bazi(self, lunar_birthday: Lunar, birth_datetime: datetime, latitude: float, longitude: float, gender: int) -> dict:
+    def analyze_bazi(
+        self,
+        lunar_birthday: Lunar,
+        birth_datetime: datetime,
+        latitude: float,
+        longitude: float,
+        gender: int,
+    ) -> dict:
         """Single entry point for complete analysis"""
         result = {
             "basic_info": self.basic_info.get_basic_info(
@@ -40,6 +48,7 @@ class BaziService:
             "bazi": self.bazi_pillars.get_bazi_pillars(lunar_birthday),
             "wu_xing": self.wu_xin.get_wu_xing(lunar_birthday),
             "shen_sha": self.shen_sha.get_shen_sha(lunar_birthday),
+            "xun_kong": self.xun_kong.get_xun_kong(lunar_birthday),
             "interactions": self.interactions.get_interactions(lunar_birthday),
             "bone_weight": self.bone_weight.calculate_yuan_tian_gang_bone_weight(
                 lunar_birthday
