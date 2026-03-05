@@ -697,6 +697,7 @@ pillar_shens = {
         "癸亥",
     ],
     "魁罡": ["庚辰", "庚戌", "戊戌", "壬辰"],
+    "扩展魁罡": ["戊辰", "壬戌"],
     "金神": ["癸酉", "己巳", "乙丑"],
     "福禄双美": ["丁卯", "癸未", "甲寅"],
     "十灵": [
@@ -1026,6 +1027,7 @@ def get_shen_sha(lunar_birthday):
         "阴阳差错": pillar_shens.get("阴阳差错", []),
         "十恶大败": pillar_shens.get("十恶大败", []),
         "魁罡": pillar_shens.get("魁罡", []),
+        "扩展魁罡": pillar_shens.get("扩展魁罡", []),
     }
     for item, target_list in day_checks.items():
         if day_pillar in target_list:
