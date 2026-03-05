@@ -226,7 +226,6 @@ def get_interactions(lunar_birthday):
     zhis = [baZi.getYearZhi(), baZi.getMonthZhi(), baZi.getDayZhi(), baZi.getTimeZhi()]
 
     pillar_names_cn = ["年柱", "月柱", "日柱", "时柱"]
-    pillar_names_en = ["Year", "Month", "Day", "Hour"]
     pillar_names = ["年", "月", "日", "时"]
 
     # Track interactions by type for priority categorization
