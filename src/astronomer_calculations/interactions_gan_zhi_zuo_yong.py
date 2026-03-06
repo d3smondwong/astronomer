@@ -478,8 +478,16 @@ def get_interactions(lunar_birthday):
                 )
 
             # Priority 8: Partial Triple Combinations (Half San He) - With strength assessment
+            # Guards: Skip if branches are in locked structures, or already in Six Harmony/Clash
             for element, group in triple_he.items():
-                if b_i in group and b_j in group:
+                if (
+                    b_i in group
+                    and b_j in group
+                    and i not in locked_branches
+                    and j not in locked_branches
+                    and six_he_map.get(b_i) != b_j  # Not in Six Harmony
+                    and clash_map.get(b_i) != b_j
+                ):  # Not in Clash
                     if "局" not in strs[i] and "会" not in strs[i]:
                         # Check half-harmony strength based on cardinal branch presence
                         cardinal = cardinal_branches.get(element)
@@ -512,7 +520,13 @@ def get_interactions(lunar_birthday):
                     break
 
             # Priority 9: Hidden Stem Combinations (An He) - Secret interactions
-            if hidden_stem_he.get(b_i) == b_j:
+            # Guards: Skip if branches are in locked structures or Clash
+            if (
+                hidden_stem_he.get(b_i) == b_j
+                and i not in locked_branches
+                and j not in locked_branches
+                and clash_map.get(b_i) != b_j
+            ):  # Clash takes precedence
                 strs[i] = f"{strs[i]} 暗合({pillar_names[j]})".strip()
                 strs[j] = f"{strs[j]} 暗合({pillar_names[i]})".strip()
                 interaction_shens.append(f"{pillar_names[i]}{pillar_names[j]}暗合")
@@ -638,7 +652,7 @@ def get_interactions(lunar_birthday):
 if __name__ == "__main__":
     import json
 
-    # python -m src.interactions_gan_zhi_zuo_yong
+    # python -m src.astronomer_calculations.interactions_gan_zhi_zuo_yong
 
     # Desmond's birthday example
     solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)  # Create solar date
