@@ -24,10 +24,10 @@ def get_na_yin(lunar_birthday: Lunar) -> dict:
         dict: Na Yin Five Elements organized by pillar in Chinese:
         {
             "纳音": {
-                "年": "...",
-                "月": "...",
-                "日": "...",
-                "时": "..."
+                "年柱": "...",
+                "月柱": "...",
+                "日柱": "...",
+                "时柱": "..."
             }
         }
     """
@@ -42,13 +42,12 @@ def get_na_yin(lunar_birthday: Lunar) -> dict:
 
     return {
         "纳音": {
-            "年": year_na_yin,
-            "月": month_na_yin,
-            "日": day_na_yin,
-            "时": time_na_yin,
+            "年柱": year_na_yin,
+            "月柱": month_na_yin,
+            "日柱": day_na_yin,
+            "时柱": time_na_yin,
         }
     }
-
 
 # --- EXECUTION ---
 
