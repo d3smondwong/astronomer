@@ -21,8 +21,8 @@ from src.astronomer_calculations import (
 )
 
 
-class BaziService:
-    """Orchestrates all BaZi calculations"""
+class AstroDataAggregator:
+    """Aggregates all astronomer data collections"""
 
     def __init__(self):
 
@@ -44,7 +44,7 @@ class BaziService:
         self.xiao_yun = xiao_yun
         self.liu_nian_ye = liu_nian_ye
 
-    def analyze_bazi(
+    def collect_data(
         self,
         lunar_birthday: Lunar,
         birth_datetime: datetime,
@@ -52,7 +52,7 @@ class BaziService:
         longitude: float,
         gender: int,
     ) -> dict:
-        """Single entry point for complete analysis"""
+        """Single entry point for complete data collection"""
         result = {
             "basic_info": self.basic_info.get_basic_info(
                 birth_datetime, latitude, longitude, gender

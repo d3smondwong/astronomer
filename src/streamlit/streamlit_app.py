@@ -10,7 +10,7 @@ from pathlib import Path
 # Add project root to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.services.bazi_service import BaziService
+from src.services.astronomer_data_aggregator import AstroDataAggregator
 from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
 from src.utils.logging import configure_logging, get_logger
 from lunar_python import Solar
@@ -147,9 +147,9 @@ if analyze_button:
             )
             lunar = tst.getLunar()
 
-            # Initialize BaZi service and analyze
-            service = BaziService()
-            analysis_result = service.analyze_bazi(
+            # Initialize data aggregator and collect data
+            aggregator = AstroDataAggregator()
+            analysis_result = aggregator.collect_data(
                 lunar,
                 birth_datetime=birth_datetime,
                 latitude=latitude,
