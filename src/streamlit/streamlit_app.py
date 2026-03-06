@@ -201,6 +201,7 @@ if analyze_button:
             tab13,
             tab14,
             tab15,
+            tab16,
         ) = st.tabs(
             [
                 "基本信息",
@@ -219,6 +220,7 @@ if analyze_button:
                 "能量系统",
                 "大运",
                 "小运",
+                "流年 & 流月",
             ]
         )
 
@@ -336,6 +338,15 @@ if analyze_button:
                 st.json(analysis_result["xiao_yun"])
             else:
                 st.info("No Xiao Yun data available")
+
+        with tab16:
+            st.subheader(
+                "📅 流年 & 流月 (Liu Nian & Liu Yue - Annual & Monthly Luck Cycles)"
+            )
+            if "liu_nian_ye" in analysis_result and analysis_result["liu_nian_ye"]:
+                st.json(analysis_result["liu_nian_ye"])
+            else:
+                st.info("No Liu Nian & Liu Yue data available")
 
         # Raw JSON (for debugging)
         with st.expander("📊 View Raw Analysis Data (JSON)"):

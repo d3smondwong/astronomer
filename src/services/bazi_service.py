@@ -17,6 +17,7 @@ from src.astronomer_calculations import (
     birth_environment,
     da_yun,
     xiao_yun,
+    liu_nian_ye,
 )
 
 
@@ -41,6 +42,7 @@ class BaziService:
         self.birth_environment = birth_environment
         self.da_yun = da_yun
         self.xiao_yun = xiao_yun
+        self.liu_nian_ye = liu_nian_ye
 
     def analyze_bazi(
         self,
@@ -74,6 +76,9 @@ class BaziService:
             "branch_energy": self.branch_energy.get_branch_energy(lunar_birthday),
             "da_yun": self.da_yun.get_da_yun(lunar_birthday, gender),
             "xiao_yun": self.xiao_yun.get_xiao_yun(lunar_birthday, gender),
+            "liu_nian_ye": self.liu_nian_ye.get_liu_nian_ye_current_focus(
+                lunar_birthday, gender
+            ),
         }
 
         return result
