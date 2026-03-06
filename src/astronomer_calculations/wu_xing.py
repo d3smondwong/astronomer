@@ -537,6 +537,102 @@ def climate_mult(element: Element, climate: str) -> float:
 
 
 # ─────────────────────────────────────────────
+# Dominant Qi Momentum (主导气势) calculation
+# ─────────────────────────────────────────────
+
+# Five Elements generating cycle (生):
+# Wood → Fire → Earth → Metal → Water → Wood
+ELEMENT_GENERATES: Dict[Element, Element] = {
+    Element.WOOD: Element.FIRE,
+    Element.FIRE: Element.EARTH,
+    Element.EARTH: Element.METAL,
+    Element.METAL: Element.WATER,
+    Element.WATER: Element.WOOD,
+}
+
+# Five Elements overcoming cycle (克):
+# Wood ⊕ Earth, Fire ⊕ Metal, Earth ⊕ Water, Metal ⊕ Wood, Water ⊕ Fire
+ELEMENT_OVERCOMES: Dict[Element, Element] = {
+    Element.WOOD: Element.EARTH,
+    Element.FIRE: Element.METAL,
+    Element.EARTH: Element.WATER,
+    Element.METAL: Element.WOOD,
+    Element.WATER: Element.FIRE,
+}
+
+
+def get_zhu_dao_qi_shi(stem_element: Element, branch_element: Element) -> str:
+    """
+    Calculate 主导气势 (Dominant Qi Momentum) based on stem-branch elemental relationship.
+
+    The relationship can be one of five types:
+        - 比和 (Bǐ Hé): Stem and branch are the same element (Pure, concentrated energy)
+        - 盖头 (Gài Tóu): Stem overcomes branch (Top controls Bottom)
+        - 截脚 (Jié Jiǎo): Branch overcomes stem (Bottom destabilizes Top)
+        - 天生地 (Tiān Shēng Dì): Stem generates branch (Energy leaks downward)
+        - 地生天 (Dì Shēng Tiān): Branch generates stem (Strong foundation)
+
+    Args:
+        stem_element: Element enum for the heavenly stem
+        branch_element: Element enum for the earthly branch
+
+    Returns:
+        str: Description of the relationship, e.g., "盖头 (木克土)"
+    """
+    # Same element
+    if stem_element == branch_element:
+        return f"比和 ({stem_element.value}气通根)"
+
+    # Stem generates branch
+    if ELEMENT_GENERATES.get(stem_element) == branch_element:
+        return f"天生地 ({stem_element.value}生{branch_element.value})"
+
+    # Branch generates stem
+    if ELEMENT_GENERATES.get(branch_element) == stem_element:
+        return f"地生天 ({branch_element.value}生{stem_element.value})"
+
+    # Stem overcomes branch
+    if ELEMENT_OVERCOMES.get(stem_element) == branch_element:
+        return f"盖头 ({stem_element.value}克{branch_element.value})"
+
+    # Branch overcomes stem
+    if ELEMENT_OVERCOMES.get(branch_element) == stem_element:
+        return f"截脚 ({branch_element.value}克{stem_element.value})"
+
+    return "未知关系"
+
+
+# Precomputed 主导气势 lookup for fast direct mapping in parse_wu_xing. Not utilised but can be used in future.
+ZHU_DAO_QI_SHI_LOOKUP: Dict[Tuple[str, str], str] = {
+    ("木", "木"): "比和 (木行纯粹)",
+    ("木", "火"): "天生地 (木生火)",
+    ("木", "土"): "盖头 (木克土)",
+    ("木", "金"): "截脚 (金克木)",
+    ("木", "水"): "地生天 (水生木)",
+    ("火", "木"): "地生天 (木生火)",
+    ("火", "火"): "比和 (火行纯粹)",
+    ("火", "土"): "天生地 (火生土)",
+    ("火", "金"): "盖头 (火克金)",
+    ("火", "水"): "截脚 (水克火)",
+    ("土", "木"): "截脚 (木克土)",
+    ("土", "火"): "地生天 (火生土)",
+    ("土", "土"): "比和 (土行纯粹)",
+    ("土", "金"): "天生地 (土生金)",
+    ("土", "水"): "盖头 (土克水)",
+    ("金", "木"): "盖头 (金克木)",
+    ("金", "火"): "截脚 (火克金)",
+    ("金", "土"): "地生天 (土生金)",
+    ("金", "金"): "比和 (金行纯粹)",
+    ("金", "水"): "天生地 (金生水)",
+    ("水", "木"): "天生地 (水生木)",
+    ("水", "火"): "盖头 (水克火)",
+    ("水", "土"): "截脚 (土克水)",
+    ("水", "金"): "地生天 (金生水)",
+    ("水", "水"): "比和 (水行纯粹)",
+}
+
+
+# ─────────────────────────────────────────────
 # Pillar dataclass
 # ─────────────────────────────────────────────
 
@@ -1056,10 +1152,20 @@ class MingQiDynamicsCalculator:
 
 
 def parse_wu_xing(wu_xing_str: str) -> Dict:
-    """Split a Wu Xing string (e.g. '木土') into stem and branch elements."""
+    """
+    Split a Wu Xing string (e.g. '木土') into stem and branch elements.
+
+    Args:
+        wu_xing_str: Wu Xing string with stem and branch (e.g. '木土')
+
+    Returns:
+        dict: Structure with 天干五行 and 地支五行
+    """
     if len(wu_xing_str) >= 2:
         return {"天干五行": wu_xing_str[0], "地支五行": wu_xing_str[1]}
     return {"天干五行": "", "地支五行": ""}
+
+
 
 
 def get_wu_xing(lunar_birthday) -> Dict:
@@ -1130,13 +1236,38 @@ def get_wu_xing(lunar_birthday) -> Dict:
         ),
     ]
 
-    return {
-        "年柱": {"五行": parse_wu_xing(year_wu_xing), "藏干": year_hide_gan},
-        "月柱": {"五行": parse_wu_xing(month_wu_xing), "藏干": month_hide_gan},
-        "日柱": {"五行": parse_wu_xing(day_wu_xing), "藏干": day_hide_gan},
-        "时柱": {"五行": parse_wu_xing(hour_wu_xing), "藏干": hour_hide_gan},
+    # Organize pillar data: (name, wu_xing_string, hide_gan)
+    pillar_data = [
+        ("年柱", year_wu_xing, year_hide_gan),
+        ("月柱", month_wu_xing, month_hide_gan),
+        ("日柱", day_wu_xing, day_hide_gan),
+        ("时柱", hour_wu_xing, hour_hide_gan),
+    ]
+
+    result = {
         "五行力量": calc.calculate(pillars),
     }
+
+    # Mapping from string to Element enum
+    STR_ELEMENT = {e.value: e for e in Element}
+
+    for pillar_name, wu_xing_str, hide_gan in pillar_data:
+        wu_xing_dict = parse_wu_xing(wu_xing_str)
+        stem_elem_str = wu_xing_dict.get("天干五行", "")
+        branch_elem_str = wu_xing_dict.get("地支五行", "")
+        stem_elem = STR_ELEMENT.get(stem_elem_str)
+        branch_elem = STR_ELEMENT.get(branch_elem_str)
+        zhu_dao_qi_shi = (
+            get_zhu_dao_qi_shi(stem_elem, branch_elem)
+            if stem_elem and branch_elem else "未知关系"
+        )
+        wu_xing_dict["主导气势"] = zhu_dao_qi_shi
+        result[pillar_name] = {
+            "五行": wu_xing_dict,
+            "藏干": hide_gan,
+        }
+
+    return result
 
 
 # --- EXECUTION ---
