@@ -1233,8 +1233,8 @@ def get_shen_sha(lunar_birthday):
     # --- Build structured JSON output ---
     pillar_dynamics = {
         pillar_names_cn[i]: {
-            "天干": gans[i],
-            "地支": zhis[i],
+            # "天干": gans[i],
+            # "地支": zhis[i],
             "神煞": strs[i].split() if strs[i] else [],
         }
         for i in range(4)
@@ -1257,7 +1257,7 @@ def get_shen_sha(lunar_birthday):
     # Final structure
     result = {
         "柱位神煞": pillar_dynamics,
-        "关系神煞": relational_shens,
+        "系统神煞": relational_shens,
     }
 
     return {"神煞": result}
