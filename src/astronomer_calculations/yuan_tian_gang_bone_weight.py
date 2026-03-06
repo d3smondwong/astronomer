@@ -534,7 +534,7 @@ def calculate_yuan_tian_gang_bone_weight(lunar_birthday):
         },
         "总骨重": total_weight_rounded,
         "计算过程": f"{year_weight} + {month_weight} + {day_weight} + {hour_weight} = {total_weight_rounded}",
-        "称骨歌": poem,
+        "称骨歌": "[传统文学意象 (非写实预测)] " + f"{poem}",
     }
 
     return {"袁天罡称骨歌": result}
