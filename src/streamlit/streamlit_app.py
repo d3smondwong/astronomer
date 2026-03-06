@@ -199,6 +199,7 @@ if analyze_button:
             tab11,
             tab12,
             tab13,
+            tab14,
         ) = st.tabs(
             [
                 "基本信息",
@@ -215,6 +216,7 @@ if analyze_button:
                 "纳音",
                 "地势",
                 "能量系统",
+                "大运",
             ]
         )
 
@@ -318,6 +320,13 @@ if analyze_button:
                 st.json(analysis_result["branch_energy"])
             else:
                 st.info("No Branch Energy data available")
+
+        with tab14:
+            st.subheader("🌙 大运 (Da Yun - Big Luck Cycles)")
+            if "da_yun" in analysis_result and analysis_result["da_yun"]:
+                st.json(analysis_result["da_yun"])
+            else:
+                st.info("No Da Yun data available")
 
         # Raw JSON (for debugging)
         with st.expander("📊 View Raw Analysis Data (JSON)"):
