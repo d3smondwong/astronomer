@@ -186,10 +186,6 @@ def get_basic_info(
     # Get Five Element seasonal info based on month branch
     seasonal_info = get_seasonal_info(month_branch)
 
-    # Get jie qi (solar terms) sandwiching info
-    prev_jie = lunar_birthday.getPrevJie()
-    next_jie = lunar_birthday.getNextJie()
-
     # Extract adjustment details
     adjustment_reason = {
         "timezone": conversion_details.get("timezone", ""),
@@ -228,10 +224,6 @@ def get_basic_info(
                 in ["严寒", "寒", "湿冷", "炎", "燥", "暑"]
                 else "中"
             ),
-        },
-        "节气窗口": {
-            "入节": f"{prev_jie.getName()} ({prev_jie.getSolar().toYmdHms()})",
-            "下个节令": f"{next_jie.getName()} ({next_jie.getSolar().toYmdHms()})",
         },
     }
 
