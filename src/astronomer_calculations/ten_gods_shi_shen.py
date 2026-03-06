@@ -85,19 +85,19 @@ def get_shi_shen(lunar_birthday: Lunar) -> dict:
 
     return {
         "十神": {
-            "年": {
+            "年柱": {
                 "天干十神": year_gan_shi_shen,
                 "地支十神": year_zhi_shi_shen,
             },
-            "月": {
+            "月柱": {
                 "天干十神": month_gan_shi_shen,
                 "地支十神": month_zhi_shi_shen,
             },
-            "日": {
+            "日柱": {
                 "天干十神": day_gan_shi_shen,
                 "地支十神": day_zhi_shi_shen,
             },
-            "时": {
+            "时柱": {
                 "天干十神": time_gan_shi_shen,
                 "地支十神": time_zhi_shi_shen,
             },
