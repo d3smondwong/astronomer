@@ -209,6 +209,36 @@ stem_clashes = {
     "癸": "丁",
 }
 
+# Stem to Five-Element mapping
+stem_elements = {
+    "甲": "木",
+    "乙": "木",
+    "丙": "火",
+    "丁": "火",
+    "戊": "土",
+    "己": "土",
+    "庚": "金",
+    "辛": "金",
+    "壬": "水",
+    "癸": "水",
+}
+
+# Branch to Five-Element mapping
+branch_elements = {
+    "子": "水",
+    "丑": "土",
+    "寅": "木",
+    "卯": "木",
+    "辰": "土",
+    "巳": "火",
+    "午": "火",
+    "未": "土",
+    "申": "金",
+    "酉": "金",
+    "戌": "土",
+    "亥": "水",
+}
+
 
 def get_interactions(lunar_birthday):
     """
@@ -310,28 +340,28 @@ def get_interactions(lunar_birthday):
                 strs[i] = f"{strs[i]} 合({pillar_names[j]})".strip()
                 strs[j] = f"{strs[j]} 合({pillar_names[i]})".strip()
                 interaction_shens.append(f"{pillar_names[i]}{pillar_names[j]}合")
-                display_text = f"六合(柱{pillar_names_cn[j]})"
+                display_text = f"六合({pillar_names_cn[j]}{b_j}{branch_elements.get(b_j, '')})"
                 pillar_dynamics[i]["structural"].append(display_text)
-                pillar_dynamics[j]["structural"].append(f"六合(柱{pillar_names_cn[i]})")
+                pillar_dynamics[j]["structural"].append(f"六合({pillar_names_cn[i]}{b_i}{branch_elements.get(b_i, '')})")
                 interactions_by_type["六合"].append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}合"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j})地支相合"
                 )
                 interaction_summary.append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}合"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j})地支相合"
                 )
             # Priority 2: Clashes (冲) - High priority, locks out minor frictions
             elif clash_map.get(b_i) == b_j:
                 strs[i] = f"{strs[i]} 冲({pillar_names[j]})".strip()
                 strs[j] = f"{strs[j]} 冲({pillar_names[i]})".strip()
                 interaction_shens.append(f"{pillar_names[i]}{pillar_names[j]}冲")
-                display_text = f"六冲(柱{pillar_names_cn[j]})"
+                display_text = f"六冲({pillar_names_cn[j]}{b_j}{branch_elements.get(b_j, '')})"
                 pillar_dynamics[i]["frictional"].append(display_text)
-                pillar_dynamics[j]["frictional"].append(f"六冲(柱{pillar_names_cn[i]})")
+                pillar_dynamics[j]["frictional"].append(f"六冲({pillar_names_cn[i]}{b_i}{branch_elements.get(b_i, '')})")
                 interactions_by_type["六冲"].append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}冲"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j})地支相冲"
                 )
                 interaction_summary.append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}冲"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j})地支相冲"
                 )
             # Priority 3: Harms (害) - Medium tier, only checked if no Harmony or Clash
             elif (
@@ -342,15 +372,15 @@ def get_interactions(lunar_birthday):
                 strs[i] = f"{strs[i]} 害({pillar_names[j]})".strip()
                 strs[j] = f"{strs[j]} 害({pillar_names[i]})".strip()
                 interaction_shens.append(f"{pillar_names[i]}{pillar_names[j]}害")
-                display_i = f"六害(柱{pillar_names_cn[j]})"
-                display_j = f"六害(柱{pillar_names_cn[i]})"
+                display_i = f"六害({pillar_names_cn[j]}{b_j}{branch_elements.get(b_j, '')})"
+                display_j = f"六害({pillar_names_cn[i]}{b_i}{branch_elements.get(b_i, '')})"
                 pillar_dynamics[i]["frictional"].append(display_i)
                 pillar_dynamics[j]["frictional"].append(display_j)
                 interactions_by_type["六害"].append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}害"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j})地支相害"
                 )
                 interaction_summary.append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}害"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j})地支相害"
                 )
             # Priority 4: Liu Po (Six Destructions) - Lowest tier, only checked if no higher-tier relationships
             elif (
@@ -361,15 +391,15 @@ def get_interactions(lunar_birthday):
                 strs[i] = f"{strs[i]} 破({pillar_names[j]})".strip()
                 strs[j] = f"{strs[j]} 破({pillar_names[i]})".strip()
                 interaction_shens.append(f"{pillar_names[i]}{pillar_names[j]}破")
-                display_i = f"六破(柱{pillar_names_cn[j]})"
-                display_j = f"六破(柱{pillar_names_cn[i]})"
+                display_i = f"六破({pillar_names_cn[j]}{b_j}{branch_elements.get(b_j, '')})"
+                display_j = f"六破({pillar_names_cn[i]}{b_i}{branch_elements.get(b_i, '')})"
                 pillar_dynamics[i]["frictional"].append(display_i)
                 pillar_dynamics[j]["frictional"].append(display_j)
                 interactions_by_type["六破"].append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}破"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j})地支相破"
                 )
                 interaction_summary.append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}破"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j})地支相破"
                 )
 
             # === INDEPENDENT CHECKS: These can coexist with the short-circuit relationships ===
@@ -393,16 +423,16 @@ def get_interactions(lunar_birthday):
                     f"{pillar_names[i]}{pillar_names[j]}{label_cn}"
                 )
                 pillar_dynamics[i]["frictional"].append(
-                    f"{label_cn}(柱{pillar_names_cn[j]})"
+                    f"{label_cn}({pillar_names_cn[j]}{b_j}{branch_elements.get(b_j, '')})"
                 )
                 pillar_dynamics[j]["frictional"].append(
-                    f"{label_cn}(柱{pillar_names_cn[i]})"
+                    f"{label_cn}({pillar_names_cn[i]}{b_i}{branch_elements.get(b_i, '')})"
                 )
                 interactions_by_type["三刑"].append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}{label_cn}"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j}){label_cn}"
                 )
                 interaction_summary.append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}{label_cn}"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j}){label_cn}"
                 )
 
             # Check for Full/Partial Bullying Punishment (丑-未-戌)
@@ -423,16 +453,16 @@ def get_interactions(lunar_birthday):
                     f"{pillar_names[i]}{pillar_names[j]}{label_cn}"
                 )
                 pillar_dynamics[i]["frictional"].append(
-                    f"{label_cn}(柱{pillar_names_cn[j]})"
+                    f"{label_cn}({pillar_names_cn[j]}{b_j}{branch_elements.get(b_j, '')})"
                 )
                 pillar_dynamics[j]["frictional"].append(
-                    f"{label_cn}(柱{pillar_names_cn[i]})"
+                    f"{label_cn}({pillar_names_cn[i]}{b_i}{branch_elements.get(b_i, '')})"
                 )
                 interactions_by_type["三刑"].append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}{label_cn}"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j}){label_cn}"
                 )
                 interaction_summary.append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}{label_cn}"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j}){label_cn}"
                 )
 
             # Check for Uncivilized Punishment (子-卯)
@@ -444,16 +474,16 @@ def get_interactions(lunar_birthday):
                     f"{pillar_names[i]}{pillar_names[j]}{label_cn}"
                 )
                 pillar_dynamics[i]["frictional"].append(
-                    f"{label_cn}(柱{pillar_names_cn[j]})"
+                    f"{label_cn}({pillar_names_cn[j]}{b_j}{branch_elements.get(b_j, '')})"
                 )
                 pillar_dynamics[j]["frictional"].append(
-                    f"{label_cn}(柱{pillar_names_cn[i]})"
+                    f"{label_cn}({pillar_names_cn[i]}{b_i}{branch_elements.get(b_i, '')})"
                 )
                 interactions_by_type["三刑"].append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}{label_cn}"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j}){label_cn}"
                 )
                 interaction_summary.append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}{label_cn}"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j}){label_cn}"
                 )
 
             # Check for Self-Punishment (辰-辰, 午-午, 酉-酉, 亥-亥)
@@ -465,16 +495,16 @@ def get_interactions(lunar_birthday):
                     f"{pillar_names[i]}{pillar_names[j]}{label_cn}"
                 )
                 pillar_dynamics[i]["frictional"].append(
-                    f"{label_cn}(柱{pillar_names_cn[j]})"
+                    f"{label_cn}({pillar_names_cn[j]}{b_j}{branch_elements.get(b_j, '')})"
                 )
                 pillar_dynamics[j]["frictional"].append(
-                    f"{label_cn}(柱{pillar_names_cn[i]})"
+                    f"{label_cn}({pillar_names_cn[i]}{b_i}{branch_elements.get(b_i, '')})"
                 )
                 interactions_by_type["三刑"].append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}{label_cn}"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j}){label_cn}"
                 )
                 interaction_summary.append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}{label_cn}"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j}){label_cn}"
                 )
 
             # Priority 8: Partial Triple Combinations (Half San He) - With strength assessment
@@ -503,8 +533,8 @@ def get_interactions(lunar_birthday):
                         label_cn = f"半合{element}局({strength_cn})"
                         strs[i] = f"{strs[i]} {label_cn}".strip()
                         strs[j] = f"{strs[j]} {label_cn}".strip()
-                        display_i = f"{label_cn}(柱{pillar_names_cn[j]})"
-                        display_j = f"{label_cn}(柱{pillar_names_cn[i]})"
+                        display_i = f"{label_cn}({pillar_names_cn[j]}{b_j}{branch_elements.get(b_j, '')})"
+                        display_j = f"{label_cn}({pillar_names_cn[i]}{b_i}{branch_elements.get(b_i, '')})"
                         pillar_dynamics[i]["structural"].append(display_i)
                         pillar_dynamics[j]["structural"].append(display_j)
 
@@ -512,10 +542,10 @@ def get_interactions(lunar_birthday):
                         f"{pillar_names[i]}{pillar_names[j]}半合{element}局"
                     )
                     interactions_by_type["六合"].append(
-                        f"{pillar_names_cn[i]}{pillar_names_cn[j]}半合{element}局"
+                        f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j})半合{element}局"
                     )
                     interaction_summary.append(
-                        f"{pillar_names_cn[i]}{pillar_names_cn[j]}半合{element}局"
+                        f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j})半合{element}局"
                     )
                     break
 
@@ -530,15 +560,15 @@ def get_interactions(lunar_birthday):
                 strs[i] = f"{strs[i]} 暗合({pillar_names[j]})".strip()
                 strs[j] = f"{strs[j]} 暗合({pillar_names[i]})".strip()
                 interaction_shens.append(f"{pillar_names[i]}{pillar_names[j]}暗合")
-                display_i = f"暗合(柱{pillar_names_cn[j]})"
-                display_j = f"暗合(柱{pillar_names_cn[i]})"
+                display_i = f"暗合({pillar_names_cn[j]}{b_j}{branch_elements.get(b_j, '')})"
+                display_j = f"暗合({pillar_names_cn[i]}{b_i}{branch_elements.get(b_i, '')})"
                 pillar_dynamics[i]["structural"].append(display_i)
                 pillar_dynamics[j]["structural"].append(display_j)
                 interactions_by_type["暗合"].append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}暗合"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j})地支暗合"
                 )
                 interaction_summary.append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}暗合"
+                    f"{pillar_names[i]}{pillar_names[j]}({b_i}{b_j})地支暗合"
                 )
 
     # --- Heavenly Stem Interactions ---
@@ -551,15 +581,15 @@ def get_interactions(lunar_birthday):
                 strs[i] = f"{strs[i]} 合化({pillar_names[j]})".strip()
                 strs[j] = f"{strs[j]} 合化({pillar_names[i]})".strip()
                 interaction_shens.append(f"{pillar_names[i]}{pillar_names[j]}天干合")
-                display_i = f"天干合(柱{pillar_names_cn[j]})"
-                display_j = f"天干合(柱{pillar_names_cn[i]})"
+                display_i = f"天干合({pillar_names_cn[j]}{g_j}{stem_elements.get(g_j, '')})"
+                display_j = f"天干合({pillar_names_cn[i]}{g_i}{stem_elements.get(g_i, '')})"
                 pillar_dynamics[i]["structural"].append(display_i)
                 pillar_dynamics[j]["structural"].append(display_j)
                 interactions_by_type["天干合"].append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}合化"
+                    f"{pillar_names[i]}{pillar_names[j]}({g_i}{g_j})天干合化"
                 )
                 interaction_summary.append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}合化"
+                    f"{pillar_names[i]}{pillar_names[j]}({g_i}{g_j})天干合化"
                 )
 
             # Stem Clash (Friction)
@@ -569,15 +599,15 @@ def get_interactions(lunar_birthday):
                     strs[i] = f"{strs[i]} 天干克({pillar_names[j]})".strip()
                     strs[j] = f"{strs[j]} 天干克({pillar_names[i]})".strip()
                 interaction_shens.append(f"{pillar_names[i]}{pillar_names[j]}天干克")
-                display_i = f"天干克(柱{pillar_names_cn[j]})"
-                display_j = f"天干克(柱{pillar_names_cn[i]})"
+                display_i = f"天干克({pillar_names_cn[j]}{g_j}{stem_elements.get(g_j, '')})"
+                display_j = f"天干克({pillar_names_cn[i]}{g_i}{stem_elements.get(g_i, '')})"
                 pillar_dynamics[i]["frictional"].append(display_i)
                 pillar_dynamics[j]["frictional"].append(display_j)
                 interactions_by_type["六冲"].append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}天干克"
+                    f"{pillar_names[i]}{pillar_names[j]}({g_i}{g_j})天干相克"
                 )
                 interaction_summary.append(
-                    f"{pillar_names_cn[i]}{pillar_names_cn[j]}天干克"
+                    f"{pillar_names[i]}{pillar_names[j]}({g_i}{g_j})天干相克"
                 )
 
     # Build the final structured JSON with all three tiers
