@@ -602,6 +602,110 @@ def get_zhu_dao_qi_shi(stem_element: Element, branch_element: Element) -> str:
     return "未知关系"
 
 
+def get_wu_xing_tier(percentage: float) -> Dict[str, str]:
+    """
+    Categorize Five Elements percentage into a tier with contextual description.
+
+    Tiers (ordered by energy intensity):
+    - 缺失 (Absent): 0%
+    - 极弱 (Critical Deficit): 0.1% - 10%
+    - 偏弱 (Subdued): 10.1% - 20%
+    - 中和 (Balanced): 20.1% - 35%
+    - 偏旺 (Robust): 35.1% - 50%
+    - 极旺 (Overwhelming): 50.1% - 70%
+    - 极亢 (Absolute Monopoly): > 70%
+
+    Args:
+        percentage: Float value representing the element's percentage of total power
+
+    Returns:
+        dict: Tier information with name, range, state description, and core advice
+    """
+    if percentage == 0:
+        return {
+            "名称": "缺失",
+            "范围": "0%",
+            "状态描述": "绝对真空，物质缺失。该谱线能量在系统演化中完全缺失，缺乏相应的物理机制支持。",
+            "核心建议": '外部引力，人工介入。本系统无法自发产生此项能量。需通过外部环境的"引力摄动"或特定的后天参数注入，方能补足该维度的缺失。',
+        }
+    elif percentage <= 10:
+        return {
+            "名称": "极弱",
+            "范围": "0.01% - 10%",
+            "状态描述": "热寂边缘，能量脉冲微弱。能量丰度极低，处于核聚变熄灭的边缘，极易被主星风暴吞噬。",
+            "核心建议": '精密维护，防止坍缩。此为系统中最脆弱的反馈回路。必须严格限制外界对该能量的消耗（克泄），通过低熵环境进行定向"光泵浦"增益，维系其微弱的运行。',
+        }
+    elif percentage <= 20:
+        return {
+            "名称": "偏弱",
+            "范围": "10.01% - 20%",
+            "状态描述": "轨道不稳，能量辐射受限。虽有物质基础，但质量不足以形成稳恒的自持反应，处于系统的边缘地带。",
+            "核心建议": "轨道提升，质能累积。不建议承担高强度的系统负荷。需通过同频率的能量共振（生扶）来增加其质量密度，逐步将其推向核心环绕轨道。",
+        }
+    elif percentage <= 35:
+        return {
+            "名称": "中和",
+            "范围": "20.01% - 35%",
+            "状态描述": "稳恒态演化，动态平衡。系统熵增率处于理想区间，能量转换效率极高且具备极强的自修复能力。",
+            "核心建议": "参数锁死，惯性运行。这是系统演化的最佳黄金期。避免大幅度的参数扰动，维持现有的动态平衡，确保系统的长周期稳定运行。",
+        }
+    elif percentage <= 50:
+        return {
+            "名称": "偏旺",
+            "范围": "35.01% - 50%",
+            "状态描述": "活跃恒星，热核反应激增。该项能量已成为系统的主要引力源，释放出强烈的能量辐射，并开始干扰其他弱能级轨道。",
+            "核心建议": "能量泄压，负载均衡。系统输出已过载。宜通过高效的能量转换界面（泄）或逆向热力学补偿（耗）来分散其压力，防止核心因能量过剩导致热失控。",
+        }
+    elif percentage <= 70:
+        return {
+            "名称": "极旺",
+            "范围": "50.01% - 70%",
+            "状态描述": "引力坍缩，黑洞效应初现。能量丰度已达到临界点，形成极强的引力陷阱，系统正被该单一变量强行锁定，面临失衡风险。",
+            "核心建议": "紧急降维，广域排干。严禁任何形式的能量注资。必须建立大容量的泄流管道，将过剩的能量强行传导至外部耗散层，以缓解核心区域巨大的压强。",
+        }
+    else:
+        return {
+            "名称": "极亢",
+            "范围": "> 70%",
+            "状态描述": "奇点降临，时空曲率极限。该能量已彻底统治整个物理场。系统规律已被重写，传统力学平衡逻辑彻底失效。",
+            "核心建议": '顺应奇点，整体同步。当能量达到绝对垄断时，任何对抗尝试都会导致系统瞬间瓦解。最优策略是顺从该能量的流动矢向，让系统整体进入"单极演化"模式。',
+        }
+
+
+def get_all_wu_xing_tiers() -> Dict[str, Dict[str, str]]:
+    """
+    Return all seven tiers of the Wu Xing contextual system as a reference.
+
+    Representative percentages are chosen from the middle of each tier's range
+    to generate tier information for all seven tiers:
+    - 缺失:  0%
+    - 极弱:  0.1% - 10%   (representative: 5%)
+    - 偏弱:  10.1% - 20%  (representative: 15%)
+    - 中和:  20.1% - 35%  (representative: 25%)
+    - 偏旺:  35.1% - 50%  (representative: 40%)
+    - 极旺:  50.1% - 70%  (representative: 60%)
+    - 极亢:  > 70%        (representative: 75%)
+
+    Returns:
+        dict: Dictionary of all tiers keyed by tier name, with full tier information
+    """
+    tiers = {}
+    # Use representative percentages from the middle of each tier's range
+    tier_specs = [
+        0,  # 缺失: 0%
+        5,  # 极弱: 0.1% - 10%
+        15,  # 偏弱: 10.1% - 20%
+        25,  # 中和: 20.1% - 35%
+        40,  # 偏旺: 35.1% - 50%
+        60,  # 极旺: 50.1% - 70%
+        75,  # 极亢: > 70%
+    ]
+    for pct in tier_specs:
+        tier_info = get_wu_xing_tier(pct)
+        tiers[tier_info["名称"]] = tier_info
+    return tiers
+
+
 # Precomputed 主导气势 lookup for fast direct mapping in parse_wu_xing. Not utilised but can be used in future.
 ZHU_DAO_QI_SHI_LOOKUP: Dict[Tuple[str, str], str] = {
     ("木", "木"): "比和 (木行纯粹)",
@@ -887,16 +991,18 @@ class MingQiDynamicsCalculator:
                     }
                 )
 
-        # Build the new "五行力量分析" structure
+        # Build the new "五行力量分析" structure with tiered context
         wu_xing_analysis = {}
         for elem in Element:
             elem_name = elem.value
             pct = percentages.get(elem_name, 0)
             state = seasonal.states.get(elem, "囚")
             state_desc = state_descriptions.get(state, state)
+            tier_info = get_wu_xing_tier(pct)
             wu_xing_analysis[elem_name] = {
                 "百分比": round(pct, 2) if isinstance(pct, (int, float)) else pct,
                 "旺衰": state_desc,
+                "能级": tier_info,
             }
 
         return {
@@ -1166,8 +1272,6 @@ def parse_wu_xing(wu_xing_str: str) -> Dict:
     return {"天干五行": "", "地支五行": ""}
 
 
-
-
 def get_wu_xing(lunar_birthday) -> Dict:
     """
     Extract Five Elements (Wu Xing) from a lunar_python Lunar object and
@@ -1246,6 +1350,7 @@ def get_wu_xing(lunar_birthday) -> Dict:
 
     result = {
         "五行力量": calc.calculate(pillars),
+        "五行相位动力": get_all_wu_xing_tiers(),
     }
 
     # Mapping from string to Element enum
@@ -1259,7 +1364,8 @@ def get_wu_xing(lunar_birthday) -> Dict:
         branch_elem = STR_ELEMENT.get(branch_elem_str)
         zhu_dao_qi_shi = (
             get_zhu_dao_qi_shi(stem_elem, branch_elem)
-            if stem_elem and branch_elem else "未知关系"
+            if stem_elem and branch_elem
+            else "未知关系"
         )
         wu_xing_dict["主导气势"] = zhu_dao_qi_shi
         result[pillar_name] = {
@@ -1274,7 +1380,6 @@ def get_wu_xing(lunar_birthday) -> Dict:
 
 if __name__ == "__main__":
     import json
-    from src.astronomer_calculations.bazi_pillars import get_bazi_pillars
     from lunar_python import Solar
 
     # python -m src.astronomer_calculations.wu_xing
