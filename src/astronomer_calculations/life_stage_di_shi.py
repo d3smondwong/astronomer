@@ -19,10 +19,10 @@ def get_di_shi(lunar_birthday: Lunar) -> dict:
         dict: Di Shi Earthly Position organized by pillar in Chinese:
         {
             "地势": {
-                "年": "...",
-                "月": "...",
-                "日": "...",
-                "时": "..."
+                "年柱": "...",
+                "月柱": "...",
+                "日柱": "...",
+                "时柱": "..."
             }
         }
     """
@@ -37,10 +37,10 @@ def get_di_shi(lunar_birthday: Lunar) -> dict:
 
     return {
         "地势": {
-            "年": year_di_shi,
-            "月": month_di_shi,
-            "日": day_di_shi,
-            "时": time_di_shi,
+            "年柱": year_di_shi,
+            "月柱": month_di_shi,
+            "日柱": day_di_shi,
+            "时柱": time_di_shi,
         }
     }
 
