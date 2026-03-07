@@ -406,6 +406,7 @@ def get_birth_environment(lunar_birthday: Lunar) -> dict:
     # Build complete result
     result = {
         "出生环境": {
+            "系统初始化参数": "以下数据代表系统初始化瞬间的‘宇宙背景辐射’与‘环境系数’。请注意，这些并非人格特质，而是影响五行初始流动的‘大气条件’与‘场域摩擦力点’。",
             "星宿与神性背景": constellation,
             "方位与地理运气": directions,
             "天神与护佑": deities,
