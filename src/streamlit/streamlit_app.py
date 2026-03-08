@@ -201,7 +201,6 @@ if analyze_button:
             tab13,
             tab14,
             tab15,
-            tab16,
         ) = st.tabs(
             [
                 "基本信息",
@@ -217,7 +216,6 @@ if analyze_button:
                 "十神",
                 "纳音",
                 "地势",
-                "能量系统",
                 "大运",
                 "小运",
                 "流年 & 流月",
@@ -319,27 +317,20 @@ if analyze_button:
                 st.info("No Di Shi data available")
 
         with tab13:
-            st.subheader("⚡ 能量系统 (Branch Energy)")
-            if "branch_energy" in analysis_result and analysis_result["branch_energy"]:
-                st.json(analysis_result["branch_energy"])
-            else:
-                st.info("No Branch Energy data available")
-
-        with tab14:
             st.subheader("🌙 大运 (Da Yun - Big Luck Cycles)")
             if "da_yun" in analysis_result and analysis_result["da_yun"]:
                 st.json(analysis_result["da_yun"])
             else:
                 st.info("No Da Yun data available")
 
-        with tab15:
+        with tab14:
             st.subheader("✨ 小运 (Xiao Yun - Small Luck Cycles)")
             if "xiao_yun" in analysis_result and analysis_result["xiao_yun"]:
                 st.json(analysis_result["xiao_yun"])
             else:
                 st.info("No Xiao Yun data available")
 
-        with tab16:
+        with tab15:
             st.subheader(
                 "📅 流年 & 流月 (Liu Nian & Liu Yue - Annual & Monthly Luck Cycles)"
             )
