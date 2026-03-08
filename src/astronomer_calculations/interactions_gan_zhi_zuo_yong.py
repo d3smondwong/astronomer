@@ -1706,8 +1706,15 @@ def get_interactions(lunar_birthday):
         }
 
     # Build 关系总览 from filtered_interactions (ensures tier ordering and deduplication)
+    # Only include interactions that have meaningful presence (强势主流 or 显著影响)
+    # Exclude heavily suppressed interactions (大幅衰减, 消融吸收, 中等衰减) from overview
     summary_dict = {}  # Use dict to deduplicate while preserving tier order
     for item in filtered_interactions:
+        strength = item.get("强度")
+        # Only include interactions with active presence (前两档)
+        if strength not in ("强势主流", "显著影响"):
+            continue
+
         itype = item.get("类型")
         # For each interaction type, find its display text from interactions_by_type
         if itype in interactions_by_type:
