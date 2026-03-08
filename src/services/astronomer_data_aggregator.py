@@ -10,7 +10,6 @@ from src.astronomer_calculations import (
     na_yin,
     basic_info,
     life_stage_di_shi,
-    branch_energy,
     void_xun_kong,
     three_palace_san_yuan,
     embryonic_breath_tai_xi,
@@ -35,7 +34,6 @@ class AstroDataAggregator:
         self.na_yin = na_yin
         self.basic_info = basic_info
         self.di_shi = life_stage_di_shi
-        self.branch_energy = branch_energy
         self.xun_kong = void_xun_kong
         self.san_yuan = three_palace_san_yuan
         self.tai_xi = embryonic_breath_tai_xi
@@ -73,7 +71,6 @@ class AstroDataAggregator:
             "shi_shen": self.shi_shen.get_shi_shen(lunar_birthday),
             "na_yin": self.na_yin.get_na_yin(lunar_birthday),
             "di_shi": self.di_shi.get_di_shi(lunar_birthday),
-            "branch_energy": self.branch_energy.get_branch_energy(lunar_birthday),
             "da_yun": self.da_yun.get_da_yun(lunar_birthday, gender),
             "xiao_yun": self.xiao_yun.get_xiao_yun(lunar_birthday, gender),
             "liu_nian_ye": self.liu_nian_ye.get_liu_nian_ye_current_focus(
