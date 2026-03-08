@@ -10,15 +10,16 @@ PHYSICS-BASED SEMANTIC FRAMEWORK:
 
 Key Features:
     - Earthly Branch Interactions: Detects clashes (冲), harms (害), six-harmonies (六合),
-      full triple combinations (三合), directional combinations (三会), and partial combinations (半合/半会)
+      full triple combinations (三合), directional combinations (三会), and partial combinations (半合/拱会/残会)
       with universal distance semantics (正/遥 = Adjacent/Distant signal decay)
 
-    - Half-Harmony Arching State & Co-Arching Detection: Distinguishes Strong (强=cardinal present),
-      Arching (拱=virtual potential when cardinal missing but connection exists), and Weak (弱=no support).
-      When a 半会(directional partial) and a 半合拱(elemental partial) both converge on the same missing
-      cardinal branch, they form a Co-Arching (共拱) Virtual Element Frame—a structurally superior
-      unified virtual-element field. Clash events involving co-arching pillars mark the frame as
-      turbid (混杂), downgrading it from 强势主流 to 显著影响.
+    - Partial Directional Detection & Co-Arching: Distinguishes three precise partial-三会 states:
+      * 拱会 (Non-cardinal flanks arch toward missing cardinal, e.g. 亥+丑→向子) — most active virtual form
+      * 残会 (Cardinal + one flank, missing the other, e.g. 亥+子 or 子+丑) — king present, support incomplete
+      * 待会 field on both: names the single missing branch that will complete the full 三会
+      When a 拱会 and a 半合拱 both converge on the same missing cardinal branch, they form a
+      Co-Arching (共拱) Virtual Element Frame. Clash events mark the frame as turbid (混杂),
+      downgrading it from 强势主流 to 显著影响.
 
     - Heavenly Stem Distance Handling: Stem clashes (天干克) and combinations (天干合) now properly
       calculate pillar distance using Signal Decay model: 正克/正冲 (Short Circuit = adjacent) vs
@@ -40,7 +41,7 @@ Key Features:
 
     - Pillar-based Tiered Analysis: Returns interaction details organized by priority tier:
       Tier 1 (纲领层=Framework): Structural harmonies (三会, 三合, 六冲, 六合)
-      Tier 2 (气势层=Dynamics): Partial/co-arching dynamics (半会, 共拱, 半合, 天干克, 天干冲, 天干合)
+      Tier 2 (气势层=Dynamics): Partial/co-arching dynamics (拱会, 残会, 共拱, 半合, 天干克, 天干冲, 天干合)
       Tier 3 (琐碎层=Details): Minute punishments (三刑, 六害, 六破, 暗合)
 
     - Multi-Pillar Interaction Distribution: Three-way combinations (三会, 三合) are robustly
@@ -243,6 +244,16 @@ directional_he = {
     "Water": {"亥", "子", "丑"},
 }
 
+# Cardinal (middle/king) branch of each directional season group
+# Used to distinguish 拱会 (two flanking branches that skip the cardinal)
+# from 残会 (one flanking branch pairing with the cardinal itself)
+directional_cardinal = {
+    "Wood": "卯",  # 寅-[卯]-辰: spring king
+    "Fire": "午",  # 巳-[午]-未: summer king
+    "Metal": "酉",  # 申-[酉]-戌: autumn king
+    "Water": "子",  # 亥-[子]-丑: winter king
+}
+
 # Six Destructions (Liu Po) - Shattering or hidden cracks
 break_map = {
     "子": "酉",
@@ -413,7 +424,10 @@ INTERACTION_STATUSES = {
     # Directional - Full/partial only
     "三会": {
         "full": "三会成局",
-        "partial": "半会局",
+        # Two non-cardinal flanking branches arch toward missing cardinal — most active virtual form
+        "arch": "拱会局",
+        # Cardinal is present, but one flanking branch is missing — residual incomplete frame
+        "residual": "残会局",
     },
     # Triple - Full only
     "三合": {
@@ -461,17 +475,18 @@ INTERACTION_TIER_ORDER = {
     "六冲": 2,
     "六合": 3,
     # 第二梯队_气势层 (Momentum tier - dynamic relationships)
-    "半会": 4,
-    "共拱": 4,  # Co-arching spans both 半会 and 半合; same tier but consolidates them
+    "共拱": 4,  # Co-arching: 拱会 + 半合拱 converge on same missing branch (strongest partial)
+    "拱会": 4,  # Two non-cardinal flanks arching toward missing cardinal (bilateral virtual)
+    "残会": 5,  # Cardinal + one flank, missing the other (real but lopsided — cf. 半合)
     "半合": 5,
-    "天干克": 6,
-    "天干冲": 7,
-    "天干合": 8,
-    # 第三梯队_琐碎层 (Friction tier - parasitic relationships)
+    "天干合": 6,  # Stem combination — locks stems, suppresses 克 (合 > 克 principle)
+    "天干克": 7,  # Stem control
+    "天干冲": 8,  # Stem opposition (mutual-克 at distance; weakest stem friction)
+    # 第三梯队_琐碎层 (tier - parasitic relationships)
     "三刑": 9,
     "六害": 10,
     "六破": 11,
-    "暗合": 12,
+    "暗合": 12,  # Hidden harmony (隐合) — constructive but weakest/most covert; sorted last
 }
 
 
@@ -550,7 +565,7 @@ def apply_bazi_master_priority(all_interactions, zhis):
     # Scan Phase: Identify what structures exist
     interaction_types = [item.get("类型") for item in all_interactions]
 
-    # Check for FULL 三会成局 only (partial 半会 should not suppress Tier 1 interactions)
+    # Check for FULL 三会成局 only (partial 拱会/残会 should not suppress Tier 1 interactions)
     has_san_hui_full = any(
         item.get("类型") == "三会" and "成局" in item.get("状态", "")
         for item in all_interactions
@@ -612,10 +627,10 @@ def apply_bazi_master_priority(all_interactions, zhis):
                 item["强度"] = "强势主流"
                 if not item.get("备注"):
                     item["备注"] = "方位场完整成局，主导全局"
-            elif itype == "半会":
+            elif itype in ("拱会", "残会"):
                 # Partial directional suppressed by the full directional field
                 item["强度"] = "大幅衰减"
-                item["备注"] = "被三会压制，半会方位力大幅弱化"
+                item["备注"] = "被三会压制，方位力大幅弱化"
             elif itype == "共拱":
                 # Co-arching dissolved — the full 三会 already claims the directional field
                 item["强度"] = "消融吸收"
@@ -634,10 +649,10 @@ def apply_bazi_master_priority(all_interactions, zhis):
                 # Half-harmonies weakened
                 item["强度"] = "大幅衰减"
                 item["备注"] = "被三合压制，半合势力弱化"
-            elif itype == "半会":
+            elif itype in ("拱会", "残会"):
                 # Partial directional field suppressed by triple combination
                 item["强度"] = "大幅衰减"
-                item["备注"] = "被三合压制，半会方位力弱化"
+                item["备注"] = "被三合压制，方位力弱化"
             elif itype == "六冲":
                 # Clash creates tension within the 三合 structure
                 item["强度"] = "中等衰减"
@@ -661,13 +676,13 @@ def apply_bazi_master_priority(all_interactions, zhis):
                     item["强度"] = "消融吸收"
                     item["备注"] = "被六冲摧毁，合力瓦解"
                 # else: 六合 on completely unrelated pillars — unaffected (falls to Tier 6)
-            elif itype in ["半合", "半会"]:
+            elif itype in ["半合", "拱会", "残会"]:
                 if shares_clash_pillar:
                     item["强度"] = "大幅衰减"
-                    item["备注"] = "六冲冲散半合/半会，势力大幅衰减"
+                    item["备注"] = "六冲冲散半合/方位拱，势力大幅衰减"
                 else:
                     item["强度"] = "中等衰减"
-                    item["备注"] = "六冲影响扩散，半合/半会衰减"
+                    item["备注"] = "六冲影响扩散，半合/方位拱衰减"
             elif itype in ["六害", "六破"]:
                 if shares_clash_pillar:
                     # Clash amplifies frictions sharing a pillar (tension compounds)
@@ -688,9 +703,9 @@ def apply_bazi_master_priority(all_interactions, zhis):
                     item["强度"] = "消融吸收"
                     item["备注"] = "被六合吸收，摩擦力消融"
                 # else: unrelated pillars — unaffected (falls to Tier 6)
-            elif itype in ["半合", "半会"] and shares_he_pillar:
+            elif itype in ["半合", "拱会", "残会"] and shares_he_pillar:
                 item["强度"] = "中等衰减"
-                item["备注"] = "被六合压制，半合/半会势力衰减"
+                item["备注"] = "被六合压制，半合/方位拱势力衰减"
             elif itype == "三刑":
                 item["强度"] = "大幅衰减"
                 item["备注"] = "被六合压制，刑力衰减"
@@ -704,7 +719,7 @@ def apply_bazi_master_priority(all_interactions, zhis):
                 item["强度"] = "消融吸收"
                 item["备注"] = "天干合化锁定本干，克力被合化消融"
 
-        # TIER 5 (Co-Arching): 共拱 self-asserts its strength; its constituent 半会/半合
+        # TIER 5 (Co-Arching): 共拱 self-asserts its strength; its constituent 拱会/半合
         # are elevated because they are not isolated partials — they reinforce each other.
         # Exception: if any participating branch is clashed (混杂), the frame is weakened
         # to 显著影响 — present but conflicted, not dominant.
@@ -718,7 +733,7 @@ def apply_bazi_master_priority(all_interactions, zhis):
                     item["强度"] = "强势主流"
                     # 备注 already set during construction
             elif (
-                itype in ("半合", "半会") and item.get("共拱") and not item.get("强度")
+                itype in ("半合", "拱会") and item.get("共拱") and not item.get("强度")
             ):
                 # Constituent of a co-arching group. Inherit turbidity from parent frame.
                 target = item.get("共拱目标", "")
@@ -897,7 +912,8 @@ def get_interactions(lunar_birthday):
     # Track interactions by type for priority categorization
     interactions_by_type = {
         "三会": [],
-        "半会": [],
+        "拱会": [],  # Two non-cardinal flanks arching toward missing cardinal
+        "残会": [],  # Cardinal + one flanking branch, missing the other
         "三合": [],
         "共拱": [],
         "天干合": [],
@@ -1019,7 +1035,13 @@ def get_interactions(lunar_birthday):
                 if branch in group:
                     pillar_dynamics[idx]["structural"].append(san_he_detail)
 
-    # PRIORITY 2 (TIER 2): Partial Directional (半会) - Weaker alignment, partial field
+    # PRIORITY 2 (TIER 2): Partial Directional — 拱会 or 残会
+    # 拱会 (Arch Assembly): Two non-cardinal flanking branches skip the cardinal.
+    #   e.g., 亥+丑 → virtual arch toward 子. Cardinal absent = active virtual pull.
+    # 残会 (Residual Assembly): One flanking branch pairs with the cardinal itself.
+    #   e.g., 亥+子 or 子+丑 → King is present but one support is missing.
+    # Both types carry a 待会 field naming the missing branch that, when it arrives
+    # (in a Luck Pillar or Annual Cycle), will complete the full 三会 directional frame.
     for direction, group in directional_he.items():
         matched_branches = {}
         for branch in group:
@@ -1028,7 +1050,7 @@ def get_interactions(lunar_birthday):
                     matched_branches[branch] = k
                     break
 
-        # PARTIAL 三会 DETECTION: Exactly 2 of 3 branches found in distinct pillars (半会局) - TIER 2
+        # PARTIAL 三会 DETECTION: Exactly 2 of 3 branches in distinct pillars - TIER 2
         if len(matched_branches) == 2:
             direction_cn = {
                 "Wood": "木",
@@ -1036,35 +1058,47 @@ def get_interactions(lunar_birthday):
                 "Metal": "金",
                 "Water": "水",
             }.get(direction, direction)
-            display_text = f"半会{direction_cn}局"
-            interaction_summary.append(display_text)
-            interaction_shens.append(f"半会{direction}局")
-            interactions_by_type["半会"].append(display_text)
 
-            # Build detailed 半会 entry
+            # Determine subtype: 拱会 (both flanks, no cardinal) vs 残会 (cardinal present)
+            cardinal = directional_cardinal.get(direction)
+            cardinal_present = cardinal in matched_branches
+            itype_partial = "残会" if cardinal_present else "拱会"
+            missing_branch = next((b for b in group if b not in matched_branches), None)
+
+            display_text = f"{itype_partial}{direction_cn}局"
+            interaction_summary.append(display_text)
+            interaction_shens.append(f"{itype_partial}{direction}局")
+            interactions_by_type[itype_partial].append(display_text)
+
+            # Build detailed entry
             matches = [
                 {"name": pillar_names_cn[k], "zhi": zhis[k]}
                 for k, zhi in enumerate(zhis)
                 if zhi in group
             ]
-            # Compute the missing (arching) branch: the cardinal of this directional group
-            missing_branch = next((b for b in group if b not in matched_branches), None)
-            san_hui_partial_detail = {
-                "类型": "半会",
+            partial_detail = {
+                "类型": itype_partial,
                 "方位": direction,
                 "组合": "-".join([m["name"] for m in matches]),
                 "组合明细": {m["name"]: m["zhi"] for m in matches},
-                "犹出": missing_branch or "无",
-                "状态": get_status("三会", {"key": "partial"}),
+                "待会": missing_branch or "无",
+                "状态": get_status(
+                    "三会",
+                    {"key": "residual" if cardinal_present else "arch"},
+                ),
             }
+            # 拱会 also carries 犹出 — the cardinal being arched toward,
+            # used by co-arching (共拱) detection to match paired 半合拱 structures.
+            if not cardinal_present:
+                partial_detail["犹出"] = missing_branch or "无"
 
             # Add to all_interactions
-            all_interactions.append(san_hui_partial_detail)
+            all_interactions.append(partial_detail)
 
             # Distribute to all matching pillars (TIER 2, not locked)
             for idx, branch in enumerate(zhis):
                 if branch in group:
-                    pillar_dynamics[idx]["frictional"].append(san_hui_partial_detail)
+                    pillar_dynamics[idx]["frictional"].append(partial_detail)
 
     # Check pairwise interactions - Evaluate all conditions in priority order
     # LOCKING SYSTEM: Tier 1 structural relationships lock branches, preventing lower-tier interactions
@@ -1478,7 +1512,7 @@ def get_interactions(lunar_birthday):
 
     # === POST-CALCULATION FILTERING ===
     # --- Co-Arching (共拱) Detection ---
-    # When a 半会 and a 半合(拱) both have the same missing (犹出) cardinal branch,
+    # When a 拱会 and a 半合(拱) both have the same missing (犹出) cardinal branch,
     # their combined aspiration toward that branch forms a Virtual Element Frame (虚拱局).
     # This is structurally more significant than two independent partial structures.
     #
@@ -1486,7 +1520,7 @@ def get_interactions(lunar_birthday):
     # what either partial structure achieves alone. When 一宥两伴 (one half-assembly +
     # one half-combination) point to the same cardinal, the chart’s qi field is
     # dominated by that element’s virtual presence.
-    # 半合 uses the "邀出" field; 半会 uses the "犹出" field — both name the same concept
+    # 半合 uses the "邀出" field; 拱会 uses the "犹出" field — both name the same concept
     # (the missing cardinal the partial structure is stretching toward), but were labelled
     # differently during detection.  The co-arching grouping must use the correct key for
     # each type so the shared-target lookup actually matches.
@@ -1498,7 +1532,7 @@ def get_interactions(lunar_birthday):
     arching_half_hui = [
         item
         for item in all_interactions
-        if item.get("类型") == "半会" and item.get("犹出") not in (None, "无")
+        if item.get("类型") == "拱会" and item.get("犹出") not in (None, "无")
     ]
 
     # Group by shared missing-cardinal target
@@ -1507,7 +1541,7 @@ def get_interactions(lunar_birthday):
         yc = item.get("邀出")  # 半合 key
         yao_chu_map.setdefault(yc, {"ban_he": [], "ban_hui": []})["ban_he"].append(item)
     for item in arching_half_hui:
-        yc = item.get("犹出")  # 半会 key
+        yc = item.get("犹出")  # 拱会 key
         yao_chu_map.setdefault(yc, {"ban_he": [], "ban_hui": []})["ban_hui"].append(
             item
         )
@@ -1589,13 +1623,13 @@ def get_interactions(lunar_birthday):
             "混杂": is_clashed,
             "备注": (
                 (
-                    f"半会({groups['ban_hui'][0].get('组合', '')})与半合(拱)"
+                    f"拱会({groups['ban_hui'][0].get('组合', '')})与半合(拱)"
                     f"({groups['ban_he'][0].get('组合', '')})同拱{missing_branch}，"
                     f"虚{element_cn}局主导全局"
                 )
                 if not is_clashed
                 else (
-                    f"半会({groups['ban_hui'][0].get('组合', '')})与半合(拱)"
+                    f"拱会({groups['ban_hui'][0].get('组合', '')})与半合(拱)"
                     f"({groups['ban_he'][0].get('组合', '')})同拱{missing_branch}，"
                     f"但{'、'.join(sorted(clashed_branches))}遭冲，虚{element_cn}局混杂衰减"
                 )
@@ -1648,7 +1682,7 @@ def get_interactions(lunar_birthday):
 
     # Define tier assignment by interaction type (strength-modulated)
     tier1_types = ["三会", "三合", "六冲", "六合"]
-    tier2_types = ["半会", "共拱", "半合", "天干冲", "天干克", "天干合"]
+    tier2_types = ["共拱", "拱会", "残会", "半合", "天干合", "天干克", "天干冲"]
     tier3_types = [
         "三刑",
         "六害",
@@ -1733,11 +1767,13 @@ def get_interactions(lunar_birthday):
                 "六合",
             ],
             "第二梯队_气势层": [
-                "半会",
                 "共拱",
+                "拱会",
+                "残会",
                 "半合",
-                "天干克",
                 "天干合",
+                "天干克",
+                "天干冲",
             ],
             "第三梯队_琐碎层": [
                 "三刑",
