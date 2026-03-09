@@ -16,7 +16,17 @@ Structure mirrors 大运:
 5. 纳音 (Nayin - Harmonic Resonance Element): Descriptive element for stem-branch pair
 6. 地势 (Life Stage): 12-stage positional strength from 长生十二宫 system
 7. 十神 (Ten Gods): Primary theme (Year Stem) + Hidden themes (Hidden Stems in Branch)
-8. 作用 (Interactions): Branch and Stem interactions with birth chart (1x4 scan)
+8. 作用 (Interactions): Branch and Stem interactions with birth chart using 1×4 scan
+   Detects 16 interaction types across tiers 0-14 (Tiers 0-14):
+   - Tier 0-3: Structural harmonies (三会, 三合, 六冲, 六合)
+   - Tier 4-10: Dynamics (共拱, 比和, 拱会, 残会, 半合, 天干合, 天干克, 天干冲)
+   - Tier 11-14: Details (三刑, 六害, 六破, 暗合)
+
+   All branch-pair interactions include 紧贴 (adjacency) field for distance semantics:
+   - 紧贴: true = Adjacent pillars (正X) → Full-force status
+   - 紧贴: false = Distant pillars (遥X) → Attenuated status
+
+   Includes 开库 sub-type for 六冲 with Earth tomb pairs (辰↔戌, 丑↔未)
 
 Key Function:
     get_xiao_yun(lunar_birthday, gender): Calculates annual Small Luck Cycles analysis.
@@ -36,12 +46,13 @@ Key Function:
             * 纳音: nayin descriptive element name
             * 地势: life stage
             * 十神: primary theme + hidden stem analysis
-            * 作用: all detected interactions with birth chart
+            * 作用: all detected interactions with birth chart (16 types, tiers 0-14)
             * Calendar year and age data
 
 Output Format:
     All dictionary keys and values use Chinese characters for consistency.
     Integrates lunar-python library data for accuracy and reliability.
+    Interactions include 紧贴 field for distance semantics (adjacent vs distant).
     Interactions are actionable event alerts for each annual period.
 """
 
@@ -61,10 +72,6 @@ from src.astronomer_calculations.da_yun import (
     directional_he,
     break_map,
     hidden_stem_he,
-    ungrateful_punishment_branches,
-    bullying_punishment_branches,
-    self_punishment_branches,
-    punishments,
     stem_combines,
     stem_clashes,
     pillar_names,
@@ -125,10 +132,19 @@ def _detect_xiao_yun_interactions(
     xiao_yun_stem: str, xiao_yun_branch: str, birth_chart: dict
 ) -> dict:
     """
-    Detect Xiao Yun interactions with birth chart using same 1x4 scan as Da Yun.
+    Detect Xiao Yun interactions with birth chart using same 1×4 scan as Da Yun.
 
     The Xiao Yun pillar (annual cycle) acts as an External Trigger entering the birth chart system.
-    Uses the same Tier-based priority checks and Key vs Lock logic for 开库 scenarios.
+    Uses the same Tier-based priority checks (16 interaction types, tiers 0-14) and Key vs Lock logic for 开库 scenarios.
+
+    Comprehensive interaction types detected:
+    - Structural: 三会, 三合, 六冲, 六合
+    - Dynamics: 共拱, 比和, 拱会, 残会, 半合, 天干合, 天干克, 天干冲
+    - Details: 三刑, 六害, 六破, 暗合
+
+    All branch-pair interactions include 紧贴 field:
+    - 紧贴: true = adjacent pillars (正X, full-force)
+    - 紧贴: false = distant pillars (遥X, attenuated)
 
     Args:
         xiao_yun_stem (str): Xiao Yun heavenly stem (year stem)
@@ -139,8 +155,10 @@ def _detect_xiao_yun_interactions(
         dict: Organized interactions by pillar and tier
     """
     # Leverage the existing Da Yun interaction detection function
-    # The interaction logic is identical between 小运 and 大运, only the reference changes
-    return _detect_da_yun_interactions(xiao_yun_stem, xiao_yun_branch, birth_chart)
+    # Pass "小运" as pillar_prefix to replace "大运" in the output
+    return _detect_da_yun_interactions(
+        xiao_yun_stem, xiao_yun_branch, birth_chart, pillar_prefix="小运"
+    )
 
 
 # ============================================================================
@@ -205,8 +223,8 @@ def get_xiao_yun(lunar_birthday: Lunar, gender: int) -> dict:
             "小运": {
                 "起运前": {
                     "性别": "男" if gender == 1 else "女",
-                    "出生阳历": lunar_birthday.getSolar().toYmdHms(),
-                    "出生农历": f"{lunar_birthday.getYear()}-{lunar_birthday.getMonth()}-{lunar_birthday.getDay()}",
+                    "阳历生日": lunar_birthday.getSolar().toYmdHms(),
+                    "农历生日": f"{lunar_birthday.getYear()}-{lunar_birthday.getMonth():02d}-{lunar_birthday.getDay():02d} {lunar_birthday.getHour():02d}:{lunar_birthday.getMinute():02d}:{lunar_birthday.getSecond():02d}",
                     "起运时间": qi_yun_date.toYmdHms(),
                     "起运年份": qi_yun_start_year,
                     "顺逆": "顺推" if yun.isForward() else "逆推",
@@ -293,7 +311,7 @@ def get_xiao_yun(lunar_birthday: Lunar, gender: int) -> dict:
             "起运前": {
                 "性别": "男" if gender == 1 else "女",
                 "出生阳历": lunar_birthday.getSolar().toYmdHms(),
-                "出生农历": f"{lunar_birthday.getYear()}-{lunar_birthday.getMonth()}-{lunar_birthday.getDay()}",
+                "出生农历": f"{lunar_birthday.getYear()}-{lunar_birthday.getMonth():02d}-{lunar_birthday.getDay():02d} {lunar_birthday.getHour():02d}:{lunar_birthday.getMinute():02d}:{lunar_birthday.getSecond():02d}",
                 "起运时间": qi_yun_date.toYmdHms(),
                 "起运年份": qi_yun_start_year,
                 "顺逆": "顺推" if yun.isForward() else "逆推",
@@ -316,9 +334,9 @@ if __name__ == "__main__":
     # python -m src.astronomer_calculations.xiao_yun
 
     # Desmond's birthday example - Female test
-    # solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)
-    # datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)
-    # tst_birthday, _ = get_true_solar_time(datetime_birthday, 1.3253, 103.808053)
+    solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)
+    datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)
+    tst_birthday, _ = get_true_solar_time(datetime_birthday, 1.3253, 103.808053)
 
     # Corinne's birthday example
     # solar_birthday = Solar.fromYmdHms(1987, 6, 3, 12, 6, 0)
@@ -328,20 +346,20 @@ if __name__ == "__main__":
     # lunar_birthday = tst_birthday.getLunar()
 
     # Lara's birthday example
-    solar_birthday = Solar.fromYmdHms(2025, 7, 31, 9, 10, 0)
-    tst_birthday, inputs_report = get_true_solar_time(
-        datetime(2025, 7, 31, 9, 10, 0), 1.4759, 103.808053
-    )
+    # solar_birthday = Solar.fromYmdHms(2025, 7, 31, 9, 10, 0)
+    # tst_birthday, inputs_report = get_true_solar_time(
+    #     datetime(2025, 7, 31, 9, 10, 0), 1.4759, 103.808053
+    # )
     lunar_birthday = tst_birthday.getLunar()
 
     print("八字")
     bazi_json = get_bazi_pillars(tst_birthday.getLunar())
     print(f"八字: {bazi_json}")
 
-    print("\n=== Xiao Yun (Female, Gender=0) ===")
-    result = get_xiao_yun(lunar_birthday, gender=0)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    # print("\n=== Xiao Yun (Female, Gender=0) ===")
+    # result = get_xiao_yun(lunar_birthday, gender=0)
+    # print(json.dumps(result, ensure_ascii=False, indent=2))
 
     # print("\n=== Xiao Yun (Male, Gender=1) ===")
-    # result = get_xiao_yun(lunar_birthday, gender=1)
-    # print(json.dumps(result, ensure_ascii=False, indent=2))
+    result = get_xiao_yun(lunar_birthday, gender=1)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
