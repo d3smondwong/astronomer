@@ -10,8 +10,8 @@ PHYSICS-BASED SEMANTIC FRAMEWORK:
 
 Key Features:
     - Earthly Branch Interactions: Detects clashes (冲), harms (害), six-harmonies (六合),
-      full triple combinations (三合), directional combinations (三会), and partial combinations (半合/拱会/残会)
-      with universal distance semantics (正/遥 = Adjacent/Distant signal decay)
+      full triple combinations (三合), directional combinations (三会), peer combinations (比和),
+      and partial combinations (半合/拱会/残会) with universal distance semantics (正/遥 = Adjacent/Distant signal decay)
 
     - Partial Directional Detection & Co-Arching: Distinguishes three precise partial-三会 states:
       * 拱会 (Non-cardinal flanks arch toward missing cardinal, e.g. 亥+丑→向子) — most active virtual form
@@ -21,16 +21,20 @@ Key Features:
       Co-Arching (共拱) Virtual Element Frame. Clash events mark the frame as turbid (混杂),
       downgrading it from 强势主流 to 显著影响.
 
-    - Heavenly Stem Distance Handling: Stem clashes (天干克) and combinations (天干合) now properly
-      calculate pillar distance using Signal Decay model: 正克/正冲 (Short Circuit = adjacent) vs
-      遥克/遥冲 (Atmospheric Interference = distant). Stem combinations (天干合) lock their participant
+    - Peer Combinations (比和): Adjacent same-element branches (e.g., 寅卯, 巳午, 申酉, 亥子)
+      representing peer energy and natural affinity. Harmonious but not binding, weaker than 六合/三合
+      but supportive. Uses set-based validator for precise element matching.
+
+    - Heavenly Stem Distance Handling: Stem clashes (天干克), combinations (天干合), and oppositions (天干冲)
+      now properly calculate pillar distance using Signal Decay model: 正克/正合/正冲 (Short Circuit = adjacent)
+      vs 遥克/遥合/遥冲 (Atmospheric Interference = distant). Stem combinations (天干合) lock their participant
       stems, preventing lower-tier 克 interactions from activating (合 > 克 principle).
 
     - Punishment Detection with Energy Semantics: Recognizes full/partial three-punishment
-      patterns (三刑) with distinct physics models:
-      * Ungrateful (恩将仇报): 寅-巳-申 triple-set → Systemic Resonance Chaos (三刑全/半刑)
-      * Bullying (欺负): 丑-未-戌 triple-set → Systemic Resonance Chaos (三刑全/半刑)
-      * Uncivilized (无礼): 子-卯 pair → Direct/Remote Structural Stress (正刑/遥刑)
+      patterns (三刑) with distinct physics models using set-based validation:
+      * Ungrateful (无恩之刑): 寅-巳-申 triple-set → Systemic Resonance Chaos (三刑全/半刑)
+      * Bullying (恃势之刑): 丑-未-戌 triple-set → Systemic Resonance Chaos (三刑全/半刑)
+      * Uncivilized (无礼之刑): 子-卯 pair → Direct/Remote Structural Stress (正刑/遥刑)
       * Self-Punishment (自刑): Repeat branches → Feedback Loop Energy Interference
         - Adjacent (紧贴): "自刑 (直接反馈过载)" = High-freq internal collision, immediate stress
         - Distant (遥隔): "遥自刑 (谐波自我纠缠)" = Low-freq resonance, delayed/cyclic response
@@ -39,10 +43,22 @@ Key Features:
       elements), triple-element combinations (三合/三会 cardinal branches), and stem-rooted qi
       to provide unified energy signatures across the chart without dependencies on separate modules.
 
-    - Pillar-based Tiered Analysis: Returns interaction details organized by priority tier:
-      Tier 1 (纲领层=Framework): Structural harmonies (三会, 三合, 六冲, 六合)
-      Tier 2 (气势层=Dynamics): Partial/co-arching dynamics (拱会, 残会, 共拱, 半合, 天干克, 天干冲, 天干合)
-      Tier 3 (琐碎层=Details): Minute punishments (三刑, 六害, 六破, 暗合)
+    - Pillar-based Tiered Analysis: Returns interaction details organized by priority tier (16 types):
+      Tier 0: 三会 (Directional seasonal combinations)
+      Tier 1: 三合 (Full triple element combinations)
+      Tier 2: 六冲 (Clash - structural failure)
+      Tier 3: 六合 (Six harmonies - molecular bond)
+      Tier 4: 共拱 (Co-arching virtual element frame)
+      Tier 5: 比和 (Peer combinations - harmonious affinity)
+      Tier 6: 拱会 (Non-cardinal flanks arching)
+      Tier 7: 残会 & 半合 (Cardinal + partial, element triple partial)
+      Tier 8: 天干合 (Heavenly stem harmony - locks stems)
+      Tier 9: 天干克 (Heavenly stem clash - electrical tension)
+      Tier 10: 天干冲 (Heavenly stem opposition - mutual clash)
+      Tier 11: 三刑 (Punishments - internal feedback loops)
+      Tier 12: 六害 (Harm - signal distortion)
+      Tier 13: 六破 (Six destructions - surface wear)
+      Tier 14: 暗合 (Hidden stem harmony - covert)
 
     - Multi-Pillar Interaction Distribution: Three-way combinations (三会, 三合) are robustly
       distributed across all affected pillars using extract_pillar_indices() function with
@@ -50,32 +66,48 @@ Key Features:
       context preservation. Deduplication key (pillar_idx, tier_key, item_id) prevents duplicate
       entries within the same pillar+tier combination while preserving multi-pillar visibility.
 
-DISTANCE SEMANTICS (Signal Decay Model):
-    All friction interactions use unified Adjacent/Distant distinction:
-    - 正X (正冲/正害/正破/正克/正刑) = Adjacent pillars → DIRECT/IMMEDIATE impact
-    - 遥X (遥冲/遥害/遥破/遥克/遥刑) = Distant pillars → MEDIATED/DELAYED impact
+DISTANCE SEMANTICS (Signal Decay Model with 紧贴 Field):
+    All friction and energetic interactions use unified Adjacent/Distant distinction:
+    - 正X (正冲/正害/正破/正克/正合/正比和) = Adjacent pillars → DIRECT/IMMEDIATE impact
+    - 遥X (遥冲/遥害/遥破/遥克/遥合/遥比和) = Distant pillars → MEDIATED/DELAYED impact
+
     Distance calculated as: is_adjacent = (pillar_j - pillar_i == 1)
+
+    All branch-pair interaction entries include "紧贴" field (boolean) for tracking adjacency:
+    - 紧贴: true (adjacent) → Full-force status
+    - 紧贴: false (distant) → Attenuated status
+
+    Applies to: 六冲, 六合, 六害, 六破, 天干克, 天干冲, 比和, and all four punishment types
 
 INTERACTION PRIORITY (in order of checking):
     TIER 1 - Structural Integrity (Hard Locks - consume branches entirely):
         1. San Hui (三会) - Directional seasonal combinations → Total field dominance
         2. San He (三合) - Full triple element combinations → Massive systemic shift
-        3. Clash (六冲) - Direct opposition/friction → Structural failure/Explosion
-        4. Liu He (六合) - Six harmonies/pairwise combinations → Locked molecular bond
+        3. Clash (六冲) - Direct opposition/friction → Structural failure/Explosion [with 紧贴]
+        4. Liu He (六合) - Six harmonies/pairwise combinations → Locked molecular bond [with 紧贴]
 
     TIER 2 - Operational Momentum (Fluid Flow with locking power):
-        5. Half San He (半合) - Partial harmonies with potential → Significant energy current (overrides Tier 3)
-        6. Stem Clashes (天干克) - Heavenly stem frictions → High-voltage electrical tension
+        5. Co-Arching (共拱) - Two partials converging on missing cardinal → Virtual element frame
+        6. Peer Combinations (比和) - Adjacent same-element branches → Natural affinity [with 紧贴]
+        7. Half San He (半合) - Partial harmonies with potential → Significant energy current
+        8. Stem Combines (天干合) - Heavenly stem harmony → Locks participant stems
+        9. Stem Clashes (天干克) - Heavenly stem frictions → High-voltage electrical tension [with 紧贴]
+        10. Stem Opposition (天干冲) - Heavenly stem mutual clash → Weakest stem friction [with 紧贴]
 
-    TIER 3 - Parasitic Losses (Frictional Layer - subject to Tier 2 locks):
-        7. San Xing (三刑) - Punishments with full/partial distinction → Internal feedback loops
-        8. Harm (害) - Damage relationships → Mutual interference/Signal distortion
-        9. Liu Po (六破) - Six destructions → Surface-level structural wear
-        10. An He (暗合) - Hidden stem combinations (independent, secret interactions)
+    TIER 3 - Parasitic Losses (Frictional Layer - subject to Tier 1-2 locks):
+        11. San Xing (三刑) - Punishments with full/partial distinction → Internal feedback loops [with 紧贴]
+        12. Harm (六害) - Damage relationships → Mutual interference/Signal distortion [with 紧贴]
+        13. Liu Po (六破) - Six destructions → Surface-level structural wear [with 紧贴]
+        14. An He (暗合) - Hidden stem combinations (independent, secret interactions)
 
 Note: All applicable interactions are evaluated and accumulated in priority order. This allows
 "double-whammy" relationships to display all relevant interactions (e.g., a Clash that also
 has a Punishment will show both). The order reflects which interaction is checked first.
+
+Validators (Set-Based Logic):
+    - is_valid_punishment(branch1, branch2, natal_branches=None): Unified validator for all four
+      punishment types (ungrateful/bullying/uncivilized/self) with full/partial distinction
+    - is_valid_peer_combination(branch1, branch2): Validates adjacent same-element branches for 比和
 
 Interaction Maps:
     - clash_map: Maps branches to their clash (opposing) partners
@@ -86,18 +118,22 @@ Interaction Maps:
     - directional_he: Groups branches by season/direction (directional combinations)
     - break_map: Maps branches to their destruction partners (六破)
     - hidden_stem_he: Maps branches to hidden stem combination partners
-    - punishments: Maps branch pairs to punishment types (三刑) with adjacent/distant distinction
     - stem_combines: Maps stems to their harmonious partners (天干合)
-    - stem_clashes: Maps stems to their polar-opposite partners (天干克) with distance routing
-    - INTERACTION_STATUSES: Centralized configuration library for all status strings (305+ lines)
+    - stem_clashes: Maps stems to their polar-opposite partners (天干克)
+    - stem_controls: Maps stems to their opposition partners (天干冲)
+    - PEER_COMBINATIONS: Maps element-specific adjacent pairs for 比和
+    - INTERACTION_TIER_ORDER: Complete 16 interaction types mapped to tiers (0-14)
+    - INTERACTION_STATUSES: Centralized configuration library for all status strings with distance modulation
 
 Main Functions:
     get_interactions(lunar_birthday): Extracts and analyzes all pillar interactions from a
         BaZi chart, returning LLM-optimized JSON with structured interaction data organized
-        by priority tier.
+        by priority tier (16 types). Includes 紧贴 field for all branch-pair interactions.
+        Now detects 比和 (Tier 5) and 天干冲 (Tier 10) in natal chart scanning.
 
     get_status(interaction_type, context): Retrieves and composes status values from centralized
         library, handling 4 pattern types: strings, templates, multi-type, and lookups.
+        Supports distance semantics (adjacent/distant) and context-specific modulation.
 
     extract_pillar_indices(pillar_indices_str): Robustly extracts pillar indices from combination
         strings like "年柱-月柱" or "年柱-月柱-日柱". Uses priority-based mapping: full names
