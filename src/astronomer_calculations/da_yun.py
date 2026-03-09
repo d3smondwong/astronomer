@@ -1564,6 +1564,11 @@ def get_da_yun(lunar_birthday: Lunar, gender: int) -> dict:
             "序号": (
                 "未行大运" if i == 0 else i
             ),  # Index/sequence number (0 = before start)
+            "开始年份": da_yun.getStartYear(),  # Start calendar year
+            "结束年份": da_yun.getEndYear(),  # End calendar year
+            "开始年龄": da_yun.getStartAge(),  # Start age (from birth)
+            "结束年龄": da_yun.getEndAge(),  # End age (from birth)
+            "周期": f"{da_yun.getStartAge()}-{da_yun.getEndAge()}岁",  # Age range display
             "干支": gan_zhi if i > 0 else "未行大运",  # Gan-Zhi (empty for first cycle)
             "旬": da_yun.getXun() if i > 0 else "未行大运",  # Xun (10-day cycle)
             "旬空": (
@@ -1587,11 +1592,6 @@ def get_da_yun(lunar_birthday: Lunar, gender: int) -> dict:
                 ),  # Hidden themes (Main/Middle/Residual)
             },
             "作用": interactions,  # Branch and Stem interactions with birth chart
-            "开始年份": da_yun.getStartYear(),  # Start calendar year
-            "结束年份": da_yun.getEndYear(),  # End calendar year
-            "开始年龄": da_yun.getStartAge(),  # Start age (from birth)
-            "结束年龄": da_yun.getEndAge(),  # End age (from birth)
-            "周期": f"{da_yun.getStartAge()}-{da_yun.getEndAge()}岁",  # Age range display
         }
         da_yun_data.append(da_yun_info)
 

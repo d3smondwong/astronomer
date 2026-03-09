@@ -285,6 +285,8 @@ def get_xiao_yun(lunar_birthday: Lunar, gender: int) -> dict:
 
         xiao_yun_info = {
             "序号": i + 1,  # 1-based sequence number
+            "日历年份": calendar_year,  # Calendar year
+            "年龄": age,  # Age at start of year (from library)
             "干支": gan_zhi,  # Gan-Zhi (stem-branch pair)
             "旬": xun,  # Xun (10-day cycle)
             "旬空": xun_kong,  # Xun Kong (void periods)
@@ -300,8 +302,7 @@ def get_xiao_yun(lunar_birthday: Lunar, gender: int) -> dict:
                 "地支十神": branch_shi_shen,  # Hidden themes (Main/Middle/Residual)
             },
             "作用": interactions,  # Branch and Stem interactions with birth chart
-            "日历年份": calendar_year,  # Calendar year
-            "年龄": age,  # Age at start of year (from library)
+
         }
         xiao_yun_data.append(xiao_yun_info)
 
