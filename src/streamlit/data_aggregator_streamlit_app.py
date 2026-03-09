@@ -16,7 +16,7 @@ from src.utils.logging import configure_logging, get_logger
 from lunar_python import Solar
 
 # To run it
-# streamlit run src/streamlit/streamlit_app.py
+# streamlit run src/streamlit/data_aggregator_streamlit_app.py
 
 # Initialize logging
 configure_logging()
