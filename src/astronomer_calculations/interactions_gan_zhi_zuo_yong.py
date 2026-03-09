@@ -317,6 +317,28 @@ SELF_PUNISHMENT = {
     "notes": "Different self branches (e.g., 辰+午) do NOT form punishment",
 }
 
+# ============================================================================
+# PEER COMBINATIONS (比和) — Tier 2 (气势层)
+# ============================================================================
+# Same element, adjacent branches representing peer energy and natural affinity.
+# These are harmonious but not as strong as full harmonies (六合, 三合).
+
+PEER_COMBINATIONS = {
+    "name": "比和 (Peer Combinations)",
+    "pairs": {
+        ("寅", "卯"),
+        ("卯", "寅"),  # Wood - Tiger & Rabbit
+        ("巳", "午"),
+        ("午", "巳"),  # Fire - Snake & Horse
+        ("申", "酉"),
+        ("酉", "申"),  # Metal - Monkey & Rooster
+        ("亥", "子"),
+        ("子", "亥"),  # Water - Pig & Rat
+    },
+    "rule": "Adjacent branches of same element (木-木, 火-火, 金-金, 水-水)",
+    "notes": "Peer energy: supportive but not binding like 六合; weaker than 三合",
+}
+
 
 def is_valid_punishment(
     branch1: str, branch2: str, natal_branches: list = None
@@ -397,6 +419,57 @@ def is_valid_punishment(
         }
 
     # No punishment detected
+    return None
+
+
+def is_valid_peer_combination(branch1: str, branch2: str) -> dict | None:
+    """
+    Validate peer combinations (比和) using set-based logic.
+
+    Peers are adjacent branches of the same element, representing supportive
+    but not binding affinity. Weaker than 六合 or 三合.
+
+    Parameters:
+        branch1: First branch
+        branch2: Second branch
+
+    Returns:
+        dict with keys:
+            - "type": "比和"
+            - "element": element name (木/火/土/金/水)
+        OR None if not a valid peer combination
+
+    Examples:
+        is_valid_peer_combination("寅", "卯") → {"type": "比和", "element": "木"}
+        is_valid_peer_combination("申", "酉") → {"type": "比和", "element": "金"}
+        is_valid_peer_combination("寅", "巳") → None (not peers)
+    """
+
+    # Skip if branches are identical
+    if branch1 == branch2:
+        return None
+
+    # Check if pair is in the PEER_COMBINATIONS set
+    pair = (branch1, branch2)
+    if pair in PEER_COMBINATIONS["pairs"]:
+        # Map branch pairs to element
+        element_map = {
+            ("寅", "卯"): "木",
+            ("卯", "寅"): "木",
+            ("巳", "午"): "火",
+            ("午", "巳"): "火",
+            ("申", "酉"): "金",
+            ("酉", "申"): "金",
+            ("亥", "子"): "水",
+            ("子", "亥"): "水",
+        }
+        element = element_map.get(pair, "未知")
+
+        return {
+            "type": "比和",
+            "element": element,
+        }
+
     return None
 
 
@@ -575,17 +648,18 @@ INTERACTION_TIER_ORDER = {
     "六合": 3,
     # 第二梯队_气势层 (Momentum tier - dynamic relationships)
     "共拱": 4,  # Co-arching: 拱会 + 半合拱 converge on same missing branch (strongest partial)
-    "拱会": 4,  # Two non-cardinal flanks arching toward missing cardinal (bilateral virtual)
-    "残会": 5,  # Cardinal + one flank, missing the other (real but lopsided — cf. 半合)
-    "半合": 5,
-    "天干合": 6,  # Stem combination — locks stems, suppresses 克 (合 > 克 principle)
-    "天干克": 7,  # Stem control
-    "天干冲": 8,  # Stem opposition (mutual-克 at distance; weakest stem friction)
+    "比和": 5,  # Peer combination: adjacent same-element branches (harmonious but not binding)
+    "拱会": 6,  # Two non-cardinal flanks arching toward missing cardinal (bilateral virtual)
+    "残会": 7,  # Cardinal + one flank, missing the other (real but lopsided — cf. 半合)
+    "半合": 7,
+    "天干合": 8,  # Stem combination — locks stems, suppresses 克 (合 > 克 principle)
+    "天干克": 9,  # Stem control
+    "天干冲": 10,  # Stem opposition (mutual-克 at distance; weakest stem friction)
     # 第三梯队_琐碎层 (tier - parasitic relationships)
-    "三刑": 9,
-    "六害": 10,
-    "六破": 11,
-    "暗合": 12,  # Hidden harmony (隐合) — constructive but weakest/most covert; sorted last
+    "三刑": 11,
+    "六害": 12,
+    "六破": 13,
+    "暗合": 14,  # Hidden harmony (隐合) — constructive but weakest/most covert; sorted last
 }
 
 
@@ -1015,6 +1089,8 @@ def get_interactions(lunar_birthday):
         "残会": [],  # Cardinal + one flanking branch, missing the other
         "三合": [],
         "共拱": [],
+        "比和": [],  # Peer combinations: adjacent same-element branches
+        "半合": [],  # Partial triple harmonies
         "天干合": [],
         "天干冲": [],
         "天干克": [],
@@ -1322,7 +1398,7 @@ def get_interactions(lunar_birthday):
                         pillar_dynamics[i]["frictional"].append(half_he_detail)
                         pillar_dynamics[j]["frictional"].append(half_he_detail)
                         all_interactions.append(half_he_detail)
-                        interactions_by_type["六合"].append(
+                        interactions_by_type["半合"].append(
                             f"{pillar_names_abr[i]}{pillar_names_abr[j]}({b_i}{b_j})半合{element}局"
                         )
                         interaction_summary.append(
@@ -1330,6 +1406,34 @@ def get_interactions(lunar_birthday):
                         )
 
                         break
+
+            # Priority 3.5: Peer Combinations (比和) - TIER 5 supportive harmony
+            # Adjacent same-element branches (e.g., 寅卯, 巳午, 申酉, 亥子)
+            peer_result = is_valid_peer_combination(b_i, b_j)
+            if peer_result:
+                peer_detail = {
+                    "类型": "比和",
+                    "组合": f"{pillar_names_cn[i]}-{pillar_names_cn[j]}",
+                    "组合明细": {pillar_names_cn[i]: b_i, pillar_names_cn[j]: b_j},
+                    "元素": peer_result["element"],
+                    "紧贴": is_adjacent,
+                    "状态": get_status(
+                        "比和", {"key": "adjacent" if is_adjacent else "distant"}
+                    ),
+                }
+
+                interaction_shens.append(
+                    f"{pillar_names_abr[i]}{pillar_names_abr[j]}比和"
+                )
+                pillar_dynamics[i]["structural"].append(peer_detail)
+                pillar_dynamics[j]["structural"].append(peer_detail)
+                all_interactions.append(peer_detail)
+                interactions_by_type["比和"].append(
+                    f"{pillar_names_abr[i]}{pillar_names_abr[j]}({b_i}{b_j})比和{peer_result['element']}"
+                )
+                interaction_summary.append(
+                    f"{pillar_names_abr[i]}{pillar_names_abr[j]}({b_i}{b_j})比和{peer_result['element']}"
+                )
 
             # Priority 4: Harms (害) - TIER 3 parasitic loss
             if harm_map.get(b_i) == b_j:
