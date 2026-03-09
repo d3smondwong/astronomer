@@ -38,38 +38,81 @@ Comprehensive BaZi Destiny Analysis Components:
    - Maps each stem-branch pair to its corresponding life stage
    - Values: 长生→沐浴→冠带→临官→帝旺→衰→病→死→墓→绝→胎→养
 
-8. 作用 (Interactions - Event Triggers):
-   - Branch interactions: 冲(clash), 害(harm), 合(combine), 刑(punishment)
-   - Stem interactions: 冲(clash), 合(combine)
-   - Triple Punishments (三刑): [寅巳申] (Tiger-Snake-Monkey) and [丑戌未] (Ox-Dog-Goat)
-   - Self-Punishment (自刑): Duplicate branches in self-punishment set
-   - Each interaction flagged with description and warning level (高/中/低)
+8. 作用 (Interactions - Comprehensive 1×4 Scan):
+   Da Yun pillar scanned against all 4 natal pillars with Tier-Based Priority (16 types):
 
-Key Function:
-    get_da_yun(lunar_birthday, gender): Calculates complete Big Luck Cycles analysis.
+   TIER 0-1 (Framework - Extreme):
+   - 反吟: Stem clash + Branch clash (same natal pillar) → complete instability
+   - 伏吟: Stem match + Branch match (same natal pillar) → stagnation
 
-    Args:
-        lunar_birthday (Lunar): Lunar calendar object
-        gender (int): 0 for Female, 1 for Male
+   TIER 2-3 (Framework - Structural):
+   - 三会: Directional combination (3 branches, one per pillar)
+   - 三合: Triple harmony (3 branches, specific elements)
+   - 六冲: Clash (6 combinations) + 开库 sub-type (Earth tomb release)
+   - 六合: Six Harmony (6 combinations with transformation)
 
-    Returns:
-        dict: Comprehensive Da Yun analysis in JSON format with:
-        - 起运 metadata: timing, direction, gender, cycle count
-        - 大运周期: array of 10 cycles, each containing:
-            * 序号: cycle number (0-9)
-            * 干支: stem-branch pair
-            * 旬/旬空: sexagenary and void information
-            * 五行: stem and branch five elements with polarity
-            * 纳音: nayin descriptive element name
-            * 地势: life stage
-            * 十神: primary theme + hidden stem analysis
-            * 作用: all detected interactions with birth chart
-            * Year and age range data
+   TIER 4-7 (Dynamics - Partial Combinations):
+   - 共拱: Co-arching (two partial combos converging on missing branch)
+   - 比和: Peer combinations (adjacent same-element branches)
+   - 拱会: Two non-cardinal branches virtually pulling toward missing cardinal
+   - 残会/半合: Cardinal + one flank, or partial element triple
+
+   TIER 8-14 (Details - Stem & Parasitic):
+   - 天干合(日主): Day Master stem harmony (highest stem priority)
+   - 天干克(日主): Day Master stem clash (Day Master threat)
+   - 天干合: Heavenly stem harmony
+   - 天干克: Heavenly stem control
+   - 天干冲: Heavenly stem opposition (same polarity, mutual clash)
+   - 三刑 (Triple Punishments): [寅巳申], [丑戌未], Zi-Mao uncivilized, self-punishment
+   - 六害: Six Harms (parasitic draining)
+   - 六破: Six Destructions (undermining)
+
+   TIER 15-19 (Covert):
+   - 暗合: Hidden stem harmony (隐秘, constructive but weakest)
+
+   Distance Semantics (紧贴 field):
+   - Adjacent (月柱/日柱): Full-force interactions (正冲/正合/etc.)
+   - Distant (年柱/时柱): Attenuated interactions (遥冲/遥合/etc.)
+   - Applies to: 六冲, 六合, 六害, 六破, 天干克, 天干冲, 比和, all punishments
+
+   Post-Calculation Modulation (apply_da_yun_master_priority):
+   - Hierarchical strength scoring: 强势主流 → 显著影响 → 中等衰减 → 大幅衰减 → 消融吸收
+   - Tier 0 (反吟/伏吟) absorbs or reduces lower-tier interactions
+   - Tier 1 (三会/三合) suppresses interactions on same pillars
+   - Tier 2 (六冲) shatters harmonies and amplifies conflicts
+   - Tier 3 (六合) stabilizes and suppresses negative interactions
+   - Stem interaction priority: 天干合 > 天干克
+
+Key Functions:
+
+    get_da_yun(lunar_birthday, gender):
+        Calculates complete Big Luck Cycles analysis.
+        Args:
+            lunar_birthday (Lunar): Lunar calendar object
+            gender (int): 0 for Female, 1 for Male
+        Returns:
+            dict: 10 × Big Luck Cycles with interactions, strengths, and interpretations
+
+    _detect_da_yun_interactions(da_yun_stem, da_yun_branch, birth_chart):
+        1×4 scan detecting all interaction types between Da Yun pillar and 4 natal pillars.
+        Uses set-based validators for accuracy.
+        Returns raw interactions (pre-modulation).
+
+    apply_da_yun_master_priority(all_interactions, zhis):
+        Post-calculation filtering and strength modulation.
+        Applies hierarchical priority rules to assign 强度 scores.
+        Sorts by DA_YUN_TIER_ORDER for consistent output.
 
 Output Format:
     All dictionary keys and values use Chinese characters for consistency.
     Integrates lunar-python library data for accuracy and reliability.
-    Interactions are actionable event alerts for period interpretation.
+    Each Da Yun cycle includes complete interaction details with:
+    - 组合: interaction partners
+    - 組合明細: detailed mapping
+    - 状态: normalized status (正/遥)
+    - 强度: strength level post-modulation
+    - 备注: contextual interpretation
+    - 紧贴: adjacency flag for distance semantics
 """
 
 from lunar_python import Lunar
@@ -81,158 +124,23 @@ from src.astronomer_calculations.wu_xing import (
     Stem,
     Branch,
 )
-
-
-# ============================================================================
-# INTERACTION MAPPINGS (作用) - Comprehensive Branch and Stem Relationships
-# ============================================================================
-
-# Branch Clash (六冲) - Opposing pairs
-clash_map = {
-    "子": "午",
-    "午": "子",
-    "丑": "未",
-    "未": "丑",
-    "寅": "申",
-    "申": "寅",
-    "卯": "酉",
-    "酉": "卯",
-    "辰": "戌",
-    "戌": "辰",
-    "巳": "亥",
-    "亥": "巳",
-}
-
-# Branch Harm (六害) - Betrayal or health issues
-harm_map = {
-    "子": "未",
-    "未": "子",
-    "丑": "午",
-    "午": "丑",
-    "寅": "巳",
-    "巳": "寅",
-    "卯": "辰",
-    "辰": "卯",
-    "申": "亥",
-    "亥": "申",
-    "酉": "戌",
-    "戌": "酉",
-}
-
-# Six Combinations (六合) - Harmony pairs
-six_he_map = {
-    "子": "丑",
-    "丑": "子",
-    "寅": "亥",
-    "亥": "寅",
-    "卯": "戌",
-    "戌": "卯",
-    "辰": "酉",
-    "酉": "辰",
-    "巳": "申",
-    "申": "巳",
-    "午": "未",
-    "未": "午",
-}
-
-# Triple Combination (三合) - Full element triads
-triple_he = {
-    "水": {"申", "子", "辰"},
-    "木": {"亥", "卯", "未"},
-    "火": {"寅", "午", "戌"},
-    "金": {"巳", "酉", "丑"},
-}
-
-# Cardinal Branches - Stability points for half-harmony assessment
-cardinal_branches = {
-    "水": "子",
-    "木": "卯",
-    "火": "午",
-    "金": "酉",
-}
-
-# Directional Combinations (三会) - Seasonal combinations
-directional_he = {
-    "Wood": {"寅", "卯", "辰"},
-    "Fire": {"巳", "午", "未"},
-    "Metal": {"申", "酉", "戌"},
-    "Water": {"亥", "子", "丑"},
-}
-
-# Six Destructions (六破) - Breaking relationships
-break_map = {
-    "子": "酉",
-    "酉": "子",
-    "卯": "午",
-    "午": "卯",
-    "辰": "丑",
-    "丑": "辰",
-    "未": "戌",
-    "戌": "未",
-    "寅": "亥",
-    "亥": "寅",
-    "巳": "申",
-    "申": "巳",
-}
-
-# Hidden Stem Combinations (暗合) - Secret interactions
-hidden_stem_he = {
-    "寅": "丑",
-    "丑": "寅",
-    "午": "亥",
-    "亥": "午",
-    "卯": "申",
-    "申": "卯",
-}
-
-# Three Punishments (三刑) - Ungrateful + Bullying patterns
-ungrateful_punishment_branches = {"寅", "巳", "申"}
-bullying_punishment_branches = {"丑", "未", "戌"}
-uncivilized_punishment_pairs = {
-    "子卯": "刑",
-    "卯子": "刑",
-}
-self_punishment_branches = {"辰", "午", "酉", "亥"}
-
-punishments = {
-    "寅巳": "刑",
-    "巳申": "刑",
-    "申寅": "刑",
-    "丑未": "刑",
-    "未戌": "刑",
-    "戌丑": "刑",
-    "子卯": "刑",
-    "卯子": "刑",
-    "辰辰": "自刑",
-    "午午": "自刑",
-    "酉酉": "自刑",
-    "亥亥": "自刑",
-}
-
-# Stem Interactions (天干作用)
-stem_combines = {
-    "甲": "己",
-    "己": "甲",
-    "乙": "庚",
-    "庚": "乙",
-    "丙": "辛",
-    "辛": "丙",
-    "丁": "壬",
-    "壬": "丁",
-    "戊": "癸",
-    "癸": "戊",
-}
-
-stem_clashes = {
-    "甲": "庚",
-    "庚": "甲",
-    "乙": "辛",
-    "辛": "乙",
-    "丙": "壬",
-    "壬": "丙",
-    "丁": "癸",
-    "癸": "丁",
-}
+from src.astronomer_calculations.interactions_gan_zhi_zuo_yong import (
+    clash_map,
+    harm_map,
+    six_he_map,
+    triple_he,
+    cardinal_branches,
+    directional_he,
+    directional_cardinal,
+    break_map,
+    hidden_stem_he,
+    stem_combines,
+    stem_clashes,
+    stem_controls,
+    get_status,
+    is_valid_punishment,
+    is_valid_peer_combination,
+)
 
 # Pillar names for reference
 pillar_names = ["年柱", "月柱", "日柱", "时柱"]
@@ -371,6 +279,332 @@ def _check_branch_rooting(stem: str, branch: str) -> dict:
 # DA YUN INTERACTIONS - 1x4 Scan with Tier-Based Priority
 # ============================================================================
 
+# Da Yun-specific tier ordering (extends shared INTERACTION_TIER_ORDER)
+# 反吟/伏吟 are Tier 0-1 (pre-empt everything); 开库 is a specialized 六冲 variant.
+DA_YUN_TIER_ORDER = {
+    "反吟": 0,
+    "伏吟": 1,
+    "三会": 2,
+    "三合": 3,
+    "共拱": 4,  # Co-arching: strongest partial combination
+    "比和": 5,  # Peer combination: adjacent same-element branches
+    "拱会": 6,  # Two non-cardinal flanks arching
+    "残会": 7,  # Cardinal + one flank, lopsided
+    "半合": 7,  # Half harmony
+    "六冲": 8,
+    "开库": 8,  # Shares the clash tier — specialized clash
+    "六合": 9,
+    "天干合(日主)": 10,  # Day Master special case
+    "天干克(日主)": 11,  # Day Master direct threat
+    "天干合": 12,
+    "天干克": 13,
+    "天干冲": 14,  # Stem opposition
+    "无恩之刑": 15,
+    "恃势之刑": 15,
+    "无礼之刑": 15,
+    "自刑": 16,
+    "六害": 17,
+    "六破": 18,
+    "暗合": 19,
+}
+
+
+def apply_da_yun_master_priority(all_interactions: list, zhis: list) -> list:
+    """
+    Post-calculation priority modulation for Da Yun interactions.
+
+    Mirrors apply_bazi_master_priority() from interactions_gan_zhi_zuo_yong.py but
+    adapted for 1×4 semantics: the Da Yun pillar is always the external side, so
+    pillar-overlap logic operates only on natal pillar indices (0–3).
+
+    The natal pillar index is parsed from the 组合 string (e.g. "大运-年柱" → index 0).
+
+    Rules:
+    1. 反吟 / 伏吟 — Tier 0: override everything on that natal pillar; lower-tier
+       interactions on the same pillar are absorbed.  Exception: 三会/三合 are
+       multi-pillar structural bonds — when one of their nodes is owned by 反吟/伏吟
+       only that node is disrupted, so the combination is reduced to 中等衰减 rather
+       than fully dissolved.
+    2. 三会 / 三合 — Tier 1: structural field; suppresses all lower-tier interactions
+       on the same natal pillars.  When the Da Yun branch is ITSELF part of a 三合
+       with natal branches, a 六冲 on those same pillars gets 中等衰减 (tension
+       between combining and clashing).
+    3. 六冲 / 开库 — Tier 2: shatters 六合/半合 sharing a pillar; amplifies 六害/六破.
+       EXCEPTION — natal three-way protection: if the targeted natal branch is part of
+       a full natal 三合 or 三会 (all 3 members purely within the natal chart, Da Yun
+       branch not involved), the triple structure resists the external clash and the
+       六冲 is marked 大幅衰减 instead.  Example: 子 clashed by Da Yun 午, but natal
+       chart has 申‑子‑辰 full triple → 申子辰 护体, 冲力大幅减弱.
+       开库 with 钥匙受困=True is weakened by the pre-scan.
+    4. 六合 — Tier 3: smooths over 六害/六破 on the same pillar.
+    5. 天干合(日主) — absorbs 天干克(日主) on the Day Pillar (合 > 克 principle).
+    6. All remaining interactions receive default 强度 based on tier.
+
+    Args:
+        all_interactions: Raw list of interaction dicts from the 1×4 scan
+        zhis: Natal branch list [year, month, day, hour] (for context lookups)
+
+    Returns:
+        Modulated list with 强度 and 备注 fields added, sorted by tier.
+    """
+    # Pillar name → natal index mapping
+    pillar_idx_map = {"年柱": 0, "月柱": 1, "日柱": 2, "时柱": 3}
+
+    def _natal_pillar_index(item: dict):
+        """Extract the natal pillar index from a 组合 string like '大运-年柱'."""
+        combo = item.get("组合", "")
+        for part in combo.split("-"):
+            part = part.strip()
+            if part in pillar_idx_map:
+                return pillar_idx_map[part]
+        return None
+
+    # ── Scan phase: identify what structural types exist and which natal pillars they cover ──
+    interaction_types = {item.get("类型") for item in all_interactions}
+
+    has_tian_gan_he_ri_zhu = "天干合(日主)" in interaction_types
+
+    # Natal pillar indices consumed by each structural tier
+    fan_fu_pillars: set = set()
+    fu_yin_pillars: set = set()
+    san_hui_pillars: set = set()
+    san_he_pillars: set = set()
+    liu_chong_pillars: set = set()
+    liu_he_pillars: set = set()
+    partial_hui_pillars: set = set()  # 拱会/残会 natal pillar indices
+
+    for item in all_interactions:
+        itype = item.get("类型")
+        idx = _natal_pillar_index(item)
+        if idx is None:
+            continue
+        if itype == "反吟":
+            fan_fu_pillars.add(idx)
+        elif itype == "伏吟":
+            fu_yin_pillars.add(idx)
+        elif itype == "三会":
+            # Multi-pillar: parse all natal indices from 组合明细 keys
+            for k in item.get("组合明细", {}):
+                if k in pillar_idx_map:
+                    san_hui_pillars.add(pillar_idx_map[k])
+        elif itype == "三合":
+            for k in item.get("组合明细", {}):
+                if k in pillar_idx_map:
+                    san_he_pillars.add(pillar_idx_map[k])
+        elif itype in ("六冲", "开库"):
+            liu_chong_pillars.add(idx)
+        elif itype == "六合":
+            liu_he_pillars.add(idx)
+        elif itype in ("拱会", "残会"):
+            for k in item.get("组合明细", {}):
+                if k in pillar_idx_map:
+                    partial_hui_pillars.add(pillar_idx_map[k])
+
+    # ── Purely natal three-way protection ──
+    # Detect natal branches shielded by a full 三合 or 三会 formed entirely within
+    # the natal chart (Da Yun branch not involved).  A branch inside such a complete
+    # triple structure is harder to dislodge by an external 六冲.
+    # pillar_idx → element/direction name, so the protection note is specific
+    natal_san_he_pillars: dict[int, str] = {}
+    natal_san_hui_pillars: dict[int, str] = {}
+
+    for element, group in triple_he.items():
+        involved = [(i, z) for i, z in enumerate(zhis) if z in group]
+        if len(involved) == 3:  # Full natal 三合: all 3 members present in natal chart
+            for idx_n, _ in involved:
+                natal_san_he_pillars[idx_n] = element
+
+    for direction, group in directional_he.items():
+        involved = [(i, z) for i, z in enumerate(zhis) if z in group]
+        if len(involved) == 3:  # Full natal 三会: all 3 members present in natal chart
+            for idx_n, _ in involved:
+                natal_san_hui_pillars[idx_n] = direction
+
+    modulated = []
+    for item in all_interactions:
+        itype = item.get("类型")
+        idx = _natal_pillar_index(item)
+
+        # ── TIER 0: 反吟 / 伏吟 — consume the entire natal pillar ──
+        if itype in ("反吟", "伏吟"):
+            item["强度"] = "强势主流"
+            item.setdefault("备注", "大运Tier0：干支全反/全同，该柱位完全支配")
+            modulated.append(item)
+            continue
+
+        # Interactions on a pillar owned by 反吟 or 伏吟 — absorbed or reduced
+        if idx is not None and idx in (fan_fu_pillars | fu_yin_pillars):
+            if itype in ("三会", "三合"):
+                # Multi-pillar bond: 反吟/伏吟 disrupts one node but cannot dissolve
+                # the whole structural combination — suppress, not eliminate
+                item["强度"] = "中等衰减"
+                item["备注"] = "部分柱位被反吟/伏吟支配，三会/三合合力受阻但不消失"
+            else:
+                item["强度"] = "消融吸收"
+                item["备注"] = "被反吟/伏吟完全吸收，独立作用消失"
+            modulated.append(item)
+            continue
+
+        # ── TIER 1: 三会 / 三合 ──
+        if itype == "三会":
+            item["强度"] = "强势主流"
+            item.setdefault("备注", "三会方位成局，主导全局")
+            modulated.append(item)
+            continue
+        if itype == "三合":
+            item["强度"] = "强势主流"
+            item.setdefault("备注", "三合全局成形，合力主导运势")
+            modulated.append(item)
+            continue
+
+        # ── TIER 1.5: 拱会 / 残会 — partial directional structures ──
+        if itype == "拱会":
+            item["强度"] = "显著影响"
+            item.setdefault("备注", "大运与命盘拱会，虚拟引力指向缺失方位")
+            modulated.append(item)
+            continue
+        if itype == "残会":
+            item["强度"] = "显著影响"
+            item.setdefault("备注", "大运与命盘残会，方位带头但尷支鸽翁未齐")
+            modulated.append(item)
+            continue
+
+        # Interactions on pillars dominated by 三会 or 三合
+        if idx is not None and idx in (san_hui_pillars | san_he_pillars):
+            if itype in ("六合", "半合"):
+                item["强度"] = "大幅衰减"
+                item["备注"] = "被三会/三合压制，合力弱化"
+            elif itype in ("拱会", "残会"):
+                item["强度"] = "大幅衰减"
+                item["备注"] = "被三会/三合压制，拱/残会势力被吸收"
+            elif itype in ("六冲", "开库"):
+                item["强度"] = "中等衰减"
+                item["备注"] = "与三会/三合结构形成张力，冲力被部分吸收"
+            elif itype in ("六害", "六破", "无恩之刑", "恃势之刑", "无礼之刑", "自刑"):
+                item["强度"] = "大幅衰减"
+                item["备注"] = "被三会/三合压制，摩擦衰减"
+            else:
+                item.setdefault("强度", "显著影响")
+            modulated.append(item)
+            continue
+
+        # ── TIER 2: 六冲 ──
+        _direction_cn = {"Wood": "木", "Fire": "火", "Metal": "金", "Water": "水"}
+        if itype == "六冲":
+            if idx is not None and idx in natal_san_hui_pillars:
+                direction = _direction_cn.get(
+                    natal_san_hui_pillars[idx], natal_san_hui_pillars[idx]
+                )
+                item["强度"] = "大幅衰减"
+                item["备注"] = f"命盘{direction}三会护体，大运冲力大幅衰减"
+            elif idx is not None and idx in natal_san_he_pillars:
+                element = natal_san_he_pillars[idx]
+                item["强度"] = "大幅衰减"
+                item["备注"] = f"命盘{element}三合护体，大运冲力大幅衰减"
+            else:
+                item["强度"] = "强势主流"
+                item.setdefault("备注", "大运六冲，结构破位激活")
+            modulated.append(item)
+            continue
+
+        # ── TIER 2 special: 开库 ──
+        if itype == "开库":
+            if item.get("钥匙受困"):
+                item["强度"] = "大幅衰减"
+                item["备注"] = "大运支被高优先级组合占用，开库之力大幅减弱"
+            else:
+                item["强度"] = "强势主流"
+                item.setdefault("备注", "大运钥匙自由，开库冲力完整激活")
+            modulated.append(item)
+            continue
+
+        # Interactions on pillars clashed by 六冲/开库
+        if idx is not None and idx in liu_chong_pillars:
+            if itype == "六合":
+                item["强度"] = "消融吸收"
+                item["备注"] = "被六冲摧毁，合力瓦解"
+            elif itype in ("半合", "拱会", "残会"):
+                item["强度"] = "大幅衰减"
+                item["备注"] = "六冲冲散半合/拱会/残会势力"
+            elif itype in ("六害", "六破"):
+                item["强度"] = "显著影响"
+                item["备注"] = "六冲加剧摩擦，冲害/冲破协同增强"
+            elif itype in ("无恩之刑", "恃势之刑", "无礼之刑"):
+                item["强度"] = "显著影响"
+                item["备注"] = "六冲与刑力协同，压力增强"
+            elif itype == "自刑":
+                item["强度"] = "显著影响"
+                item["备注"] = "冲力转化为外部冲突带来的内在自我怀疑"
+            else:
+                item.setdefault("强度", "显著影响")
+            modulated.append(item)
+            continue
+
+        # ── TIER 3: 六合 ──
+        if itype == "六合":
+            item["强度"] = "强势主流"
+            item.setdefault("备注", "大运六合，柱位稳定")
+            modulated.append(item)
+            continue
+
+        # Interactions on pillars harmonised by 六合
+        if idx is not None and idx in liu_he_pillars:
+            if itype in ("六害", "六破"):
+                item["强度"] = "消融吸收"
+                item["备注"] = "被六合吸收，摩擦消融"
+            elif itype in ("半合", "拱会", "残会"):
+                item["强度"] = "中等衰减"
+                item["备注"] = "被六合压制，半合/拱会/残会势力衰减"
+            elif itype in ("无恩之刑", "恃势之刑", "无礼之刑", "自刑"):
+                item["强度"] = "大幅衰减"
+                item["备注"] = "被六合压制，刑力衰减"
+            else:
+                item.setdefault("强度", "显著影响")
+            modulated.append(item)
+            continue
+
+        # ── BaZi principle: 天干合 > 天干克 on the Day Pillar ──
+        if itype == "天干克(日主)" and has_tian_gan_he_ri_zhu:
+            item["强度"] = "消融吸收"
+            item["备注"] = "日主天干已被合化，克力被合化消融"
+            modulated.append(item)
+            continue
+
+        # ── Default strength assignment for remaining interactions ──
+        if itype in ("天干合(日主)", "天干合"):
+            item["强度"] = "强势主流"
+            item.setdefault("备注", "天干合化，绑定激活")
+        elif itype == "天干克(日主)":
+            item["强度"] = "强势主流"
+            item.setdefault("备注", "大运天干直克日主，压力极大")
+        elif itype == "天干克":
+            item["强度"] = "显著影响"
+            item.setdefault("备注", "天干克，柱位有冲突")
+        elif itype == "半合":
+            item["强度"] = "强势主流"
+            item.setdefault("备注", "半合独立激活，部分合力")
+        elif itype in ("拱会", "残会"):
+            item["强度"] = "显著影响"
+            item.setdefault("备注", "拱会/残会独立激活，虚拟方位出现")
+        elif itype in ("无恩之刑", "恃势之刑", "无礼之刑", "自刑"):
+            item["强度"] = "强势主流"
+            item.setdefault("备注", "刑力独立激活")
+        elif itype in ("六害", "六破"):
+            item["强度"] = "显著影响"
+            item.setdefault("备注", "摩擦独立作用")
+        elif itype == "暗合":
+            item["强度"] = "强势主流"
+            item.setdefault("备注", "暗合隐秘作用")
+        else:
+            item.setdefault("强度", "强势主流")
+            item.setdefault("备注", "独立激活")
+
+        modulated.append(item)
+
+    # Sort by interaction tier
+    modulated.sort(key=lambda x: DA_YUN_TIER_ORDER.get(x.get("类型", ""), 99))
+    return modulated
+
 
 def _detect_global_triple_combinations(
     da_yun_branch: str, natal_branches: list
@@ -445,32 +679,30 @@ def _detect_da_yun_interactions(
     da_yun_stem: str, da_yun_branch: str, birth_chart: dict
 ) -> dict:
     """
-    Detect sophisticated Da Yun interactions with birth chart using 1x4 scan.
+    Detect Da Yun interactions with the birth chart using a 1x4 scan.
 
-    The Da Yun pillar acts as an External Trigger entering the birth chart system.
-    Implements Tier 0 (Fan Fu & Fu Yin), Tier 1 (Structural), and Tier 2/3 (Frictional) checks.
+    The Da Yun pillar acts as an External Trigger entering the birth chart.
+    All interactions are accumulated without manual locking, then passed through
+    apply_da_yun_master_priority() for hierarchical strength modulation.
 
-    Tier 0 Priority Checks:
-    - Fan Fu (反吟): Total Opposition - Da Yun stem and branch both clash with natal pillar
-    - Fu Yin (伏吟): Total Identity - Da Yun pillar exactly matches a natal pillar
+    Output schema mirrors interactions_gan_zhi_zuo_yong.py:
+        {类型, 组合, 组合明细, 状态, 强度, 备注, ...}
+    where 组合 uses "大运-年柱" / "大运-月柱" etc. to mark the external trigger side.
 
-    Tier 2 Special Case - Opening the Storehouse (开库):
-    - Earth branch clashes (辰-戌 or 丑-未) are treated differently from regular clashes
-    - Instead of predictable "high warning disorder," opening the storehouse releases the
-      hidden stems (天干魂气) and their ten gods within that natal branch
-    - Outcome depends on what's released: wealth stars = financial gain, officer stars = power shift,
-      printing stars = mentor appearance
-    - Warning level reduced from 高 to 中 due to nuanced interpretive potential
+    Da Yun-unique interaction types (handled before shared logic):
+    - 反吟: Da Yun stem AND branch both clash the same natal pillar → extreme instability
+    - 伏吟: Da Yun pillar exactly matches a natal pillar → stagnation / groaning decade
+    - 开库: Earth branch clash (辰↔戌 or 丑↔未) releasing hidden stems (Key vs Lock)
+    - 天干合(日主) / 天干克(日主): stem hit on the Day Master pillar → elevated severity
 
     Args:
         da_yun_stem (str): Da Yun heavenly stem
         da_yun_branch (str): Da Yun earthly branch
         birth_chart (dict): Birth chart with keys "year", "month", "day", "hour"
-                           Each containing "stem" and "branch" strings
+                            each containing "stem" and "branch" strings
 
     Returns:
-        dict: Organized interactions by pillar and tier
-              Special 开库 interactions include "释放天干" and "释放十神" fields
+        dict: {"作用": [list of modulated interaction dicts]}
     """
     if not da_yun_stem or not da_yun_branch:
         return {"作用": []}
@@ -490,422 +722,401 @@ def _detect_da_yun_interactions(
         birth_chart["hour"]["branch"],
     ]
 
-    interactions = []
-    locked_branches = set()  # Prevent zombie interactions
-    combined_pillars = (
-        set()
-    )  # Track Tier 1 (San Hui/San He) bindings - highest priority
-    harmonized_pillars = set()  # Track Tier 2A (Liu He) bindings - strong priority
-    clashed_pillars = (
-        set()
-    )  # Track Tier 2B (Liu Chong) bindings - can break punishments
+    all_interactions = []  # Accumulate raw; priority modulation applied afterwards
 
-    # === PRE-SCAN: Check if Da Yun branch is globally bound by triple combinations ===
-    # This MUST happen before the main 1x4 loop so that Key vs Lock logic is correct
+    # === PRE-SCAN: Is Da Yun branch globally bound by 三会 or 三合? ===
+    # This feeds into 开库 Key vs Lock logic.
     global_binding_info = _detect_global_triple_combinations(da_yun_branch, zhis)
-    da_yun_branch_bound = global_binding_info["is_bound"]  # Global binding status
-    globally_bound_pillars = global_binding_info[
-        "affected_indices"
-    ]  # Which pillars participate
+    da_yun_branch_bound = global_binding_info["is_bound"]
 
-    # Report global San Hui/San He combination (Tier 1A/1B - reported once globally)
+    # Report the global triple combination itself (once, tagged as global)
     if da_yun_branch_bound:
         combination_type = global_binding_info.get("combination_type")
         element = global_binding_info.get("element", "")
+        direction_cn_map = {"Wood": "木", "Fire": "火", "Metal": "金", "Water": "水"}
 
         if combination_type == "三会":
-            direction_cn = {
-                "Wood": "木",
-                "Fire": "火",
-                "Metal": "金",
-                "Water": "水",
-            }.get(element, element)
-            interactions.append(
+            direction_cn = direction_cn_map.get(element, element)
+            participating = sorted(global_binding_info["affected_indices"])
+            combo_pillars = "-".join(
+                ["大运"] + [pillar_names[k] for k in participating]
+            )
+            combo_detail = {pillar_names[k]: zhis[k] for k in participating}
+            combo_detail["大运"] = da_yun_branch
+            all_interactions.append(
                 {
-                    "优先级": "1_三会",
-                    "柱": "全局",
-                    "类型": f"三会{direction_cn}局",
-                    "描述": f"大运{da_yun_branch}与八字三会{direction_cn}局，该方位事业/学业易有突破",
-                    "警告等级": "无",
+                    "类型": "三会",
+                    "组合": combo_pillars,
+                    "组合明细": combo_detail,
+                    "状态": get_status("三会", {"key": "full"}),
+                    "元素": direction_cn,
                 }
             )
         elif combination_type == "三合":
-            interactions.append(
+            participating = sorted(global_binding_info["affected_indices"])
+            combo_pillars = "-".join(
+                ["大运"] + [pillar_names[k] for k in participating]
+            )
+            combo_detail = {pillar_names[k]: zhis[k] for k in participating}
+            combo_detail["大运"] = da_yun_branch
+            all_interactions.append(
                 {
-                    "优先级": "1_三合",
-                    "柱": "全局",
-                    "类型": f"三合{element}局",
-                    "描述": f"大运{da_yun_branch}与八字三合{element}局，合力促进相关运势",
-                    "警告等级": "无",
+                    "类型": "三合",
+                    "组合": combo_pillars,
+                    "组合明细": combo_detail,
+                    "状态": get_status("三合", {"key": "full"}),
+                    "元素": element,
                 }
             )
 
-    # 1x4 SCAN: Da Yun pillar vs each birth pillar
+    # === PRE-SCAN: Partial 三会 — 拱会 / 残会 ===
+    # When the Da Yun branch contributes to a PARTIAL directional frame (exactly one natal
+    # branch from the same 三会 group), we detect the subtype:
+    #   拱会 — Da Yun + one natal flank, BOTH non-cardinal → virtual pull toward missing cardinal
+    #   残会 — Da Yun is/pairs with the cardinal → king-present but one support missing
+    # These are NOT marked as bound (da_yun_branch_bound stays False here), so 开库 logic
+    # is unaffected.  They are Tier 1.5 structural signals below full 三会/三合.
+    if not da_yun_branch_bound:
+        direction_cn_map = {"Wood": "木", "Fire": "火", "Metal": "金", "Water": "水"}
+        for direction, group in directional_he.items():
+            if da_yun_branch in group:
+                # Collect natal branches that belong to this directional group
+                natal_matches = [(i, zhis[i]) for i in range(4) if zhis[i] in group]
+                if len(natal_matches) == 1:
+                    natal_idx, natal_branch = natal_matches[0]
+                    cardinal = directional_cardinal.get(direction)
+                    cardinal_present = (da_yun_branch == cardinal) or (
+                        natal_branch == cardinal
+                    )
+                    itype_partial = "残会" if cardinal_present else "拱会"
+                    missing_branch = next(
+                        (b for b in group if b != da_yun_branch and b != natal_branch),
+                        None,
+                    )
+                    direction_cn = direction_cn_map.get(direction, direction)
+                    combo_pillars = f"大运-{pillar_names[natal_idx]}"
+                    combo_detail_partial = {
+                        pillar_names[natal_idx]: natal_branch,
+                        "大运": da_yun_branch,
+                    }
+                    entry = {
+                        "类型": itype_partial,
+                        "方位": direction,
+                        "元素": direction_cn,
+                        "组合": combo_pillars,
+                        "组合明细": combo_detail_partial,
+                        "待会": missing_branch or "无",
+                        "状态": get_status(
+                            "三会",
+                            {"key": "residual" if cardinal_present else "arch"},
+                        ),
+                    }
+                    if not cardinal_present:
+                        entry["犹出"] = missing_branch or "无"
+                    all_interactions.append(entry)
+
+    # === 1x4 SCAN: Da Yun pillar vs each natal pillar ===
     for i in range(4):
         target_gan = gans[i]
         target_zhi = zhis[i]
         pillar = pillar_names[i]
+        combo = f"大运-{pillar}"
+        combo_detail = {"大运支": da_yun_branch, pillar: target_zhi}
+        combo_detail_stem = {"大运干": da_yun_stem, pillar: target_gan}
 
-        # === TIER 0: Fan Fu (反吟) - Total Opposition ===
+        # Distance semantics: Da Yun energy flows directly through 月柱 (i=1) and 日柱 (i=2)
+        # (its structural origin and the Day Master).  年柱 and 时柱 receive attenuated signal.
+        # is_adjacent=True  → 正X (immediate, full-force)
+        # is_adjacent=False → 遥X (mediated, reduced intensity)
+        is_adjacent = i in (1, 2)
+
+        # ── TIER 0A: 反吟 (Fan Fu) - Branch clash + Stem clash on same natal pillar ──
         if (
             clash_map.get(da_yun_branch) == target_zhi
             and stem_clashes.get(da_yun_stem) == target_gan
         ):
-            interactions.append(
+            all_interactions.append(
                 {
-                    "优先级": "0_反吟",
-                    "柱": pillar,
                     "类型": "反吟",
-                    "描述": f"大运与{pillar}干支皆反，主该柱位发生重大转折（若日柱则婚姻/健康危机）",
-                    "警告等级": "极高",
+                    "组合": combo,
+                    "组合明细": {
+                        "大运干": da_yun_stem,
+                        "大运支": da_yun_branch,
+                        pillar: f"{target_gan}{target_zhi}",
+                    },
+                    "状态": "干支皆反",
+                    "日柱特殊": i == 2,
                 }
             )
-            locked_branches.add(i)
-            continue
+            # No continue — lower-tier branch/stem interactions are recorded below
+            # and absorbed by apply_da_yun_master_priority (六冲, 天干克 become 消融吸收).
 
-        # === TIER 0B: Fu Yin (伏吟) - Total Identity ===
-        # Sui Yun Bing Lin (岁运并临): Da Yun pillar matches natal pillar exactly
-        # Warning severity depends on which pillar is affected:
-        # - Day Pillar (日柱): "极高" - directly impacts the self
-        # - Year Pillar (年柱): "高" - ancestral/family level impact
-        # - Other pillars (月/时): "高" - standard impact
+        # ── TIER 0B: 伏吟 (Fu Yin) - Da Yun pillar exactly matches natal pillar ──
         if da_yun_stem == target_gan and da_yun_branch == target_zhi:
-            # Adjust warning level based on pillar type
-            if i == 2:  # i=2 is Day Pillar (日柱)
-                warning_level = "极高"
-                description = f"大运与{pillar}干支完全相同（伏吟并临），主该十年自我心绪极度不宁、事倍功半，身心俱疲，或有呻吟之忧。直接作用于日主本身，影响深远。"
-            else:  # Year Pillar (i=0), Month Pillar (i=1), or Hour Pillar (i=3)
-                warning_level = "高"
-                description = f"大运与{pillar}干支完全相同（伏吟），主该十年该柱位心绪不宁、事倍功半，或有呻吟之忧。"
-
-            interactions.append(
+            all_interactions.append(
                 {
-                    "优先级": "0_伏吟",
-                    "柱": pillar,
                     "类型": "伏吟",
-                    "描述": description,
-                    "警告等级": warning_level,
+                    "组合": combo,
+                    "组合明细": {
+                        "大运干": da_yun_stem,
+                        "大运支": da_yun_branch,
+                        pillar: f"{target_gan}{target_zhi}",
+                    },
+                    "状态": "干支皆同",
+                    "日柱特殊": i == 2,
                 }
             )
-            locked_branches.add(i)
-            continue
+            # No continue — lower-tier interactions are recorded below and absorbed by
+            # apply_da_yun_master_priority.  When da_yun_branch == target_zhi (伏吟),
+            # guards below prevent spurious self-matches (半合, triple-刑); 自刑 is
+            # intentionally kept (e.g. 辰+辰 on 伏吟 is a valid feedback-loop signal).
 
-        # === TIER 2A: Liu He (六合) - Pairwise harmony ===
+        # ── Branch Interactions ──
+
+        # 六合
         if six_he_map.get(da_yun_branch) == target_zhi:
-            interactions.append(
+            all_interactions.append(
                 {
-                    "优先级": "2_六合",
-                    "柱": pillar,
                     "类型": "六合",
-                    "描述": f"大运与{pillar}六合，稳定或被约束该柱位",
-                    "警告等级": "无",
+                    "组合": combo,
+                    "组合明细": combo_detail,
+                    "紧贴": is_adjacent,
+                    "状态": get_status(
+                        "六合", {"key": "adjacent" if is_adjacent else "distant"}
+                    ),
                 }
             )
-            locked_branches.add(i)
-            harmonized_pillars.add(i)  # Mark as consumed by Tier 2A harmony
-            # Note: da_yun_branch_bound was already determined by pre-scan
-            continue  # Short-circuit to prevent lower tiers
 
-        # === TIER 2B: Liu Chong (六冲) - Direct opposition ===
-        # Special case: Earth branch clashes (辰-戌 or 丑-未) = "Opening the Storehouse" (开库)
-        if clash_map.get(da_yun_branch) == target_zhi and i not in locked_branches:
-            # Check if this is an Earth branch clash (开库)
-            earth_branch_clashes = {
-                "辰": "戌",
-                "戌": "辰",
-                "丑": "未",
-                "未": "丑",
-            }
-
-            if target_zhi in earth_branch_clashes:
-                # This is an Earth branch clash - "Opening the Storehouse" (开库)
-                # Key vs Lock Logic: Da Yun branch is the KEY. If it's bound (busy), it lacks force.
-                #
-                # If the Key (Da Yun branch) is bound by beneficial combinations (San Hui/San He/Liu He),
-                # it has no energy to "bump" open the Lock (natal tomb). The 开库 manifestation is suppressed.
-                #
-                # If the Key is free, it can open the Lock fully.
-
-                if da_yun_branch_bound:
-                    # Key is busy - cannot open the Lock properly
-                    description = f"大运{da_yun_branch}与{pillar}{target_zhi}相冲形成开库之象，但大运{da_yun_branch}已被高优先级组合所占用，缺乏剩余力量撬开该柱位。库象虽存在，冲击力大幅减弱，难以真正释放内部力量。"
-                    warning_level = "低"
-                else:
-                    # Key is free - can open the Lock fully
-                    # Get hidden stems from the natal branch being opened
-                    hidden_stems = LunarUtil.ZHI_HIDE_GAN.get(target_zhi, [])
-                    hidden_stem_names = (
-                        "、".join(hidden_stems) if hidden_stems else "未知"
-                    )
-                    hidden_stem_ten_gods = [
-                        _get_shi_shen_for_stem_pair(day_stem, stem)
-                        for stem in hidden_stems
-                    ]
-                    ten_god_names = (
-                        "、".join(hidden_stem_ten_gods)
-                        if hidden_stem_ten_gods
-                        else "未知"
-                    )
-
-                    description = f"大运{da_yun_branch}与{pillar}{target_zhi}相冲形成开库，释放该柱位的隐藏天干（{hidden_stem_names}）及其十神力量（{ten_god_names}）。若释放财星，可能财运亨通；若释放官星，可能权力变化；若释放印星，可能贵人现身。"
-                    warning_level = "中"
-
-                interactions.append(
+        # 六冲 — with 开库 special case for Earth-branch pairs
+        if clash_map.get(da_yun_branch) == target_zhi:
+            earth_tomb_pairs = {"辰": "戌", "戌": "辰", "丑": "未", "未": "丑"}
+            if target_zhi in earth_tomb_pairs:
+                # 开库: Key (Da Yun branch) vs Lock (natal tomb branch)
+                hidden_stems = LunarUtil.ZHI_HIDE_GAN.get(target_zhi, [])
+                hidden_ten_gods = [
+                    _get_shi_shen_for_stem_pair(day_stem, s) for s in hidden_stems
+                ]
+                all_interactions.append(
                     {
-                        "优先级": "2_开库",
-                        "柱": pillar,
                         "类型": "开库",
-                        "描述": description,
-                        "警告等级": warning_level,
+                        "组合": combo,
+                        "组合明细": combo_detail,
+                        "紧贴": is_adjacent,
+                        "状态": (
+                            "大运钥匙受困，库力受阻"
+                            if da_yun_branch_bound
+                            else "开库冲出，库藏释放"
+                        ),
+                        "钥匙受困": da_yun_branch_bound,
                         "释放天干": (
-                            "、".join(LunarUtil.ZHI_HIDE_GAN.get(target_zhi, []))
+                            "、".join(hidden_stems)
                             if not da_yun_branch_bound
                             else "(被组合所占用，释放力减弱)"
                         ),
                         "释放十神": (
-                            "、".join(
-                                [
-                                    _get_shi_shen_for_stem_pair(day_stem, stem)
-                                    for stem in LunarUtil.ZHI_HIDE_GAN.get(
-                                        target_zhi, []
-                                    )
-                                ]
-                            )
+                            "、".join(hidden_ten_gods)
                             if not da_yun_branch_bound
                             else "(被组合所占用，释放力减弱)"
                         ),
                     }
                 )
             else:
-                # Regular clash for non-Earth branches (no Key vs Lock logic needed)
-                interactions.append(
+                all_interactions.append(
                     {
-                        "优先级": "2_六冲",
-                        "柱": pillar,
                         "类型": "六冲",
-                        "描述": f"大运与{pillar}相冲，该柱位可能有破位、搬家、工作变动",
-                        "警告等级": "高",
+                        "组合": combo,
+                        "组合明细": combo_detail,
+                        "紧贴": is_adjacent,
+                        "状态": get_status(
+                            "六冲", {"key": "adjacent" if is_adjacent else "distant"}
+                        ),
                     }
                 )
 
-            locked_branches.add(i)
-            clashed_pillars.add(
-                i
-            )  # Mark as consumed by Tier 2B clash - can break punishments
-            continue
-
-        # === TIER 3A: Ban He (半合) - Partial triple ===
+        # 半合 — guard: skip when da_yun_branch == target_zhi (spurious self-match on 伏吟)
         for element, group in triple_he.items():
-            if da_yun_branch in group and target_zhi in group:
+            if (
+                da_yun_branch != target_zhi
+                and da_yun_branch in group
+                and target_zhi in group
+            ):
                 cardinal = cardinal_branches.get(element)
-                # Check if cardinal is present in birth chart OR if Da Yun IS the cardinal
                 branches_with_da_yun = zhis + [da_yun_branch]
-                strength = "强" if cardinal in branches_with_da_yun else "弱"
-                interactions.append(
+                if cardinal in branches_with_da_yun:
+                    state = "strong"
+                elif da_yun_branch != cardinal and target_zhi != cardinal:
+                    state = "arching"
+                else:
+                    state = "weak"
+                all_interactions.append(
                     {
-                        "优先级": "3_半合",
-                        "柱": pillar,
-                        "类型": f"半合{element}局({strength})",
-                        "描述": f"大运与{pillar}半合{element}局({strength})，部分促进作用",
-                        "警告等级": "无",
+                        "类型": "半合",
+                        "元素": element,
+                        "组合": combo,
+                        "组合明细": combo_detail,
+                        "状态": get_status(
+                            "半合", {"element": element, "state": state}
+                        ),
+                        "邀出": cardinal if state == "arching" else "无",
+                        "紧贴": is_adjacent,
                     }
                 )
                 break
 
-        # === TIER 3B: Liu Hai (六害) - Damage relationships ===
-        # Principle: Harm is weakened if the branch is consumed by Tier 1 (combination) or Tier 2A (harmony)
-        if harm_map.get(da_yun_branch) == target_zhi and i not in locked_branches:
-            if i in combined_pillars or i in harmonized_pillars:
-                # Branch is "happy" with its binding, weakens the Harm manifestation
-                warning_level = "低"
-                description = f"大运与{pillar}相害，但该柱位已被较高优先级的组合或和谐所吸收，冲击力减弱"
-            else:
-                # Normal Harm manifestation
-                warning_level = "中"
-                description = f"大运与{pillar}相害，该柱位易有背叛、健康问题或冲突"
-
-            interactions.append(
+        # 六害
+        if harm_map.get(da_yun_branch) == target_zhi:
+            all_interactions.append(
                 {
-                    "优先级": "3_六害",
-                    "柱": pillar,
                     "类型": "六害",
-                    "描述": description,
-                    "警告等级": warning_level,
+                    "组合": combo,
+                    "组合明细": combo_detail,
+                    "紧贴": is_adjacent,
+                    "状态": get_status(
+                        "六害", {"key": "adjacent" if is_adjacent else "distant"}
+                    ),
                 }
             )
-            continue
 
-        # === TIER 3C: Liu Po (六破) - Breaking relationships ===
-        # Principle: Break is weakened if the branch is consumed by Tier 1 (combination) or Tier 2A (harmony)
-        if break_map.get(da_yun_branch) == target_zhi and i not in locked_branches:
-            if i in combined_pillars or i in harmonized_pillars:
-                # Branch is "busy" with its binding, further weakens the Break manifestation
-                warning_level = "极低"
-                description = f"大运与{pillar}相破，但该柱位已被较高优先级的组合或和谐所吸收，实际影响微弱"
-            else:
-                # Normal Break manifestation
-                warning_level = "低"
-                description = f"大运与{pillar}相破，该柱位有隐性损害或裂痕"
-
-            interactions.append(
+        # 六破
+        if break_map.get(da_yun_branch) == target_zhi:
+            all_interactions.append(
                 {
-                    "优先级": "3_六破",
-                    "柱": pillar,
                     "类型": "六破",
-                    "描述": description,
-                    "警告等级": warning_level,
-                }
-            )
-            continue
-
-        # === TIER 4: San Xing (三刑) - Punishments ===
-        # Principle: Clash (Tier 2B) can break/transform Punishments (Tier 4)
-        # If Liu Chong exists on this pillar, the Punishment is "shattered" by external force
-
-        # Ungrateful Punishment (恩将仇报)
-        if (
-            da_yun_branch in ungrateful_punishment_branches
-            and target_zhi in ungrateful_punishment_branches
-        ):
-            # Skip if this pillar is already shattered by a Clash
-            if i in clashed_pillars:
-                continue  # The Clash takes center stage, Punishment is transformed/broken
-
-            count = sum(1 for z in zhis if z in ungrateful_punishment_branches)
-            label = "三刑(恩将仇报)" if count == 3 else "半刑(恩将仇报)"
-            interactions.append(
-                {
-                    "优先级": "4_三刑",
-                    "柱": pillar,
-                    "类型": label,
-                    "描述": f"大运与{pillar}{label}，该柱位易显现忘恩负义或被背叛",
-                    "警告等级": "高",
+                    "组合": combo,
+                    "组合明细": combo_detail,
+                    "紧贴": is_adjacent,
+                    "状态": get_status(
+                        "六破", {"key": "adjacent" if is_adjacent else "distant"}
+                    ),
                 }
             )
 
-        # Bullying Punishment (欺负)
-        if (
-            da_yun_branch in bullying_punishment_branches
-            and target_zhi in bullying_punishment_branches
-        ):
-            # Skip if this pillar is already shattered by a Clash
-            if i in clashed_pillars:
-                continue  # The Clash takes center stage, Punishment is transformed/broken
-
-            count = sum(1 for z in zhis if z in bullying_punishment_branches)
-            label = "三刑(欺负)" if count == 3 else "半刑(欺负)"
-            interactions.append(
-                {
-                    "优先级": "4_三刑",
-                    "柱": pillar,
-                    "类型": label,
-                    "描述": f"大运与{pillar}{label}，该柱位易显现欺凌或被欺凌",
-                    "警告等级": "高",
-                }
+        # ── PUNISHMENTS (三刑) ──
+        # Use set-based validator to detect all punishment types
+        # (ungrateful, bullying, rude, self). Skips self-matches on 伏吟 pillars.
+        if da_yun_branch != target_zhi:
+            punishment_result = is_valid_punishment(
+                da_yun_branch, target_zhi, natal_branches=zhis
             )
 
-        # Self-Punishment (自刑)
-        pair_key = "".join(sorted([da_yun_branch, target_zhi]))
-        if pair_key in ["辰辰", "午午", "酉酉", "亥亥"]:
-            # Self-Punishment nuance: Even if pillar is clashed, still report as internal psychological state
-            if i in clashed_pillars:
-                # Clash takes center stage: Self-Punishment becomes internal doubt/sabotage from external conflict
-                interactions.append(
+            if punishment_result:
+                punishment_type = punishment_result["type"]
+                is_full = punishment_result["is_full"]
+
+                # Map punishment type to internal codes for get_status()
+                if punishment_type == "无恩之刑":
+                    punishment_code = "ungrateful"
+                elif punishment_type == "恃势之刑":
+                    punishment_code = "bullying"
+                elif punishment_type == "无礼之刑":
+                    punishment_code = "uncivilized"
+                elif punishment_type == "自刑":
+                    punishment_code = "self"
+                else:
+                    punishment_code = "unknown"
+
+                all_interactions.append(
                     {
-                        "优先级": "4_自刑",
-                        "柱": pillar,
-                        "类型": "自刑",
-                        "描述": f"因受冲力影响，自刑之象转化为外部冲突带来的自我怀疑。大运与{pillar}相冲时产生的内在心理冲突，表现为自我否定或自我破坏行为",
-                        "警告等级": "低",
-                    }
-                )
-            else:
-                # Free pillar: Pure self-punishment as internal psychological state
-                interactions.append(
-                    {
-                        "优先级": "4_自刑",
-                        "柱": pillar,
-                        "类型": "自刑",
-                        "描述": f"大运与{pillar}自刑，该柱位易引发自伤行为或内疚",
-                        "警告等级": "中",
+                        "类型": punishment_type,
+                        "组合": combo,
+                        "组合明细": combo_detail,
+                        "紧贴": is_adjacent,
+                        "状态": get_status(
+                            "三刑",
+                            {
+                                "punishment_type": punishment_code,
+                                "is_full": is_full,
+                                "is_adjacent": is_adjacent,
+                            },
+                        ),
                     }
                 )
 
-        # === TIER 5: Hidden Stem Combinations (暗合) ===
+        # 暗合
         if hidden_stem_he.get(da_yun_branch) == target_zhi:
-            interactions.append(
+            all_interactions.append(
                 {
-                    "优先级": "5_暗合",
-                    "柱": pillar,
                     "类型": "暗合",
-                    "描述": f"大运与{pillar}暗合，私下或隐性的和谐作用",
-                    "警告等级": "无",
+                    "组合": combo,
+                    "组合明细": combo_detail,
+                    "状态": get_status("暗合"),
                 }
             )
 
-        # === Stem Interactions (Heavenly Stems) ===
-        # Stem Combine
+        # ── TIER 2: 比和 (Peer Combinations) ──
+        # Adjacent branches of the same element: supportive but not binding
+        peer_result = is_valid_peer_combination(da_yun_branch, target_zhi)
+        if peer_result:
+            all_interactions.append(
+                {
+                    "类型": "比和",
+                    "组合": combo,
+                    "组合明细": combo_detail,
+                    "元素": peer_result["element"],
+                    "紧贴": is_adjacent,
+                    "状态": get_status(
+                        "比和",
+                        {"key": "adjacent" if is_adjacent else "distant"},
+                    ),
+                }
+            )
+
+        # ── Stem Interactions ──
+
+        # 天干合 — special case when combining with Day Master
         if stem_combines.get(da_yun_stem) == target_gan:
-            # Special Case: Day Master Being Joined (日主被合) - Double-edged sword
-            if i == 2:  # i=2 is the Day Pillar (Day Master/Self)
-                # Check branch rooting (is the combination "tight" or "loose"?)
-                rooting_info = _check_branch_rooting(da_yun_stem, da_yun_branch)
+            rooting_info = _check_branch_rooting(da_yun_stem, da_yun_branch)
+            all_interactions.append(
+                {
+                    "类型": "天干合(日主)" if i == 2 else "天干合",
+                    "组合": f"大运-{pillar}",
+                    "组合明细": combo_detail_stem,
+                    "状态": get_status("天干合"),
+                    "日柱特殊": i == 2,
+                    "根基强度": rooting_info["strength"],
+                    "根基说明": rooting_info["interpretation"],
+                }
+            )
 
-                # Construct detailed interaction record
-                interactions.append(
-                    {
-                        "优先级": "1_日主被合",
-                        "柱": pillar,
-                        "类型": "天干合(日主)",
-                        "描述": f"大运天干与日主相合，主该十年与人事物深度绑定。可能婚配、重大合作或执着沉溺，需警惕失去独立性。根基状态：{rooting_info['strength']}。",
-                        "警告等级": "中",
-                        "根基强度": rooting_info["strength"],
-                        "根基说明": rooting_info["interpretation"],
-                    }
-                )
-            else:
-                # Regular stem combine with other pillars
-                interactions.append(
-                    {
-                        "优先级": "2_天干合",
-                        "柱": pillar,
-                        "类型": "天干合",
-                        "描述": f"大运干与{pillar}干相合，该柱位性格或行动更协调",
-                        "警告等级": "无",
-                    }
-                )
-
-        # Stem Clash
+        # 天干克 — special case when clashing Day Master
         if stem_clashes.get(da_yun_stem) == target_gan:
-            # Special Case: Day Master Under Attack (日主受克) - Highest severity
-            if i == 2:  # i=2 is the Day Pillar (Day Master/Self)
-                # Check branch rooting (is the attack "strong" or "weak"?)
-                rooting_info = _check_branch_rooting(da_yun_stem, da_yun_branch)
+            rooting_info = _check_branch_rooting(da_yun_stem, da_yun_branch)
+            all_interactions.append(
+                {
+                    "类型": "天干克(日主)" if i == 2 else "天干克",
+                    "组合": f"大运-{pillar}",
+                    "组合明细": combo_detail_stem,
+                    "状态": get_status(
+                        "天干克", {"key": "adjacent" if is_adjacent else "distant"}
+                    ),
+                    "日柱特殊": i == 2,
+                    "根基强度": rooting_info["strength"],
+                    "根基说明": rooting_info["interpretation"],
+                }
+            )
 
-                interactions.append(
-                    {
-                        "优先级": "0_日主受克",
-                        "柱": pillar,
-                        "类型": "天干克(日主)",
-                        "描述": f"大运天干直接克制日主，主该十年压力极大。需关注身体健康与意外。根基状态：{rooting_info['strength']}。",
-                        "警告等级": "极高",
-                        "根基强度": rooting_info["strength"],
-                        "根基说明": rooting_info["interpretation"],
-                    }
-                )
-            else:
-                # Regular stem clash with other pillars
-                interactions.append(
-                    {
-                        "优先级": "2_天干克",
-                        "柱": pillar,
-                        "类型": "天干克",
-                        "描述": f"大运干与{pillar}干相克，该柱位性格或行动有冲突",
-                        "警告等级": "低",
-                    }
-                )
+        # 天干冲 — Heavenly Stem Opposition
+        if (da_yun_stem, target_gan) in stem_controls or (
+            target_gan,
+            da_yun_stem,
+        ) in stem_controls:
+            rooting_info = _check_branch_rooting(da_yun_stem, da_yun_branch)
+            all_interactions.append(
+                {
+                    "类型": "天干冲",
+                    "组合": f"大运-{pillar}",
+                    "组合明细": combo_detail_stem,
+                    "状态": get_status(
+                        "天干冲", {"key": "adjacent" if is_adjacent else "distant"}
+                    ),
+                    "根基强度": rooting_info["strength"],
+                    "根基说明": rooting_info["interpretation"],
+                }
+            )
 
-    return {"作用": interactions}
+    # Apply Da Yun-specific priority modulation (replaces manual lock system)
+    modulated = apply_da_yun_master_priority(all_interactions, zhis)
+    return {"作用": modulated}
 
 
 # ============================================================================
@@ -1287,7 +1498,7 @@ def get_da_yun(lunar_birthday: Lunar, gender: int) -> dict:
     yun = bazi.getYun(gender)
 
     # Get the solar date when 起运 begins
-    start_solar = yun.getStartSolar()
+    qi_yun_date = yun.getStartSolar()
 
     # Get all 大运 (Big Luck Cycles) - default 10 cycles
     da_yun_list = yun.getDaYun()
@@ -1374,8 +1585,9 @@ def get_da_yun(lunar_birthday: Lunar, gender: int) -> dict:
         "大运": {
             "起运": {
                 "性别": "男" if gender == 1 else "女",
-                "出生地阳历": lunar_birthday.getSolar().toYmdHms(),
-                "起运时间": start_solar.toYmdHms(),
+                "出生阳历": lunar_birthday.getSolar().toYmdHms(),
+                "出生农历": f"{lunar_birthday.getYear()}-{lunar_birthday.getMonth():02d}-{lunar_birthday.getDay():02d} {lunar_birthday.getHour():02d}:{lunar_birthday.getMinute():02d}:{lunar_birthday.getSecond():02d}",
+                "起运时间": qi_yun_date.toYmdHms(),
                 "起运前时间": f"{yun.getStartYear()}年{yun.getStartMonth()}月{yun.getStartDay()}天{yun.getStartHour()}小时",
                 "顺逆": "顺推" if yun.isForward() else "逆推",
             },
@@ -1398,17 +1610,19 @@ if __name__ == "__main__":
     # python -m src.astronomer_calculations.da_yun
 
     # Desmond's birthday example - Female test
-    # solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)
-    # datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)
-    # tst_birthday, _ = get_true_solar_time(datetime_birthday, 1.3253, 103.808053)
-
+    solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)
+    datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)
+    tst_birthday, _ = get_true_solar_time(datetime_birthday, 1.3253, 103.808053)
 
     # Corinne's birthday example
-    solar_birthday= Solar.fromYmdHms(1987, 6, 3, 12, 6, 0)  # Create solar date June 3, 1987 at 12:06 PM
-    tst_birthday, inputs_report = get_true_solar_time(datetime(1987, 6, 3, 12, 6, 0), 1.4759, 103.808053)
+    # solar_birthday = Solar.fromYmdHms(
+    #     1987, 6, 3, 12, 6, 0
+    # )  # Create solar date June 3, 1987 at 12:06 PM
+    # tst_birthday, inputs_report = get_true_solar_time(
+    #     datetime(1987, 6, 3, 12, 6, 0), 1.4759, 103.808053
+    # )
     lunar_birthday = tst_birthday.getLunar()
 
-    print("八字")
     bazi_json = get_bazi_pillars(tst_birthday.getLunar())
     print(f"八字: {bazi_json}")
 
@@ -1417,5 +1631,5 @@ if __name__ == "__main__":
     # print(json.dumps(result, ensure_ascii=False, indent=2))
 
     print("\n=== Male (Gender=1) ===")
-    result = get_da_yun(lunar_birthday, gender=0)
+    result = get_da_yun(lunar_birthday, gender=1)
     print(json.dumps(result, ensure_ascii=False, indent=2))
