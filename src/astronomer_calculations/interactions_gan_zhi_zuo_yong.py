@@ -280,26 +280,125 @@ hidden_stem_he = {
     "申": "卯",
 }
 
-# "Three Punishments" (三刑 - San Xing) with full/partial detection
-# Ungrateful (恩将仇报): 寅-巳-申 (needs all 3 for FULL, just 2 is PARTIAL)
-# Bullying (欺负): 丑-未-戌 (needs all 3 for FULL, just 2 is PARTIAL)
-# Uncivilized (无礼): 子-卯 (simple pair)
-# Self-Punishment: 辰-辰, 午-午, 酉-酉, 亥-亥
+# "Three Punishments" (三刑 - San Xing)
+# All punishment types are now validated via is_valid_punishment() using set logic
 
-ungrateful_punishment_branches = {"寅", "巳", "申"}
-bullying_punishment_branches = {"丑", "未", "戌"}
-uncivilized_punishment_pairs = {
-    "子卯": "刑",
-    "卯子": "刑",
-}
-self_punishment_branches = {"辰", "午", "酉", "亥"}
+# ============================================================================
+# STRUCTURED PUNISHMENT DEFINITIONS (Set-based validation)
+# ============================================================================
+# Pure set-based logic to validate all punishment types. Replaces old
+# branch-group approximations which could not handle mixed cases.
+# Example: 丑戌 is now correctly identified as a valid bullying pair.
 
-punishments = {
-    "辰辰": "自刑",
-    "午午": "自刑",
-    "酉酉": "自刑",
-    "亥亥": "自刑",
+UNGRATEFUL_PUNISHMENT = {
+    "name": "无恩之刑 (Ungrateful Punishment)",
+    "universe": {"寅", "巳", "申"},
+    "rule": "Any 2 or 3 elements from {寅,巳,申}",
+    "notes": "Note: 巳申 also forms harmony — both effects can coexist",
 }
+
+BULLYING_PUNISHMENT = {
+    "name": "恃势之刑 (Bullying Punishment)",
+    "universe": {"丑", "戌", "未"},
+    "rule": "Any 2 or 3 elements from {丑,戌,未} — all pairs are valid",
+    "notes": "All pairs valid. 丑未 also forms clash; both effects operate.",
+}
+
+RUDE_PUNISHMENT = {
+    "name": "无礼之刑 (Rude Punishment)",
+    "universe": {"子", "卯"},
+    "rule": "Exclusive pair {子,卯}",
+}
+
+SELF_PUNISHMENT = {
+    "name": "自刑 (Self Punishment)",
+    "universe": {"辰", "午", "酉", "亥"},
+    "rule": "Same branch appears at least twice",
+    "notes": "Different self branches (e.g., 辰+午) do NOT form punishment",
+}
+
+
+def is_valid_punishment(
+    branch1: str, branch2: str, natal_branches: list = None
+) -> dict | None:
+    """
+    Universal punishment validator using set-based logic.
+
+    Parameters:
+        branch1: First branch
+        branch2: Second branch
+        natal_branches: Optional list of 4 natal branches [year, month, day, hour]
+                      Used to count total occurrences for full/partial classification
+
+    Returns:
+        dict with keys:
+            - "type": punishment type name (e.g., "无恩之刑")
+            - "is_full": True if all 3 members present (when applicable)
+            - "triple_count": number of distinct branches from the punishment universe
+        OR None if no punishment detected
+
+    Examples:
+        is_valid_punishment("寅", "巳") → {"type": "无恩之刑", "is_full": False, "triple_count": 2}
+        is_valid_punishment("子", "卯") → {"type": "无礼之刑", "is_full": True, "triple_count": 2}
+        is_valid_punishment("辰", "辰") → {"type": "自刑", "is_full": True, "triple_count": 1}
+    """
+
+    # Handle self-punishment (identical branches)
+    if branch1 == branch2 and branch1 in SELF_PUNISHMENT["universe"]:
+        return {
+            "type": "自刑",
+            "is_full": True,
+            "triple_count": 1,
+        }
+
+    # Skip if branches are identical but not self-punishing
+    if branch1 == branch2:
+        return None
+
+    # Create set of branches to check
+    branches_set = {branch1, branch2}
+
+    # Check rude punishment (exclusive pair)
+    if branches_set == RUDE_PUNISHMENT["universe"]:
+        return {
+            "type": "无礼之刑",
+            "is_full": True,
+            "triple_count": 2,
+        }
+
+    # Check ungrateful punishment (subset of {寅,巳,申})
+    if branches_set.issubset(UNGRATEFUL_PUNISHMENT["universe"]):
+        if natal_branches:
+            # Count how many distinct members of the universe appear in natal + da_yun
+            total_set = set(natal_branches) | branches_set
+            triple_count = len(total_set & UNGRATEFUL_PUNISHMENT["universe"])
+        else:
+            triple_count = len(branches_set)
+
+        return {
+            "type": "无恩之刑",
+            "is_full": triple_count == 3,
+            "triple_count": triple_count,
+        }
+
+    # Check bullying punishment (subset of {丑,戌,未})
+    if branches_set.issubset(BULLYING_PUNISHMENT["universe"]):
+        if natal_branches:
+            # Count how many distinct members of the universe appear in natal + da_yun
+            total_set = set(natal_branches) | branches_set
+            triple_count = len(total_set & BULLYING_PUNISHMENT["universe"])
+        else:
+            triple_count = len(branches_set)
+
+        return {
+            "type": "恃势之刑",
+            "is_full": triple_count == 3,
+            "triple_count": triple_count,
+        }
+
+    # No punishment detected
+    return None
+
 
 # Stem Interactions
 stem_combines = {
@@ -1285,15 +1384,11 @@ def get_interactions(lunar_birthday):
             # === INDEPENDENT CHECKS: These can coexist with the short-circuit relationships ===
             # Punishments add "flavor" to primary relationships (e.g., "Clash" + "Ungrateful Punishment")
 
-            # Check for Full/Partial Ungrateful Punishment (寅-巳-申)
-            if (
-                b_i in ungrateful_punishment_branches
-                and b_j in ungrateful_punishment_branches
-            ):
-                ungrateful_count = sum(
-                    1 for branch in zhis if branch in ungrateful_punishment_branches
-                )
-                label_cn = "刑(恩将仇报)" if ungrateful_count == 3 else "刑(半恩将仇报)"
+            # Check for Full/Partial Ungrateful Punishment (寅-巳-申) using set-based validator
+            ungrateful_result = is_valid_punishment(b_i, b_j, natal_branches=zhis)
+            if ungrateful_result and ungrateful_result["type"] == "无恩之刑":
+                is_full = ungrateful_result["is_full"]
+                label_cn = "刑(恩将仇报)" if is_full else "刑(半恩将仇报)"
 
                 xing_detail = {
                     "类型": "无恩之刑",
@@ -1304,7 +1399,7 @@ def get_interactions(lunar_birthday):
                         "三刑",
                         {
                             "punishment_type": "ungrateful",
-                            "is_full": ungrateful_count == 3,
+                            "is_full": is_full,
                         },
                     ),
                 }
@@ -1322,15 +1417,11 @@ def get_interactions(lunar_birthday):
                     f"{pillar_names_abr[i]}{pillar_names_abr[j]}({b_i}{b_j}){label_cn}"
                 )
 
-            # Check for Full/Partial Bullying Punishment (丑-未-戌)
-            if (
-                b_i in bullying_punishment_branches
-                and b_j in bullying_punishment_branches
-            ):
-                bullying_count = sum(
-                    1 for branch in zhis if branch in bullying_punishment_branches
-                )
-                label_cn = "刑(欺负)" if bullying_count == 3 else "刑(半欺负)"
+            # Check for Full/Partial Bullying Punishment (丑-未-戌) using set-based validator
+            bullying_result = is_valid_punishment(b_i, b_j, natal_branches=zhis)
+            if bullying_result and bullying_result["type"] == "恃势之刑":
+                is_full = bullying_result["is_full"]
+                label_cn = "刑(欺负)" if is_full else "刑(半欺负)"
 
                 xing_detail = {
                     "类型": "恃势之刑",
@@ -1339,7 +1430,7 @@ def get_interactions(lunar_birthday):
                     "紧贴": is_adjacent,
                     "状态": get_status(
                         "三刑",
-                        {"punishment_type": "bullying", "is_full": bullying_count == 3},
+                        {"punishment_type": "bullying", "is_full": is_full},
                     ),
                 }
 
@@ -1356,8 +1447,9 @@ def get_interactions(lunar_birthday):
                     f"{pillar_names_abr[i]}{pillar_names_abr[j]}({b_i}{b_j}){label_cn}"
                 )
 
-            # Check for Uncivilized Punishment (子-卯)
-            if pair_key in uncivilized_punishment_pairs:
+            # Check for Uncivilized Punishment (子-卯) using set-based validator
+            rude_result = is_valid_punishment(b_i, b_j, natal_branches=zhis)
+            if rude_result and rude_result["type"] == "无礼之刑":
                 label_cn = "刑(无礼)"
                 xing_detail = {
                     "类型": "无礼之刑",
@@ -1383,9 +1475,10 @@ def get_interactions(lunar_birthday):
                     f"{pillar_names_abr[i]}{pillar_names_abr[j]}({b_i}{b_j}){label_cn}"
                 )
 
-            # Check for Self-Punishment (辰-辰, 午-午, 酉-酉, 亥-亥)
-            if pair_key in punishments and "自刑" in punishments.get(pair_key, ""):
-                label_cn = punishments[pair_key]
+            # Check for Self-Punishment (辰-辰, 午-午, 酉-酉, 亥-亥) using set-based validator
+            self_result = is_valid_punishment(b_i, b_j, natal_branches=zhis)
+            if self_result and self_result["type"] == "自刑":
+                label_cn = "刑(自刑)"
                 xing_detail = {
                     "类型": "自刑",
                     "组合": f"{pillar_names_cn[i]}-{pillar_names_cn[j]}",
