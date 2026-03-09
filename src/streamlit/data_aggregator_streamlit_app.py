@@ -121,6 +121,7 @@ with st.sidebar:
         "Select Gender",
         options=[0, 1],
         format_func=lambda x: "Female" if x == 0 else "Male",
+        index=1,
         horizontal=True,
     )
 
