@@ -297,7 +297,6 @@ def get_xiao_yun(lunar_birthday: Lunar, gender: int) -> dict:
             "纳音": nayin,  # Nayin element (harmonic resonance)
             "地势": di_shi,  # Life Stage (长生十二神)
             "十神": {
-                "主题": stem_shi_shen,  # Primary life theme (Year Stem Ten God)
                 "天干十神": stem_shi_shen,  # Year Stem Ten God (for clarity)
                 "地支十神": branch_shi_shen,  # Hidden themes (Main/Middle/Residual)
             },

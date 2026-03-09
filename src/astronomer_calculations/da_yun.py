@@ -1581,9 +1581,6 @@ def get_da_yun(lunar_birthday: Lunar, gender: int) -> dict:
             "纳音": nayin,  # Nayin element (harmonic resonance)
             "地势": di_shi,  # Life Stage (长生十二神)
             "十神": {
-                "主题": (
-                    stem_shi_shen if i > 0 else "未行大运"
-                ),  # Primary life theme (Stem Ten God)
                 "天干十神": (
                     stem_shi_shen if i > 0 else "未行大运"
                 ),  # Stem Ten God (for clarity)
