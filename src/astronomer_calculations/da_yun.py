@@ -309,7 +309,9 @@ DA_YUN_TIER_ORDER = {
 }
 
 
-def apply_da_yun_master_priority(all_interactions: list, zhis: list) -> list:
+def apply_da_yun_master_priority(
+    all_interactions: list, zhis: list, cycle_name: str = "大运"
+) -> list:
     """
     Post-calculation priority modulation for Da Yun interactions.
 
@@ -428,7 +430,10 @@ def apply_da_yun_master_priority(all_interactions: list, zhis: list) -> list:
         # ── TIER 0: 反吟 / 伏吟 — consume the entire natal pillar ──
         if itype in ("反吟", "伏吟"):
             item["强度"] = "强势主流"
-            item.setdefault("备注", "大运Tier0：干支全反/全同，该柱位完全支配")
+            if itype == "反吟":
+                item.setdefault("备注", f"反吟：干支皆反，该柱位被{cycle_name}完全支配")
+            else:  # 伏吟
+                item.setdefault("备注", f"伏吟：干支皆同，该柱位被{cycle_name}完全占据")
             modulated.append(item)
             continue
 
@@ -460,12 +465,14 @@ def apply_da_yun_master_priority(all_interactions: list, zhis: list) -> list:
         # ── TIER 1.5: 拱会 / 残会 — partial directional structures ──
         if itype == "拱会":
             item["强度"] = "显著影响"
-            item.setdefault("备注", "大运与命盘拱会，虚拟引力指向缺失方位")
+            item.setdefault(
+                "备注", f"拱会：命盘与{cycle_name}虚拟拱会，引力指向缺失方位"
+            )
             modulated.append(item)
             continue
         if itype == "残会":
             item["强度"] = "显著影响"
-            item.setdefault("备注", "大运与命盘残会，方位带头但尷支鸽翁未齐")
+            item.setdefault("备注", f"残会：命盘与{cycle_name}残会，方位带头但缺乏支撑")
             modulated.append(item)
             continue
 
@@ -503,7 +510,7 @@ def apply_da_yun_master_priority(all_interactions: list, zhis: list) -> list:
                 item["备注"] = f"命盘{element}三合护体，大运冲力大幅衰减"
             else:
                 item["强度"] = "强势主流"
-                item.setdefault("备注", "大运六冲，结构破位激活")
+                item.setdefault("备注", f"六冲：{cycle_name}冲力完整激活，结构破位")
             modulated.append(item)
             continue
 
@@ -511,10 +518,14 @@ def apply_da_yun_master_priority(all_interactions: list, zhis: list) -> list:
         if itype == "开库":
             if item.get("钥匙受困"):
                 item["强度"] = "大幅衰减"
-                item["备注"] = "大运支被高优先级组合占用，开库之力大幅减弱"
+                item["备注"] = (
+                    f"开库受阻：{cycle_name}支被高优先级组合占用，库力释放大幅减弱"
+                )
             else:
                 item["强度"] = "强势主流"
-                item.setdefault("备注", "大运钥匙自由，开库冲力完整激活")
+                item.setdefault(
+                    "备注", f"开库激活：{cycle_name}钥匙自由，库力释放完整激活"
+                )
             modulated.append(item)
             continue
 
@@ -543,7 +554,7 @@ def apply_da_yun_master_priority(all_interactions: list, zhis: list) -> list:
         # ── TIER 3: 六合 ──
         if itype == "六合":
             item["强度"] = "强势主流"
-            item.setdefault("备注", "大运六合，柱位稳定")
+            item.setdefault("备注", f"六合：{cycle_name}与命盘和谐共济，柱位稳定")
             modulated.append(item)
             continue
 
@@ -576,7 +587,7 @@ def apply_da_yun_master_priority(all_interactions: list, zhis: list) -> list:
             item.setdefault("备注", "天干合化，绑定激活")
         elif itype == "天干克(日主)":
             item["强度"] = "强势主流"
-            item.setdefault("备注", "大运天干直克日主，压力极大")
+            item.setdefault("备注", f"天干克(日主)：{cycle_name}直克日主，压力极大")
         elif itype == "天干克":
             item["强度"] = "显著影响"
             item.setdefault("备注", "天干克，柱位有冲突")
@@ -676,7 +687,7 @@ def _detect_global_triple_combinations(
 
 
 def _detect_da_yun_interactions(
-    da_yun_stem: str, da_yun_branch: str, birth_chart: dict
+    da_yun_stem: str, da_yun_branch: str, birth_chart: dict, pillar_prefix: str = "大运"
 ) -> dict:
     """
     Detect Da Yun interactions with the birth chart using a 1x4 scan.
@@ -687,7 +698,7 @@ def _detect_da_yun_interactions(
 
     Output schema mirrors interactions_gan_zhi_zuo_yong.py:
         {类型, 组合, 组合明细, 状态, 强度, 备注, ...}
-    where 组合 uses "大运-年柱" / "大运-月柱" etc. to mark the external trigger side.
+    where 组合 uses pillar_prefix-combined with pillar names (e.g., "大运-年柱", "小运-月柱").
 
     Da Yun-unique interaction types (handled before shared logic):
     - 反吟: Da Yun stem AND branch both clash the same natal pillar → extreme instability
@@ -700,12 +711,16 @@ def _detect_da_yun_interactions(
         da_yun_branch (str): Da Yun earthly branch
         birth_chart (dict): Birth chart with keys "year", "month", "day", "hour"
                             each containing "stem" and "branch" strings
+        pillar_prefix (str): Prefix for pillar combination strings (default "大运", can be "小运")
 
     Returns:
         dict: {"作用": [list of modulated interaction dicts]}
     """
     if not da_yun_stem or not da_yun_branch:
         return {"作用": []}
+
+    # Create cycle_name variable for context messages (used in 备注 fields)
+    cycle_name = pillar_prefix
 
     # Extract birth chart data
     day_stem = birth_chart["day"]["stem"]  # Day Master (日主) - reference for Ten Gods
@@ -739,10 +754,10 @@ def _detect_da_yun_interactions(
             direction_cn = direction_cn_map.get(element, element)
             participating = sorted(global_binding_info["affected_indices"])
             combo_pillars = "-".join(
-                ["大运"] + [pillar_names[k] for k in participating]
+                [pillar_prefix] + [pillar_names[k] for k in participating]
             )
             combo_detail = {pillar_names[k]: zhis[k] for k in participating}
-            combo_detail["大运"] = da_yun_branch
+            combo_detail[pillar_prefix] = da_yun_branch
             all_interactions.append(
                 {
                     "类型": "三会",
@@ -755,10 +770,10 @@ def _detect_da_yun_interactions(
         elif combination_type == "三合":
             participating = sorted(global_binding_info["affected_indices"])
             combo_pillars = "-".join(
-                ["大运"] + [pillar_names[k] for k in participating]
+                [pillar_prefix] + [pillar_names[k] for k in participating]
             )
             combo_detail = {pillar_names[k]: zhis[k] for k in participating}
-            combo_detail["大运"] = da_yun_branch
+            combo_detail[pillar_prefix] = da_yun_branch
             all_interactions.append(
                 {
                     "类型": "三合",
@@ -794,10 +809,10 @@ def _detect_da_yun_interactions(
                         None,
                     )
                     direction_cn = direction_cn_map.get(direction, direction)
-                    combo_pillars = f"大运-{pillar_names[natal_idx]}"
+                    combo_pillars = f"{pillar_prefix}-{pillar_names[natal_idx]}"
                     combo_detail_partial = {
                         pillar_names[natal_idx]: natal_branch,
-                        "大运": da_yun_branch,
+                        pillar_prefix: da_yun_branch,
                     }
                     entry = {
                         "类型": itype_partial,
@@ -820,9 +835,9 @@ def _detect_da_yun_interactions(
         target_gan = gans[i]
         target_zhi = zhis[i]
         pillar = pillar_names[i]
-        combo = f"大运-{pillar}"
-        combo_detail = {"大运支": da_yun_branch, pillar: target_zhi}
-        combo_detail_stem = {"大运干": da_yun_stem, pillar: target_gan}
+        combo = f"{pillar_prefix}-{pillar}"
+        combo_detail = {f"{pillar_prefix}支": da_yun_branch, pillar: target_zhi}
+        combo_detail_stem = {f"{pillar_prefix}干": da_yun_stem, pillar: target_gan}
 
         # Distance semantics: Da Yun energy flows directly through 月柱 (i=1) and 日柱 (i=2)
         # (its structural origin and the Day Master).  年柱 and 时柱 receive attenuated signal.
@@ -840,8 +855,8 @@ def _detect_da_yun_interactions(
                     "类型": "反吟",
                     "组合": combo,
                     "组合明细": {
-                        "大运干": da_yun_stem,
-                        "大运支": da_yun_branch,
+                        f"{pillar_prefix}干": da_yun_stem,
+                        f"{pillar_prefix}支": da_yun_branch,
                         pillar: f"{target_gan}{target_zhi}",
                     },
                     "状态": "干支皆反",
@@ -858,8 +873,8 @@ def _detect_da_yun_interactions(
                     "类型": "伏吟",
                     "组合": combo,
                     "组合明细": {
-                        "大运干": da_yun_stem,
-                        "大运支": da_yun_branch,
+                        f"{pillar_prefix}干": da_yun_stem,
+                        f"{pillar_prefix}支": da_yun_branch,
                         pillar: f"{target_gan}{target_zhi}",
                     },
                     "状态": "干支皆同",
@@ -903,7 +918,7 @@ def _detect_da_yun_interactions(
                         "组合明细": combo_detail,
                         "紧贴": is_adjacent,
                         "状态": (
-                            "大运钥匙受困，库力受阻"
+                            f"钥匙受困：{cycle_name}库力受阻"
                             if da_yun_branch_bound
                             else "开库冲出，库藏释放"
                         ),
@@ -1069,7 +1084,7 @@ def _detect_da_yun_interactions(
             all_interactions.append(
                 {
                     "类型": "天干合(日主)" if i == 2 else "天干合",
-                    "组合": f"大运-{pillar}",
+                    "组合": f"{pillar_prefix}-{pillar}",
                     "组合明细": combo_detail_stem,
                     "状态": get_status("天干合"),
                     "日柱特殊": i == 2,
@@ -1084,7 +1099,7 @@ def _detect_da_yun_interactions(
             all_interactions.append(
                 {
                     "类型": "天干克(日主)" if i == 2 else "天干克",
-                    "组合": f"大运-{pillar}",
+                    "组合": f"{pillar_prefix}-{pillar}",
                     "组合明细": combo_detail_stem,
                     "状态": get_status(
                         "天干克", {"key": "adjacent" if is_adjacent else "distant"}
@@ -1104,7 +1119,7 @@ def _detect_da_yun_interactions(
             all_interactions.append(
                 {
                     "类型": "天干冲",
-                    "组合": f"大运-{pillar}",
+                    "组合": f"{pillar_prefix}-{pillar}",
                     "组合明细": combo_detail_stem,
                     "状态": get_status(
                         "天干冲", {"key": "adjacent" if is_adjacent else "distant"}
@@ -1115,7 +1130,7 @@ def _detect_da_yun_interactions(
             )
 
     # Apply Da Yun-specific priority modulation (replaces manual lock system)
-    modulated = apply_da_yun_master_priority(all_interactions, zhis)
+    modulated = apply_da_yun_master_priority(all_interactions, zhis, cycle_name)
     return {"作用": modulated}
 
 
