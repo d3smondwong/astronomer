@@ -25,10 +25,9 @@ The Birth Environment encompasses:
        - 福神方位 (Fortune Direction): Direction of blessings
        - 阳贵/阴贵 (Noble Directions): High-luck directions
 
-    3. **Taboos & Restrictions**
-       - 彭祖百忌 (Peng Zu Taboos): Actions to avoid
-       - 日冲 (Daily Clash): Conflicting zodiac signs
-       - 日煞 (Daily Sha): Harmful energies
+    3. **Heavenly Deities**
+       - 日值天神 (Day Deity): Guardian deity of the day
+       - 时值天神 (Hour Deity): Guardian deity of the hour
 
     4. **Auspicious & Inauspicious Actions**
        - 日宜 (Day Auspicious): Good actions for the day
@@ -45,53 +44,42 @@ The Birth Environment encompasses:
        - 时冲 (Hour Clash): Hour-specific clash with zodiac
        - 时煞 (Hour Sha): Hour-specific harmful energies
 
-    6. **Heavenly Deities**
-       - 日值天神 (Day Deity): Guardian deity of the day
-       - 时值天神 (Hour Deity): Guardian deity of the hour
-
-    7. **Seasonal & Environmental Context**
+    6. **Seasonal & Environmental Context**
        - 月相 (Moon Phase): Lunar phase information
        - 节日 (Festivals): Traditional celebrations
        - 季节 (Season): Current season
 
-    8. **Seasonal Divisions & Energy Cycles**
+    7. **Seasonal Divisions & Energy Cycles**
        - 三伏 (Three Fu): Summer heat periods (Dog Days)
        - 数九 (Shu Jiu): Winter energy counting (Nine Days of Winter)
        - 六曜 (Liu Yao): Six bright stars/weekday system
 
-    9. **Phenological & Astronomical Data**
+    8. **Phenological & Astronomical Data**
        - 物候 (Wu Hou): Phenology describing nature's activity
        - 候 (Hou): Seasonal phase or sub-seasonal marker
        - 日禄 (Day Lu): Day prosperity/wealth marker
 
-    10. **Spiritual Calendar Systems**
+    9. **Spiritual Calendar Systems**
        - 佛历 (Foto): Buddhist calendar and dates
        - 道历 (Tao): Taoist calendar and dates
 
-    11. **Qi Markers & Solar Terms**
+    10. **Qi Markers & Solar Terms**
        - 前气令 (Previous Qi): Previous solar term marker with timing
        - 下个气令 (Next Qi): Next solar term marker with timing
        - Marks seasonal transitions and energy shifts
 
-    12. **Jie Markers & Mid-Month Solar Terms**
+    11. **Jie Markers & Mid-Month Solar Terms**
        - 前节 (Previous Jie): Previous mid-month solar term marker with timing
        - 下个节 (Next Jie): Next mid-month solar term marker with timing
        - Complements Qi markers for complete seasonal tracking
 
-    13. **Nine Star Energy & Feng Shui**
+    12. **Nine Star Energy & Feng Shui**
        - 年九星 (Year Star): Calculated by Li Chun boundary (parameter 3)
        - 月九星 (Month Star): Based on lunar month
        - 日九星 (Day Star): Determined by Solstice proximity
        - 时九星 (Time Star): Hour-specific nine star
 
-    14. **Time-Specific Luck Directions**
-       - 时分财神方位 (Hour Wealth Direction): Hour-specific wealth direction
-       - 时分喜神方位 (Hour Joy Direction): Hour-specific joy direction
-       - 时分福神方位 (Hour Fortune Direction): Hour-specific fortune direction
-       - 时分阳贵人 (Hour Yang Noble): Hour-specific yang noble direction
-       - 时分阴贵人 (Hour Yin Noble): Hour-specific yin noble direction
-
-    15. **Tai Sui Positions**
+    13. **Tai Sui Positions**
        - 年太岁 (Year Tai Sui): Year Tai Sui position relative to deity (12 positions)
        - 月太岁 (Month Tai Sui): Month Tai Sui position relative to deity (12 positions)
        - 日太岁 (Day Tai Sui): Day Tai Sui position relative to deity (12 positions)
@@ -363,31 +351,7 @@ def get_birth_environment(lunar_birthday: Lunar) -> dict:
         "时九星": time_star.toFullString() if time_star else "N/A",
     }
 
-    # 13. Time-Specific Luck Directions (出生时刻方位)
-    time_directions = {
-        "时分财神方位": {
-            "方向": lunar_birthday.getTimePositionCaiDesc(),
-            "方位": lunar_birthday.getTimePositionCai(),
-        },
-        "时分喜神方位": {
-            "方向": lunar_birthday.getTimePositionXiDesc(),
-            "方位": lunar_birthday.getTimePositionXi(),
-        },
-        "时分福神方位": {
-            "方向": lunar_birthday.getTimePositionFuDesc(),
-            "方位": lunar_birthday.getTimePositionFu(),
-        },
-        "时分阳贵人": {
-            "方向": lunar_birthday.getTimePositionYangGuiDesc(),
-            "方位": lunar_birthday.getTimePositionYangGui(),
-        },
-        "时分阴贵人": {
-            "方向": lunar_birthday.getTimePositionYinGuiDesc(),
-            "方位": lunar_birthday.getTimePositionYinGui(),
-        },
-    }
-
-    # 14. Tai Sui Positions (太岁位置)
+    # 13. Tai Sui Positions (太岁位置)
     tai_sui_positions = {
         "年太岁": {
             "位置": lunar_birthday.getYearPositionTaiSui(),
@@ -419,7 +383,6 @@ def get_birth_environment(lunar_birthday: Lunar) -> dict:
             "气令与节气": qi_markers,
             "节令与中气": jie_markers,
             "九星能量与风水": nine_star_feng_shui,
-            "出生时刻方位": time_directions,
             "太岁位置": tai_sui_positions,
         }
     }
