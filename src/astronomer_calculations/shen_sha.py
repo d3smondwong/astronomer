@@ -41,8 +41,28 @@ stem_partners = {
     "癸": "戊",
 }
 
+# --- BATH POSITION (CONDITIONAL MODIFIER FOR PEACH BLOSSOM) ---
+# Maps Day Stem (Day Master) to its specific "Bath" (沐浴) stage
+# Used to identify when Peach Blossom becomes active (沐浴桃花)
+bath_position = {
+    "甲": "子",
+    "乙": "巳",
+    "丙": "卯",
+    "丁": "申",
+    "戊": "卯",
+    "己": "申",
+    "庚": "午",
+    "辛": "亥",
+    "壬": "酉",
+    "癸": "寅",
+}
+
 # --- SHEN SHA DICTIONARIES ---
-year_shens = {
+year_earthly_branches_shens = {
+    "龙德": {
+        "子": "未", "丑": "申", "寅": "酉", "卯": "戌", "辰": "亥", "巳": "子",
+        "午": "丑", "未": "寅", "申": "卯", "酉": "辰", "戌": "巳", "亥": "午",
+    }, # Dragon Virtue: A powerful star that dissolves negativity and brings high-level mentors.
     # --- ROMANCE & SOCIAL ---
     "红鸾": {
         "子": "卯",
@@ -257,7 +277,7 @@ year_shens = {
     },
 }
 
-month_shens = {
+month_earthly_branches_shens = {
     # --- VIRTUES ---
     "天德": {
         "子": "巳",
@@ -605,6 +625,34 @@ day_heavenly_stem_shens = {
     },
 }
 
+# --- HEAVENLY NOBLES - YEAR STEM BASED ---
+year_heavenly_stem_shens = {
+    "昼天乙": {
+        "甲": "丑",
+        "乙": "申",
+        "丙": "亥",
+        "丁": "酉",
+        "戊": "丑",
+        "己": "子",
+        "庚": "未",
+        "辛": "午",
+        "壬": "卯",
+        "癸": "巳",
+    },
+    "夜天乙": {
+        "甲": "未",
+        "乙": "子",
+        "丙": "酉",
+        "丁": "亥",
+        "戊": "未",
+        "己": "申",
+        "庚": "丑",
+        "辛": "寅",
+        "壬": "巳",
+        "癸": "卯",
+    },
+}
+
 pillar_shens = {
     # --- VOID ---
     "空亡": {
@@ -776,7 +824,7 @@ def get_shen_sha(lunar_birthday):
     # ============================================================
     # 1. YEAR BRANCH BASED (Year Branch -> Other Pillars)
     # ============================================================
-    for item, mapping in year_shens.items():
+    for item, mapping in year_earthly_branches_shens.items():
         lookup = mapping.get(zhis[0], "")
         for i in range(4):
             # Skip if the star is in exclusion list and we are looking at the trigger pillar
@@ -794,7 +842,7 @@ def get_shen_sha(lunar_birthday):
     # ============================================================
     # 2. MONTH BRANCH BASED (Month Branch -> All Pillars)
     # ============================================================
-    for item, mapping in month_shens.items():
+    for item, mapping in month_earthly_branches_shens.items():
 
         if item == "天赦":
             target_pillar = mapping.get(birth_season)
@@ -818,7 +866,9 @@ def get_shen_sha(lunar_birthday):
     # --- Virtue Union (Tian De He) - Dynamic Computation ---
     # Logic: If a stem is the partner of the Heavenly Virtue (天德) for this month,
     # and that partner stem appears anywhere in the chart, add 天德合
-    tian_de_stem = month_shens["天德"].get(zhis[1])  # Get virtue stem for this month
+    tian_de_stem = month_earthly_branches_shens["天德"].get(
+        zhis[1]
+    )  # Get virtue stem for this month
     if tian_de_stem:
         partner_stem = stem_partners.get(tian_de_stem)  # Get its partner
         if partner_stem:
@@ -828,7 +878,9 @@ def get_shen_sha(lunar_birthday):
 
     # --- Month Virtue Union (Yue De He) - Dynamic Computation ---
     # 月德
-    yue_de_stem = month_shens["月德"].get(zhis[1])  # Get month virtue stem
+    yue_de_stem = month_earthly_branches_shens["月德"].get(
+        zhis[1]
+    )  # Get month virtue stem
     if yue_de_stem:
         partner_stem = stem_partners.get(yue_de_stem)
         if partner_stem:
@@ -866,20 +918,8 @@ def get_shen_sha(lunar_birthday):
                     add_shen(i, item, strs, all_found_shens)
 
     # --- Peach Blossom "Bath" Activation ---
-    # Map Day Master (Stem) to its specific "Bath" (沐浴) branch
-    bath_map = {
-        "甲": "子",
-        "乙": "巳",
-        "丙": "卯",
-        "丁": "申",
-        "戊": "卯",
-        "己": "申",
-        "庚": "午",
-        "辛": "亥",
-        "壬": "酉",
-        "癸": "寅",
-    }
-    my_bath_branch = bath_map.get(me)
+    # Maps to specific "Bath" (沐浴) stage for Day Master (Stem)
+    my_bath_branch = bath_position.get(me)
 
     for i in range(4):
         if "桃花" in strs[i] and zhis[i] == my_bath_branch:
@@ -910,14 +950,9 @@ def get_shen_sha(lunar_birthday):
                 if zhis[i] in lookup:
                     add_shen(i, item, strs, all_found_shens)
 
-    # SECONDARY LOOP: Year Stem derived stars (Historical/optional, with distinct labeling)
-    # Only apply Year Stem to Heavenly Nobles - these traditionally recognize both sources
-    year_stem_only_stars = {"昼天乙", "夜天乙"}
-
-    for item, mapping in day_heavenly_stem_shens.items():
-        if item not in year_stem_only_stars:
-            continue
-        lookup = mapping.get(year_stem, "")  # Year Stem only, for specific stars
+    # SECONDARY LOOP: Year Stem derived stars (Heavenly Nobles - Historical/optional, with distinct labeling)
+    for item, mapping in year_heavenly_stem_shens.items():
+        lookup = mapping.get(year_stem, "")
         if not lookup:
             continue
         for i in range(4):
