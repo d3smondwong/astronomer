@@ -60,9 +60,19 @@ bath_position = {
 # --- SHEN SHA DICTIONARIES ---
 year_earthly_branches_shens = {
     "龙德": {
-        "子": "未", "丑": "申", "寅": "酉", "卯": "戌", "辰": "亥", "巳": "子",
-        "午": "丑", "未": "寅", "申": "卯", "酉": "辰", "戌": "巳", "亥": "午",
-    }, # Dragon Virtue: A powerful star that dissolves negativity and brings high-level mentors.
+        "子": "未",
+        "丑": "申",
+        "寅": "酉",
+        "卯": "戌",
+        "辰": "亥",
+        "巳": "子",
+        "午": "丑",
+        "未": "寅",
+        "申": "卯",
+        "酉": "辰",
+        "戌": "巳",
+        "亥": "午",
+    },  # Dragon Virtue: A powerful star that dissolves negativity and brings high-level mentors.
     # --- ROMANCE & SOCIAL ---
     "红鸾": {
         "子": "卯",
@@ -771,6 +781,23 @@ pillar_shens = {
 # Stars that are NOT allowed to land on their own trigger pillar
 SELF_EXCLUSION_STARS = {"桃花", "孤辰", "寡宿", "驿马", "劫煞", "亡神"}
 
+# --- SEASONAL MAPPING FOR CELESTIAL OPERATIONS ---
+# Maps month branches to Chinese seasons for 天赦 (Heavenly Pardon) and 四废 (Four Wastes)
+seasons_map = {
+    "寅": "春",
+    "卯": "春",
+    "辰": "春",
+    "巳": "夏",
+    "午": "夏",
+    "未": "夏",
+    "申": "秋",
+    "酉": "秋",
+    "戌": "秋",
+    "亥": "冬",
+    "子": "冬",
+    "丑": "冬",
+}
+
 
 def add_shen(pillar_idx, shen_name, strs, all_found_shens):
     """Helper to add shen to pillar and track unique shens"""
@@ -801,21 +828,6 @@ def get_shen_sha(lunar_birthday):
     day_pillar = gans[2] + zhis[2]
     hour_pillar = gans[3] + zhis[3]
 
-    # Map month branches to Chinese seasons for '天赦' and '四废'
-    seasons_map = {
-        "寅": "春",
-        "卯": "春",
-        "辰": "春",
-        "巳": "夏",
-        "午": "夏",
-        "未": "夏",
-        "申": "秋",
-        "酉": "秋",
-        "戌": "秋",
-        "亥": "冬",
-        "子": "冬",
-        "丑": "冬",
-    }
     birth_season = seasons_map.get(zhis[1])
 
     strs = ["", "", "", ""]
