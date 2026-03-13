@@ -196,8 +196,12 @@ Output Format:
 """
 
 from lunar_python import Solar, Lunar
+from lunar_python.util import LunarUtil
 from datetime import datetime
 from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # NATAL CHART INTERACTIONS
@@ -387,6 +391,16 @@ stem_elements = {
     "癸": "水",
 }
 
+# ── 合化五行 lookup — element produced by each 天干合 pair ───────────────────
+# 甲己→土, 乙庚→金, 丙辛→水, 丁壬→木, 戊癸→火
+_STEM_COMBINE_ELEMENT: dict[str, str] = {
+    "甲": "土", "己": "土",
+    "乙": "金", "庚": "金",
+    "丙": "水", "辛": "水",
+    "丁": "木", "壬": "木",
+    "戊": "火", "癸": "火",
+}
+
 branch_elements = {
     "子": "水",
     "丑": "土",
@@ -464,6 +478,7 @@ INTERACTION_STATUSES = {
     "三会": {"full": "三会成局", "arch": "拱会局", "residual": "残会局"},
     "三合": {"full": "三合全局"},
     "暗合": "暗(隐秘)",
+    "干支透合": "透合(藏干隐合)",
     "天干合": "合化",
     "天干冲": {"adjacent": "正冲", "distant": "遥冲"},
     "天干克": {"adjacent": "正克", "distant": "遥克"},
@@ -506,6 +521,7 @@ INTERACTION_TIER_ORDER = {
     "六害": 12,
     "六破": 13,
     "暗合": 14,
+    "干支透合": 15,
 }
 
 # ── Declarative Priority Rule Table ──────────────────────────────────────────
@@ -586,6 +602,18 @@ PRIORITY_RULE_TABLE = {
     ("STEM_天干克", "天干冲"): "消融吸收",
     # 天干冲 in place: clash weakens control but does not nullify it
     ("STEM_天干冲", "天干克"): "大幅衰减",
+    # Branch/Stem locks → 干支透合
+    # 干支透合 is a covert stem-to-hidden-stem bond; always secondary to direct interactions.
+    # STRUCTURAL: target branch in a 三会/三合 field — hidden stems consumed by transformation.
+    # PRIMARY_六合: target branch occupied by 六合 (贪合) — hidden stems tied up, unavailable.
+    # PRIMARY_六冲: target branch clashed — hidden stems scattered (冲则气散).
+    # STEM_天干合: source stem already directly combining — covert bond absorbed (贪合忘合).
+    # STEM_天干克 omitted: 克 operates stem-to-stem; branch hidden stem is a different layer.
+    ("STRUCTURAL_三会", "干支透合"): "大幅衰减",
+    ("STRUCTURAL_三合", "干支透合"): "大幅衰减",
+    ("PRIMARY_六合",    "干支透合"): "大幅衰减",
+    ("PRIMARY_六冲",    "干支透合"): "大幅衰减",
+    ("STEM_天干合",     "干支透合"): "消融吸收",
 }
 
 # ── Declarative Remarks Table ─────────────────────────────────────────────────
@@ -611,6 +639,11 @@ STRENGTH_REMARKS = {
     ("STEM_天干合", "天干冲"): "天干合化锁定，冲力被合化消融",
     ("STEM_天干克", "天干冲"): "天干克在位，冲势被制化消融",
     ("STEM_天干冲", "天干克"): "天干冲动场域，克力受震荡大幅衰减",
+    ("STRUCTURAL_三会", "干支透合"): "三会方位场锁定地支，藏干不得透出，干支透合受压",
+    ("STRUCTURAL_三合", "干支透合"): "三合局锁定地支，藏干不得透出，干支透合受压",
+    ("PRIMARY_六合",    "干支透合"): "目标地支已被六合占位，藏干潜合力被合力压制",
+    ("PRIMARY_六冲",    "干支透合"): "目标地支被六冲气散，藏干无力应合",
+    ("STEM_天干合",     "干支透合"): "源天干已与他干直合，贪合之下，藏干透合消融",
     ("SYNTHETIC_半合", "origin"): "原三合因争位失败，剩余两支保留半合牵引",
     ("SYNTHETIC_残会", "origin"): "原三会因争位失败，剩余两支保留残会框架",
     ("GONG_GONG", "echo"): "虚局与实局同元素共鸣，气场压倒性主导",
@@ -660,6 +693,8 @@ DEFAULT_STRENGTH = {
     ("比和", False): "显著影响",
     ("暗合", True): "显著影响",
     ("暗合", False): "显著影响",
+    ("干支透合", True): "显著影响",
+    ("干支透合", False): "显著影响",
     ("共拱", True): "强势主流",
     ("共拱", False): "强势主流",
 }
@@ -812,9 +847,11 @@ class BranchActor:
     def __init__(self, idx: int, branch: str):
         self.idx = idx
         self.branch = branch
-        self.lock_type = None
-        self.lock_element = None  # element of structural lock (for 共拱 echo)
-        self.lock_item_id = None
+        self.lock_type: str | None = None
+        self.lock_element: str | None = (
+            None  # element of structural lock (for 共拱 echo)
+        )
+        self.lock_item_id: int | None = None
         self.item_ids: list[int] = []
 
 
@@ -1142,12 +1179,30 @@ def _pass2_dual(registry: InteractionRegistry) -> None:
         # Broken Link: absorb all 六冲 on this branch, free partners
         for chong in registry.get_by_type(["六冲"], idx):
             registry.absorb(chong["_iid"])
-            partner_idx = registry.partner_branch_idx(chong, idx)
-            if partner_idx is not None:
-                partner = registry.branch_actors.get(partner_idx)
-                if partner and partner.lock_type is None:
-                    partner.lock_type = "VACANT"
-                    partner.lock_item_id = None
+            chong_partner_idx = registry.partner_branch_idx(chong, idx)
+            if chong_partner_idx is not None:
+                chong_partner = registry.branch_actors.get(chong_partner_idx)
+                if chong_partner and chong_partner.lock_type is None:
+                    chong_partner.lock_type = "VACANT"
+                    chong_partner.lock_item_id = None
+        # 贪合忘冲 is bidirectional: the 六合 partner is equally "in the bond"
+        # and must also forget its own 六冲.
+        he_partner_idx = registry.partner_branch_idx(winner, idx)
+        if he_partner_idx is not None:
+            he_partner = registry.branch_actors.get(he_partner_idx)
+            if he_partner and he_partner.lock_type is None:
+                he_partner.lock_type = "PRIMARY_六合"
+                he_partner.lock_item_id = winner["_iid"]
+                for chong in registry.get_by_type(["六冲"], he_partner_idx):
+                    registry.absorb(chong["_iid"])
+                    chong_partner_idx = registry.partner_branch_idx(
+                        chong, he_partner_idx
+                    )
+                    if chong_partner_idx is not None:
+                        chong_partner = registry.branch_actors.get(chong_partner_idx)
+                        if chong_partner and chong_partner.lock_type is None:
+                            chong_partner.lock_type = "VACANT"
+                            chong_partner.lock_item_id = None
 
     # Round 1b — Assign PRIMARY_六冲 to unlocked branches with 六冲 (no 六合 available)
     for idx, actor in registry.branch_actors.items():
@@ -1203,6 +1258,10 @@ def _pass3_conflict(registry: InteractionRegistry) -> None:
                 continue
             if actor.lock_item_id == item.get("_iid"):
                 continue  # never downgrade the winner itself
+            # 干支透合: the source-stem pillar's branch lock is irrelevant.
+            # Only the TARGET branch (支方索引) can suppress its own hidden-stem availability.
+            if item.get("类型") == "干支透合" and item.get("支方索引") != idx:
+                continue
             _apply_rule(item, actor.lock_type)
 
     _pass3_stems(registry)
@@ -1259,6 +1318,16 @@ def _pass3_stems(registry: InteractionRegistry) -> None:
             if item.get("_iid") != winner_iid:
                 _apply_rule(item, lock_key)
 
+        # ── Cross-actor: STEM_天干合 → 干支透合 (贪合忘合) ────────────────────
+        # 干支透合 is wired to branch_actor (target branch), so its suppression
+        # by the SOURCE STEM's 天干合 lock must be applied explicitly here.
+        # 贪合忘合: once the stem is engaged in a direct 天干合, it cannot also
+        # form a covert bond with a hidden stem in another branch.
+        if lock_key == "STEM_天干合":
+            for item in registry.active_items():
+                if item.get("类型") == "干支透合" and item.get("干方索引") == idx:
+                    _apply_rule(item, lock_key)
+
 
 def _pick_stem_winner(candidates: list[dict]) -> dict | None:
     """日柱 absolute anchor, then _STEM_LOCK_PRIORITY order."""
@@ -1298,6 +1367,10 @@ def _pass4_group(registry: InteractionRegistry) -> None:
             item["强度"] = "显著影响"
             continue
 
+        if itype == "干支透合":
+            item["强度"] = "显著影响"
+            continue
+
         if itype in {"半合", "拱会", "残会"}:
             if item.get("强度"):
                 continue  # already assigned in Pass 3
@@ -1332,8 +1405,7 @@ def _pass4_group(registry: InteractionRegistry) -> None:
                 registry.branch_actors[i].lock_element
                 for i in indices
                 if i in registry.branch_actors
-                and registry.branch_actors[i].lock_type
-                and registry.branch_actors[i].lock_type.startswith("STRUCTURAL")
+                and (registry.branch_actors[i].lock_type or "").startswith("STRUCTURAL")
                 and registry.branch_actors[i].lock_element
             ]
             existing = item.get("强度")
@@ -1417,6 +1489,35 @@ def apply_bazi_master_priority(
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION 5 — Detection Helpers
 # ══════════════════════════════════════════════════════════════════════════════
+
+
+def _get_shi_shen_for_stem_pair(day_stem: str, hidden_stem: str) -> str:
+    """
+    Compute the ten-god relationship of hidden_stem relative to day_stem.
+    Returns a Chinese ten-god label.
+    All ten-god relationships in BaZi are always computed relative to the day master.
+    """
+    day_elem = stem_elements.get(day_stem, "")
+    hidden_elem = stem_elements.get(hidden_stem, "")
+
+    day_yin = day_stem in "乙丁己辛癸"
+    hidden_yin = hidden_stem in "乙丁己辛癸"
+    same_polarity = day_yin == hidden_yin
+
+    _generates = {"木": "火", "火": "土", "土": "金", "金": "水", "水": "木"}
+    _controls = {"木": "土", "火": "金", "土": "水", "金": "木", "水": "火"}
+
+    if hidden_elem == day_elem:
+        return "比肩" if same_polarity else "劫财"
+    if _generates.get(day_elem) == hidden_elem:
+        return "食神" if same_polarity else "伤官"
+    if _generates.get(hidden_elem) == day_elem:
+        return "正印" if same_polarity else "偏印"
+    if _controls.get(day_elem) == hidden_elem:
+        return "正财" if same_polarity else "偏财"
+    if _controls.get(hidden_elem) == day_elem:
+        return "正官" if same_polarity else "七杀"
+    return "未知"
 
 
 def _detect_san_hui(zhis: list, registry: InteractionRegistry) -> None:
@@ -1506,9 +1607,13 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
     """
     Detect all pairwise branch and stem interactions.
 
-    Branch (all registered independently):  六冲, 六合, 半合, 比和, 六害, 六破, 刑, 暗合
+    Branch (all registered independently):  六冲, 六合, 半合, 比和, 六害, 六破, 刑, 暗合, 干支透合
     Stem (all registered independently):    天干合, 天干冲, 天干克
     Suppression is handled by the priority filter, not at detection time.
+
+    干支透合 is bidirectional per pair: checks both g_i→zhis[j] and g_j→zhis[i].
+    Each item stores 干方索引 (source stem pillar) and 支方索引 (target branch pillar)
+    so the priority filter can apply branch locks only from the target branch.
     """
     for i in range(4):
         for j in range(i + 1, 4):
@@ -1656,6 +1761,59 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
                         "状态": get_status("暗合"),
                     }
                 )
+
+            # ── 干支透合 — natal stem combines covertly with hidden stem in a different pillar's branch ──
+            # Distinct from 暗合 (branch↔branch): here a heavenly stem from one pillar
+            # covertly combines with a hidden stem (藏干) inside another pillar's branch.
+            # Bidirectional per pair: g_i → zhis[j] AND g_j → zhis[i].
+            # 冲则气散 and 贪合忘合 are handled by the priority filter (PRIMARY_六冲 and STEM_天干合
+            # rules); detection registers all candidates and suppression is applied post-detection.
+            # 藏干十神 is always relative to the day master (gans[2]).
+            _day_stem = gans[2]
+            _stem_i, _stem_j = gans[i], gans[j]
+            _hidden_labels = ["本气", "中气", "余气"]
+            # Direction 1: stem of pillar i covertly bonds with hidden stem in branch of pillar j
+            for _hi, _hs in enumerate(LunarUtil.ZHI_HIDE_GAN.get(b_j, [])):
+                if stem_combines.get(_stem_i) == _hs:
+                    registry.register(
+                        {
+                            "类型": "干支透合",
+                            "组合": combo,
+                            "组合明细": {
+                                f"{pn_i}干": _stem_i,
+                                f"{pn_j}支": b_j,
+                                "藏干": _hs,
+                                "藏干层": _hidden_labels[_hi] if _hi < 3 else "余气",
+                                "藏干十神": _get_shi_shen_for_stem_pair(_day_stem, _hs),
+                                "合化五行": _STEM_COMBINE_ELEMENT.get(_stem_i, ""),
+                            },
+                            "干方索引": i,
+                            "支方索引": j,
+                            "状态": get_status("干支透合"),
+                        }
+                    )
+                    break  # 天干合 is 1-to-1; one hidden stem match per branch
+            # Direction 2: stem of pillar j covertly bonds with hidden stem in branch of pillar i
+            for _hi, _hs in enumerate(LunarUtil.ZHI_HIDE_GAN.get(b_i, [])):
+                if stem_combines.get(_stem_j) == _hs:
+                    registry.register(
+                        {
+                            "类型": "干支透合",
+                            "组合": combo,
+                            "组合明细": {
+                                f"{pn_j}干": _stem_j,
+                                f"{pn_i}支": b_i,
+                                "藏干": _hs,
+                                "藏干层": _hidden_labels[_hi] if _hi < 3 else "余气",
+                                "藏干十神": _get_shi_shen_for_stem_pair(_day_stem, _hs),
+                                "合化五行": _STEM_COMBINE_ELEMENT.get(_stem_j, ""),
+                            },
+                            "干方索引": j,
+                            "支方索引": i,
+                            "状态": get_status("干支透合"),
+                        }
+                    )
+                    break  # 天干合 is 1-to-1; one hidden stem match per branch
 
             # ── Stem interactions — all registered independently ──────────
             # A stem pair may simultaneously combine AND clash/control
@@ -2081,6 +2239,7 @@ def get_interactions(lunar_birthday) -> dict:
                     "六害",
                     "六破",
                     "暗合",
+                    "干支透合",
                 ],
             },
         }
@@ -2092,6 +2251,11 @@ def get_interactions(lunar_birthday) -> dict:
 if __name__ == "__main__":
     import json
     from src.astronomer_calculations.bazi_pillars import get_bazi_pillars
+    from src.utils.logging import configure_logging, get_logger
+
+    # Initialize logging system
+    configure_logging()
+    logger = get_logger(__name__)
 
     # python -m src.astronomer_calculations.interactions_gan_zhi_zuo_yong
 
@@ -2111,16 +2275,16 @@ if __name__ == "__main__":
     )
     lunar_birthday = tst_birthday.getLunar()
 
-    print("阳历生日: " + solar_birthday.toYmdHms())
-    print("真太阳时生日: " + tst_birthday.toYmdHms())
+    logger.info("阳历生日: " + solar_birthday.toYmdHms())
+    logger.info("真太阳时生日: " + tst_birthday.toYmdHms())
 
     lunar_birthday = tst_birthday.getLunar()  # Convert to lunar calendar
 
     bazi_json = get_bazi_pillars(tst_birthday.getLunar())
-    print(f"{bazi_json}")
+    logger.info(f"{bazi_json}")
 
     # Get interactions in LLM-ready JSON format
     result = get_interactions(lunar_birthday)
 
-    print(f"\n--- JSON Output for LLM ---")
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    logger.info("--- JSON Output for LLM ---")
+    logger.info(json.dumps(result, ensure_ascii=False, indent=2))
