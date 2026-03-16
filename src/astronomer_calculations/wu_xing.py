@@ -821,14 +821,13 @@ class MingQiDynamicsCalculator:
     # 六合 (Six Branch Harmonies): Each pair merges into a new element
     # Strength coefficient applied as additive bonus scaled by pillar weights × 0.06
     # Weaker than 三合 (which uses 0.08–0.15) — simpler, less powerful pairing
-    # 午未合 uses Fire (the primary outcome in classical texts)
     SIX_HARMONIES: Dict[Tuple[Branch, Branch], Element] = {
         (Branch.ZI, Branch.CHOU): Element.EARTH,
         (Branch.YIN, Branch.HAI): Element.WOOD,
         (Branch.MAO, Branch.XU): Element.FIRE,
         (Branch.CHEN, Branch.YOU): Element.METAL,
         (Branch.SI, Branch.SHEN): Element.WATER,
-        (Branch.WU, Branch.WEI): Element.FIRE,
+        (Branch.WU, Branch.WEI): Element.EARTH,
     }
     SIX_HARMONY_STRENGTH = 0.06  # weaker than 三合 adjacent pairs (0.08–0.15)
 
@@ -929,7 +928,7 @@ class MingQiDynamicsCalculator:
         state_descriptions = {
             "旺": "旺 (最强)",
             "相": "相 (次强)",
-            "囚": "囚 (受克)",
+            "囚": "囚 (弱)",
             "休": "休 (气弱)",
             "死": "死 (极弱)",
         }
@@ -943,7 +942,35 @@ class MingQiDynamicsCalculator:
             # Determine if stem is Yang (甲丙戊庚壬) or Yin (乙丁己辛癸)
             yang_stems = {"甲", "丙", "戊", "庚", "壬"}
             yang_yin = "阳" if stem_val in yang_stems else "阴"
-            day_master = f"{stem_val}{elem.value} ({yang_yin}{elem.value})"
+
+            # Calculate 旺衰 (seasonal strength)
+            dm_state = state_descriptions.get(seasonal.states.get(elem, "囚"), "未知")
+
+            # Calculate 十二长生 (12-stage life cycle)
+            dm_stage = SHENG_WANG_TABLE.get(day_pillar.stem, {}).get(day_pillar.branch) if day_pillar.branch else None
+
+            # Calculate 通根 (root connection) - check day master stem across all branches
+            root_labels = ["本气根", "中气根", "余气根"]
+            tong_gen_results = {}
+            pillar_names = {"year": "年", "month": "月", "day": "日", "hour": "时"}
+            for p in pillars:
+                if p.branch:
+                    hidden = BRANCH_HIDDEN.get(p.branch, [])
+                    for idx, (hidden_stem, _depth) in enumerate(hidden):
+                        if hidden_stem == day_pillar.stem and idx < len(root_labels):
+                            tong_gen_results[pillar_names[p.position]] = root_labels[idx]
+                            break
+            tong_gen = tong_gen_results if tong_gen_results else "无根"
+
+            day_master = {
+                "显示名称": f"{stem_val}{elem.value} ({yang_yin}{elem.value})",
+                "天干": stem_val,
+                "五行": elem.value,
+                "阴阳": yang_yin,
+                "旺衰": dm_state,
+                "十二长生": dm_stage,
+                "通根": tong_gen
+            }
 
         # Map season to Chinese season name
         season_names = {
@@ -971,25 +998,51 @@ class MingQiDynamicsCalculator:
             # "气候特征": climate_char,
         }
 
-        # Expose visible-stem seasonal multipliers so callers can inspect the floor effect
-        # Preserve all stems in order (year, month, day, hour), including duplicates
-        visible_stem_mults = []
-        pillar_positions = {"year": "年", "month": "月", "day": "日", "hour": "时"}
+        # Build unified pillar dict: 年柱/月柱/日柱/时柱
+        pillar_names = {"year": "年柱", "month": "月柱", "day": "日柱", "hour": "时柱"}
+        root_labels = ["本气根", "中气根", "余气根"]
+        si_zhu = {}
         for p in pillars:
-            if p.stem:
-                elem = STEM_ELEMENT[p.stem]
-                state = seasonal.states.get(elem, "囚")
-                raw = STATE_MULT.get(state, 0.40)
-                floored = VISIBLE_STEM_MULT.get(state, 0.50)
-                state_desc = state_descriptions.get(state, state)
-                visible_stem_mults.append(
-                    {
-                        "柱": pillar_positions[p.position],
-                        "天干": p.stem.value,
-                        "季节状态": state_desc,
-                        "是否托底": floored != raw,
-                    }
-                )
+            if not p.stem:
+                continue
+            stem_elem = STEM_ELEMENT[p.stem]
+            state = seasonal.states.get(stem_elem, "囚")
+            state_desc = state_descriptions.get(state, state)
+            sheng_wang_stage = SHENG_WANG_TABLE.get(p.stem, {}).get(p.branch) if p.branch else None
+
+            # 通根: check if stem's element matches any hidden stem's element in same-pillar branch
+            tong_gen = "无根"
+            if p.branch:
+                hidden = BRANCH_HIDDEN.get(p.branch, [])
+                for idx, (hidden_stem, _) in enumerate(hidden):
+                    if STEM_ELEMENT[hidden_stem] == stem_elem and idx < len(root_labels):
+                        tong_gen = root_labels[idx]
+                        break
+
+            # 五行
+            branch_elem = BRANCH_ELEMENT.get(p.branch) if p.branch else None
+            wu_xing_info = {
+                "天干五行": stem_elem.value,
+                "地支五行": branch_elem.value if branch_elem else None,
+                "主导气势": get_zhu_dao_qi_shi(stem_elem, branch_elem) if branch_elem else None,
+            }
+
+            # 藏干: hidden stems with strength category
+            cang_gan = []
+            if p.branch:
+                for idx, (hs, _) in enumerate(BRANCH_HIDDEN.get(p.branch, [])):
+                    strength = root_labels[idx] if idx < len(root_labels) else "未知"
+                    cang_gan.append({"干": hs.value, "强度": strength})
+
+            si_zhu[pillar_names[p.position]] = {
+                "天干": p.stem.value,
+                "地支": p.branch.value if p.branch else None,
+                "季节状态": state_desc,
+                "十二长生": sheng_wang_stage,
+                "通根": tong_gen,
+                "五行": wu_xing_info,
+                "藏干": cang_gan,
+            }
 
         # Build the new "五行力量分析" structure with tiered context
         wu_xing_analysis = {}
@@ -1007,13 +1060,13 @@ class MingQiDynamicsCalculator:
 
         return {
             "基本信息": basic_info,
+            "四柱": si_zhu,
             "五行力量分析": wu_xing_analysis,
             "组合加成": [e.value for e, v in combo_bonus.items() if v > 0],
             "六合加成": [e.value for e, v in six_harmony_bonus.items() if v > 0],
             "相冲减损": [b.value for b in clash_reductions.keys()],
             "刑减损": [b.value for b in xing_reductions.keys()],
             "害减损": [b.value for b in hai_reductions.keys()],
-            "天干透出系数": visible_stem_mults,
         }
 
     # ─── helpers ──────────────────────────────────────────────
@@ -1251,7 +1304,6 @@ class MingQiDynamicsCalculator:
 
         return min(bonus, 0.01)  # cap at 0.01
 
-
 # ─────────────────────────────────────────────
 # Execution function
 # ─────────────────────────────────────────────
@@ -1284,18 +1336,6 @@ def get_wu_xing(lunar_birthday) -> Dict:
         dict with keys 年柱, 月柱, 日柱, 时柱, 五行力量
     """
     bazi = lunar_birthday.getEightChar()
-
-    # Wu Xing strings per pillar (e.g. "木土")
-    year_wu_xing = bazi.getYearWuXing()
-    month_wu_xing = bazi.getMonthWuXing()
-    day_wu_xing = bazi.getDayWuXing()
-    hour_wu_xing = bazi.getTimeWuXing()
-
-    # Hidden stems per pillar
-    year_hide_gan = bazi.getYearHideGan()
-    month_hide_gan = bazi.getMonthHideGan()
-    day_hide_gan = bazi.getDayHideGan()
-    hour_hide_gan = bazi.getTimeHideGan()
 
     # Full pillar strings (e.g. "戊辰") → split into stem + branch characters
     year_pillar_str = bazi.getYear()
@@ -1341,37 +1381,10 @@ def get_wu_xing(lunar_birthday) -> Dict:
     ]
 
     # Organize pillar data: (name, wu_xing_string, hide_gan)
-    pillar_data = [
-        ("年柱", year_wu_xing, year_hide_gan),
-        ("月柱", month_wu_xing, month_hide_gan),
-        ("日柱", day_wu_xing, day_hide_gan),
-        ("时柱", hour_wu_xing, hour_hide_gan),
-    ]
-
     result = {
         "五行力量": calc.calculate(pillars),
         "五行相位动力": get_all_wu_xing_tiers(),
     }
-
-    # Mapping from string to Element enum
-    STR_ELEMENT = {e.value: e for e in Element}
-
-    for pillar_name, wu_xing_str, hide_gan in pillar_data:
-        wu_xing_dict = parse_wu_xing(wu_xing_str)
-        stem_elem_str = wu_xing_dict.get("天干五行", "")
-        branch_elem_str = wu_xing_dict.get("地支五行", "")
-        stem_elem = STR_ELEMENT.get(stem_elem_str)
-        branch_elem = STR_ELEMENT.get(branch_elem_str)
-        zhu_dao_qi_shi = (
-            get_zhu_dao_qi_shi(stem_elem, branch_elem)
-            if stem_elem and branch_elem
-            else "未知关系"
-        )
-        wu_xing_dict["主导气势"] = zhu_dao_qi_shi
-        result[pillar_name] = {
-            "五行": wu_xing_dict,
-            "藏干": hide_gan,
-        }
 
     return result
 
@@ -1381,10 +1394,15 @@ def get_wu_xing(lunar_birthday) -> Dict:
 if __name__ == "__main__":
     import json
     from lunar_python import Solar
+    from src.utils.logging import configure_logging, get_logger
+    from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
+
+    logging = configure_logging()
+    logger = get_logger(__name__)
 
     # python -m src.astronomer_calculations.wu_xing
 
-    # # Desmond's birthday example
+    # # # Desmond's birthday example
     solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)  # Create solar date
     datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)  # Create datetime object
     tst_birthday, _ = get_true_solar_time(
@@ -1403,18 +1421,18 @@ if __name__ == "__main__":
     #     datetime(2025, 7, 31, 9, 10, 0), 1.3253, 103.808053
     # )
 
-    print("阳历生日: " + solar_birthday.toYmdHms())
-    print("真太阳时生日: " + tst_birthday.toYmdHms())
+    logger.info("阳历生日: " + solar_birthday.toYmdHms())
+    logger.info("真太阳时生日: " + tst_birthday.toYmdHms())
 
     lunar_birthday = tst_birthday.getLunar()  # Convert to lunar calendar
 
     bazi = lunar_birthday.getEightChar()
-    print(
+    logger.info(
         f"\nBaZi: {bazi.getYear()}, {bazi.getMonth()}, {bazi.getDay()}, {bazi.getTime()}"
     )
 
     # Get Wu Xing in LLM-ready JSON format
     result = get_wu_xing(lunar_birthday)
 
-    print(f"\n--- JSON Output for LLM ---")
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    logger.info(f"\n--- JSON Output for LLM ---")
+    logger.info(json.dumps(result, ensure_ascii=False, indent=2))
