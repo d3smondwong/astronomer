@@ -149,6 +149,9 @@ class AstroDataLLMFormatter:
 
         # wu_xing data
         wu_xing_data = self.raw_data.get("wu_xing", {})
+        wu_xing_force = wu_xing_data.get("五行力量", {})
+        wu_xing_basic_info = wu_xing_force.get("基本信息", {})
+        wu_xing_pillars_data = wu_xing_force.get("四柱", {})
 
         # na_yin data
         na_yin_outer = self.raw_data.get("na_yin", {})
@@ -181,17 +184,17 @@ class AstroDataLLMFormatter:
         pillars = {}
 
         for pillar_name in ["年柱", "月柱", "日柱", "时柱"]:
-            # Extract from bazi (now properly unwrapped)
+            # Extract from bazi
             bazi_pillar = bazi.get(pillar_name, {})
             stem = bazi_pillar.get("天干")
             branch = bazi_pillar.get("地支")
 
-            # Extract from wu_xing (direct access, note: keys are 天干五行 and 地支五行)
-            wu_xing_pillar = wu_xing_data.get(pillar_name, {})
-            wu_xing_elements = wu_xing_pillar.get("五行", {})
-            stem_element = wu_xing_elements.get("天干五行")
-            branch_element = wu_xing_elements.get("地支五行")
-            dominant_energy = wu_xing_elements.get("主导气势")
+            # Extract from wu_xing
+            wu_xing_pillar = wu_xing_pillars_data.get(pillar_name, {})
+            seasonal_state = wu_xing_pillar.get("季节状态")
+            sheng_wang = wu_xing_pillar.get("十二长生")
+            tong_gen = wu_xing_pillar.get("通根")
+            gan_zhi_wu_xing = wu_xing_pillar.get("干支五行")
             hidden_stems = wu_xing_pillar.get("藏干", [])
 
             # Extract from na_yin
@@ -216,12 +219,12 @@ class AstroDataLLMFormatter:
             pillars[pillar_name] = {
                 "天干": stem,
                 "地支": branch,
-                "五行": {
-                    "天干": stem_element,
-                    "地支": branch_element,
-                    "主导气势": dominant_energy,
-                },
                 "藏干": hidden_stems,
+                "季节状态": seasonal_state,
+                "干支五行": gan_zhi_wu_xing,
+                "季节状态": seasonal_state,
+                "十二长生": sheng_wang,
+                "通根": tong_gen,
                 "十神": shi_shen_pillar,
                 "地势": di_shi_pillar,
                 "纳音": nayin,
@@ -230,7 +233,11 @@ class AstroDataLLMFormatter:
                 "作用": zuo_yong,
             }
 
-        return {"干支关系总览": zuo_yong_relationship_data, "四柱实体": pillars}
+        return {
+            "干支关系总览": zuo_yong_relationship_data,
+            "基本信息": wu_xing_basic_info,
+            "四柱实体": pillars,
+        }
 
     def _extract_wu_xing(self) -> dict:
         """
@@ -243,7 +250,13 @@ class AstroDataLLMFormatter:
         """
         wu_xing_data = self.raw_data.get("wu_xing", {})
 
-        return wu_xing_data
+        wu_xing_force = wu_xing_data.get("五行力量", {})
+        _EXCLUDE = {"基本信息", "四柱"}
+        wu_xing_distribution = {k: v for k, v in wu_xing_force.items() if k not in _EXCLUDE}
+
+        wu_xing_scoring_explanation = wu_xing_force.get("五行相位动力", {})
+
+        return {"五行力量": wu_xing_distribution, "五行相位动力": wu_xing_scoring_explanation}
 
     def _extract_bone_weight(self) -> dict:
         """

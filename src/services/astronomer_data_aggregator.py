@@ -51,20 +51,26 @@ class AstroDataAggregator:
         gender: int,
     ) -> dict:
         """Single entry point for complete data collection"""
+        # Run interactions first so the priority list can be passed to wu_xing scoring
+        interactions_result = self.interactions.get_interactions(lunar_birthday)
+
         result = {
             "basic_info": self.basic_info.get_basic_info(
                 birth_datetime, latitude, longitude, gender
             ),
             "bazi": self.bazi_pillars.get_bazi_pillars(lunar_birthday),
-            "wu_xing": self.wu_xin.get_wu_xing(lunar_birthday),
-            "shen_sha": self.shen_sha.get_shen_sha(lunar_birthday),
+            "wu_xing": self.wu_xin.get_wu_xing(
+                lunar_birthday,
+                priority_list=interactions_result.get("_raw_priority_list"),
+            ),
+            "shen_sha": self.shen_sha.get_shen_sha(lunar_birthday, gender),
             "xun_kong": self.xun_kong.get_xun_kong(lunar_birthday),
             "san_yuan": self.san_yuan.get_san_yuan(lunar_birthday),
             "tai_xi": self.tai_xi.get_tai_xi(lunar_birthday),
             "birth_environment": self.birth_environment.get_birth_environment(
                 lunar_birthday
             ),
-            "interactions": self.interactions.get_interactions(lunar_birthday),
+            "interactions": interactions_result,
             "bone_weight": self.bone_weight.calculate_yuan_tian_gang_bone_weight(
                 lunar_birthday
             ),
