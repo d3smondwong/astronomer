@@ -54,10 +54,25 @@ KEY FEATURES:
        PRIORITY_RULE_TABLE maps (lock_type, interaction_type) → 强度 downgrade.
        STRENGTH_REMARKS provides causal explanations (no generic noise).
 
-    5. Co-Arching Detection (共拱):
-       When two partial interactions (拱会 + 半合拱 or equivalent) both missing
-       the same cardinal branch, they form a virtual frame. Clash events mark
-       the frame as turbid (混杂), downgrading from 强势主流 to 显著影响.
+    5. Co-Arching Detection (共拱) — Two-Layer System:
+       Detects virtual frames formed by partial interactions all targeting the same
+       missing cardinal branch (拱向).
+
+       Layer 1 (L1 — Positional):
+         Two adjacent/nearby branches whose partial structures aim at the same
+         missing branch form a positional co-arch.
+
+       Layer 2 (L2 — Structural Composite):
+         When multiple partial interactions (拱会, 半合, 残会) across the chart
+         collectively target the same missing branch, they form a composite 共拱.
+         Unified Subsumption Rule: once an L2 composite exists, every other active
+         item stamped with the same 拱向 target (including L1 positional 共拱 and
+         contributing partials) is absorbed → 消融吸收. The L2 composite is the
+         authoritative structure (以大局为主).
+
+       Clash events mark the frame as turbid (混杂), downgrading from 强势主流
+       to 显著影响. Each 共拱 item carries a 拱向 field (the missing target branch)
+       and 元素 (the element of that branch).
 
     6. Distance Semantics (紧贴 Field):
        All branch-pair interactions include adjacency tracking:
@@ -67,7 +82,7 @@ KEY FEATURES:
 
     7. Interaction Types (16 total):
        Tier 1 (Structural): 三会, 三合, 六冲, 六合
-       Tier 2 (Operational): 共拱, 比和, 拱会, 残会, 半合, 天干合, 天干克, 天干冲
+       Tier 2 (Operational): 共拱, 比和, 拱会, 残会, 半合, 天干合, 干支透合, 天干克, 天干冲
        Tier 3 (Frictional): 三刑 (四种/full/partial), 六害, 六破, 暗合
 
     8. Heavenly Stem Interactions:
@@ -100,6 +115,9 @@ INTERNAL KEYS (STRIPPED BEFORE OUTPUT):
 
     _iid:        Unique interaction identifier (for state tracking and dedup)
     _synthetic:  Flag indicating synthetic half-structure (from Pass 1 loser injection)
+    _layer:      Layer discriminator for 共拱 (1 = positional, 2 = structural composite)
+    干方索引:    Source stem pillar index for 干支透合 suppression logic
+    支方索引:    Target branch pillar index for 干支透合 suppression logic
 
 These keys are stripped in-place during _build_pillar_dynamics (first encounter per item).
 
@@ -189,8 +207,9 @@ Output Format:
     - 组合明细: Branch/stem mapping per pillar
     - 状态: Status (from INTERACTION_STATUSES)
     - 紧贴: Boolean (adjacency for applicable types)
-    - 邀出 / 待会 / 共拱 / 混杂: Context fields (when applicable)
-    - 元素 / 方位: Element or directional info
+    - 邀出 / 待会 / 拱向 / 混杂: Context fields (when applicable)
+      (拱向: the missing target branch a 共拱/拱会/残会/半合 is arching toward)
+    - 元素 / 方位: Element or directional info (方位 only on 三会/拱会/残会)
     - 强度: Modulated strength (strong/significant/weakened/etc.)
     - 备注: Causal note (if suppressed/absorbed)
 """
@@ -2244,13 +2263,27 @@ def _build_vacant_flags(registry: InteractionRegistry) -> dict:
 
 def get_interactions(lunar_birthday) -> dict:
     """
-    Extract all pillar interactions from a BaZi chart.
+    Extract and analyze all pillar interactions from a BaZi chart.
+
+    Args:
+        lunar_birthday (Lunar): Lunar calendar object from lunar_python.
+
+    Returns:
+        dict: LLM-ready JSON under the "作用" key containing:
+            - 关系总览: Status strings for all 强势主流/显著影响 interactions
+            - 柱位动态: Per-pillar interactions split into three tiers
+                (第一梯队_纲领层 / 第二梯队_气势层 / 第三梯队_琐碎层)
+            - 柱位开放: Pillars freed by 贪合忘冲 (VACANT); only True entries shown
+            - 判定优先级: Reference tier groupings for all 16 interaction types
+            - _raw_priority_list: Internal list passed to wu_xing for scoring
+              (stripped from final output by the aggregator)
 
     Flow:
-      1. Build registry + actors
-      2. Detection: 三会/三合 → pairwise → 共拱
-      3. Five-pass priority filter
-      4. Output assembly
+      1. Build InteractionRegistry with BranchActor/StemActor per pillar
+      2. Detect 三会/三合 (structural), then all pairwise interactions
+      3. Five-pass priority filter (共拱 detection runs inside, after Pass 1
+         so synthetic half-structures from losers are visible)
+      4. Assemble per-pillar dynamics, vacant flags, and 关系总览 summary
     """
     baZi = lunar_birthday.getEightChar()
     gans = [baZi.getYearGan(), baZi.getMonthGan(), baZi.getDayGan(), baZi.getTimeGan()]

@@ -1,17 +1,19 @@
 """
 Wu Xing (五行) - Five Elements Calculation Module
 
-This module extracts and analyzes the Five Elements (Wu Xing) composition from a BaZi chart,
-applying the Ming Dynasty Imperial Qi Dynamics (明代帝王氣動法) calculation system with
-professional-grade climate influence and branch relationship modifiers.
+This module extracts and analyzes the Five Elements (五行) composition from a BaZi chart
+using the WuXingDynamicsCalculator engine. It follows 三命通会 classical methodology for
+hidden stem ordering, with position-weighted scoring, climate modulation, and full
+priority-resolved interaction bonuses and reductions.
 
 Core Architecture:
     - Hidden Stem Analysis: Extracts buried elemental stems from branches with depth weighting
+      (三命通会 ordering: e.g. 巳 → 丙(本气), 庚(中气), 戊(余气))
     - Heavenly Stem Scoring: Position-weighted visible stem contributions with seasonal floors
     - Climate Modulation: 5-category temperature system (very_cold, cold, neutral, warm, hot)
       with element-specific sensitivity multipliers
-    - Branch Relationships: 三合 (three-harmony), 六合 (six-harmony), 冲 (clash), 刑 (punishment)
-      and 害 (harm) combinations and reductions
+    - Branch Relationships: 13 scored interaction types across 三合, 六合, 六冲, 刑, 害, 破,
+      共拱, 半合, 天干合, 干支透合, and more
 
 Weight Architecture (~1.10 total scale):
     Branch hidden stems:  year=0.15, month=0.45, day=0.25, hour=0.15 (sum=1.00)
@@ -22,7 +24,7 @@ Key Functions:
     get_wu_xing(lunar_birthday, priority_list): Extracts Five Elements with professional analysis.
 
     Returns:
-        dict: Professional LLM-ready JSON structure:
+        dict: LLM-ready JSON structure:
         {
             "五行力量": {
                 "基本信息": {
@@ -38,7 +40,7 @@ Key Functions:
                     "年柱": {
                         "天干": "乙", "地支": "亥",
                         "季节状态": "相 (次强)", "十二长生": "死",
-                        "通根": {"年": "本气根"},  # or "无根"
+                        "通根": {"年": "本气根"},  # dict of pillar→root, or "无根"
                         "干支五行": {"天干五行": "木", "地支五行": "水",
                                  "主导气势": "截脚 (水克木)"},
                         "藏干": [{"干": "壬", "强度": "本气根"}, ...]
@@ -86,9 +88,7 @@ Interaction Scoring Coverage (16 types total):
 
 Climate System:
     5-category weighted average from branch temperature qualities with position weights.
-    Fire/Water: ±24% inverse sensitivity | Wood/Metal/Earth: ±12% moderate sensitivity
-
-This data is LLM-ready with transparent calculations for professional practitioners.
+    Fire/Water: ±30% inverse sensitivity | Wood/Metal/Earth: ±8% moderate sensitivity
 """
 
 from datetime import datetime
@@ -818,9 +818,9 @@ STR_BRANCH = {b.value: b for b in Branch}
 # ─────────────────────────────────────────────
 # Main calculator
 # ─────────────────────────────────────────────
-class MingQiDynamicsCalculator:
+class WuXingDynamicsCalculator:
     """
-    Ming Dynasty Imperial Qi Dynamics (明代帝王氣動法).
+    Five Elements dynamics calculator following 三命通会 classical methodology.
 
     Weight architecture (total ~1.10):
       Branch hidden stems: year=0.15, month=0.45, day=0.25, hour=0.15  (sum=1.00)
@@ -900,7 +900,7 @@ class MingQiDynamicsCalculator:
             if p.branch:
                 for idx, (hidden_stem, _) in enumerate(BRANCH_HIDDEN.get(p.branch, [])):
                     if STEM_ELEMENT[hidden_stem] == stem_elem and idx < len(root_labels):
-                        results[MingQiDynamicsCalculator._PILLAR_SHORT[p.position]] = root_labels[idx]
+                        results[WuXingDynamicsCalculator._PILLAR_SHORT[p.position]] = root_labels[idx]
                         break
         return results if results else "无根"
 
@@ -1455,7 +1455,7 @@ def get_wu_xing(lunar_birthday, priority_list: list) -> Dict:
     hour_stem, hour_branch = _split(hour_pillar_str)
 
     # Build pillars and run the calculator in one step
-    calc = MingQiDynamicsCalculator()
+    calc = WuXingDynamicsCalculator()
     pillars = [
         Pillar(
             "year",
