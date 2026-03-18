@@ -297,6 +297,22 @@ directional_he = {
     "水": {"亥", "子", "丑"},
 }
 
+# San Hui direction mapping — used to identify which directional quadrant
+SAN_HUI_DIRECTION = {
+    frozenset(["寅", "卯", "辰"]): "东",
+    frozenset(["巳", "午", "未"]): "南",
+    frozenset(["申", "酉", "戌"]): "西",
+    frozenset(["亥", "子", "丑"]): "北",
+}
+
+# Direction to element mapping — converts direction to five-element
+DIRECTION_TO_ELEMENT = {
+    "东": "木",  # East → Wood
+    "南": "火",  # South → Fire
+    "西": "金",  # West → Metal
+    "北": "水",  # North → Water
+}
+
 # Six Destructions (Liu Po) - Shattering or hidden cracks
 break_map = {
     "子": "酉",
@@ -394,11 +410,16 @@ stem_elements = {
 # ── 合化五行 lookup — element produced by each 天干合 pair ───────────────────
 # 甲己→土, 乙庚→金, 丙辛→水, 丁壬→木, 戊癸→火
 _STEM_COMBINE_ELEMENT: dict[str, str] = {
-    "甲": "土", "己": "土",
-    "乙": "金", "庚": "金",
-    "丙": "水", "辛": "水",
-    "丁": "木", "壬": "木",
-    "戊": "火", "癸": "火",
+    "甲": "土",
+    "己": "土",
+    "乙": "金",
+    "庚": "金",
+    "丙": "水",
+    "辛": "水",
+    "丁": "木",
+    "壬": "木",
+    "戊": "火",
+    "癸": "火",
 }
 
 branch_elements = {
@@ -470,6 +491,8 @@ INTERACTION_STATUSES = {
         "ungrateful_partial": "半刑",
         "bullying_full": "三刑全",
         "bullying_partial": "半刑",
+        "uncivilized_adjacent": "正刑",
+        "uncivilized_distant": "遥刑",
         "self_adjacent": "自刑 (直接反馈过载)",
         "self_distant": "遥自刑 (谐波自我纠缠)",
         "adjacent": "正刑",
@@ -611,9 +634,9 @@ PRIORITY_RULE_TABLE = {
     # STEM_天干克 omitted: 克 operates stem-to-stem; branch hidden stem is a different layer.
     ("STRUCTURAL_三会", "干支透合"): "大幅衰减",
     ("STRUCTURAL_三合", "干支透合"): "大幅衰减",
-    ("PRIMARY_六合",    "干支透合"): "大幅衰减",
-    ("PRIMARY_六冲",    "干支透合"): "大幅衰减",
-    ("STEM_天干合",     "干支透合"): "消融吸收",
+    ("PRIMARY_六合", "干支透合"): "大幅衰减",
+    ("PRIMARY_六冲", "干支透合"): "大幅衰减",
+    ("STEM_天干合", "干支透合"): "消融吸收",
 }
 
 # ── Declarative Remarks Table ─────────────────────────────────────────────────
@@ -641,9 +664,9 @@ STRENGTH_REMARKS = {
     ("STEM_天干冲", "天干克"): "天干冲动场域，克力受震荡大幅衰减",
     ("STRUCTURAL_三会", "干支透合"): "三会方位场锁定地支，藏干不得透出，干支透合受压",
     ("STRUCTURAL_三合", "干支透合"): "三合局锁定地支，藏干不得透出，干支透合受压",
-    ("PRIMARY_六合",    "干支透合"): "目标地支已被六合占位，藏干潜合力被合力压制",
-    ("PRIMARY_六冲",    "干支透合"): "目标地支被六冲气散，藏干无力应合",
-    ("STEM_天干合",     "干支透合"): "源天干已与他干直合，贪合之下，藏干透合消融",
+    ("PRIMARY_六合", "干支透合"): "目标地支已被六合占位，藏干潜合力被合力压制",
+    ("PRIMARY_六冲", "干支透合"): "目标地支被六冲气散，藏干无力应合",
+    ("STEM_天干合", "干支透合"): "源天干已与他干直合，贪合之下，藏干透合消融",
     ("SYNTHETIC_半合", "origin"): "原三合因争位失败，剩余两支保留半合牵引",
     ("SYNTHETIC_残会", "origin"): "原三会因争位失败，剩余两支保留残会框架",
     ("GONG_GONG", "echo"): "虚局与实局同元素共鸣，气场压倒性主导",
@@ -1060,7 +1083,7 @@ def _pass1_structural(registry: InteractionRegistry, zhis: list) -> None:
 
             for loser in ranked[1:]:
                 loser["强度"] = "中等衰减"
-                loser_indices = extract_pillar_indices(loser.get("组合", ""))
+                loser_indices = extract_pillar_indices(loser.get("组合", "无"))
                 surviving = [i for i in loser_indices if i != idx]
                 if len(surviving) == 2:
                     s_a, s_b = surviving[0], surviving[1]
@@ -1076,14 +1099,42 @@ def _pass1_structural(registry: InteractionRegistry, zhis: list) -> None:
                             _PILLAR_NAMES_CN[idx], "无"
                         ),
                         "备注": STRENGTH_REMARKS.get(
-                            (f"SYNTHETIC_{synthetic_itype}", "origin"), ""
+                            (f"SYNTHETIC_{synthetic_itype}", "origin"), "无"
                         ),
                     }
                     if loser_itype == "三合":
-                        synthetic["元素"] = loser.get("元素", "")
+                        # Compute element from the two surviving branches via triple_he lookup.
+                        branches_pair = {zhis[s_a], zhis[s_b]}
+                        synthetic["元素"] = next(
+                            (
+                                elem
+                                for elem, group in triple_he.items()
+                                if branches_pair.issubset(group)
+                            ),
+                            "无",
+                        )
                     else:
-                        synthetic["方位"] = loser.get("方位", "")
-                        synthetic["待会"] = loser.get("待会", "无")
+                        # 残会: compute direction/element from the two surviving branches directly.
+                        branches_present = {zhis[s_a], zhis[s_b]}
+                        direction = None
+                        missing_branch = "无"
+                        for dir_branches, dir_name in SAN_HUI_DIRECTION.items():
+                            if branches_present.issubset(dir_branches):
+                                direction = dir_name
+                                missing_branch = next(
+                                    (
+                                        b
+                                        for b in dir_branches
+                                        if b not in branches_present
+                                    ),
+                                    "无",
+                                )
+                                break
+                        synthetic["方位"] = direction or "无"
+                        synthetic["元素"] = (
+                            DIRECTION_TO_ELEMENT[direction] if direction else "无"
+                        )
+                        synthetic["待会"] = missing_branch
                     registry.inject(synthetic)
 
         winner_itype = winner.get("类型")
@@ -1094,7 +1145,7 @@ def _pass1_structural(registry: InteractionRegistry, zhis: list) -> None:
         # Lock ALL branches that participate in the winning structure, not just
         # the current contest branch. Without this, Pass 3 misses suppression
         # for interactions that touch only the un-locked co-participants.
-        for winning_idx in extract_pillar_indices(winner.get("组合", "")):
+        for winning_idx in extract_pillar_indices(winner.get("组合", "无")):
             winning_actor = registry.branch_actors.get(winning_idx)
             if winning_actor and winning_actor.lock_type is None:
                 winning_actor.lock_type = winner_lock
@@ -1251,7 +1302,7 @@ def _pass3_conflict(registry: InteractionRegistry) -> None:
     lock across all participating branches naturally wins.
     """
     for item in registry.active_items():
-        indices = extract_pillar_indices(item.get("组合", ""))
+        indices = extract_pillar_indices(item.get("组合", "无"))
         for idx in indices:
             actor = registry.branch_actors.get(idx)
             if not actor or not actor.lock_type:
@@ -1333,11 +1384,11 @@ def _pick_stem_winner(candidates: list[dict]) -> dict | None:
     """日柱 absolute anchor, then _STEM_LOCK_PRIORITY order."""
     if not candidates:
         return None
-    ri_zhu = [c for c in candidates if 2 in extract_pillar_indices(c.get("组合", ""))]
+    ri_zhu = [c for c in candidates if 2 in extract_pillar_indices(c.get("组合", "无"))]
     pool = ri_zhu if ri_zhu else candidates
 
     def _rank(item):
-        indices = extract_pillar_indices(item.get("组合", ""))
+        indices = extract_pillar_indices(item.get("组合", "无"))
         ranks = [
             _STEM_LOCK_PRIORITY.index(i) for i in indices if i in _STEM_LOCK_PRIORITY
         ]
@@ -1357,7 +1408,7 @@ def _pass4_group(registry: InteractionRegistry) -> None:
     """
     for item in registry.active_items():
         itype = item.get("类型", "")
-        indices = extract_pillar_indices(item.get("组合", ""))
+        indices = extract_pillar_indices(item.get("组合", "无"))
 
         if itype == "比和":
             item["强度"] = "显著影响"
@@ -1389,7 +1440,7 @@ def _pass4_group(registry: InteractionRegistry) -> None:
                 # VACANT = freed by 贪合忘冲; the pillar is open and undefended.
                 # A partial structure pulling on an open pillar activates fully.
                 item["强度"] = "强势主流"
-                item["备注"] = STRENGTH_REMARKS.get(("VACANT", "branch"), "")
+                item["备注"] = STRENGTH_REMARKS.get(("VACANT", "branch"), "无")
             else:
                 # Covers None (no lock) and SECONDARY (next-best minor lock).
                 # SECONDARY is a weak residual bond — not strong enough to suppress
@@ -1400,12 +1451,14 @@ def _pass4_group(registry: InteractionRegistry) -> None:
             continue
 
         if itype == "共拱":
-            gong_element = item.get("元素", "")
+            gong_element = item.get("元素", "无")
             structural_elements = [
                 registry.branch_actors[i].lock_element
                 for i in indices
                 if i in registry.branch_actors
-                and (registry.branch_actors[i].lock_type or "").startswith("STRUCTURAL")
+                and (registry.branch_actors[i].lock_type or "无").startswith(
+                    "STRUCTURAL"
+                )
                 and registry.branch_actors[i].lock_element
             ]
             existing = item.get("强度")
@@ -1416,16 +1469,16 @@ def _pass4_group(registry: InteractionRegistry) -> None:
                     "显著影响", 0
                 ) > STRENGTH_ORDER.get(existing, 0):
                     item["强度"] = "显著影响"
-                    item["备注"] = STRENGTH_REMARKS.get(("GONG_GONG", "turbid"), "")
+                    item["备注"] = STRENGTH_REMARKS.get(("GONG_GONG", "turbid"), "无")
             elif gong_element in structural_elements:
                 # Echo upgrade: same element resonance — legitimate Pass 4 upgrade,
                 # overrides any prior downgrade because structural echo dominates.
                 item["强度"] = "强势主流"
-                item["备注"] = STRENGTH_REMARKS.get(("GONG_GONG", "echo"), "")
+                item["备注"] = STRENGTH_REMARKS.get(("GONG_GONG", "echo"), "无")
                 # Elevate constituent partials
-                target = item.get("共拱")
+                target = item.get("拱向")
                 for sub in registry.active_items():
-                    if sub.get("共拱") == target and sub.get("类型") in {
+                    if sub.get("拱向") == target and sub.get("类型") in {
                         "半合",
                         "拱会",
                     }:
@@ -1436,7 +1489,9 @@ def _pass4_group(registry: InteractionRegistry) -> None:
                     "大幅衰减", 0
                 ) > STRENGTH_ORDER.get(existing, 0):
                     item["强度"] = "大幅衰减"
-                    item["备注"] = STRENGTH_REMARKS.get(("GONG_GONG", "suppressed"), "")
+                    item["备注"] = STRENGTH_REMARKS.get(
+                        ("GONG_GONG", "suppressed"), "无"
+                    )
             elif not existing:
                 item["强度"] = "强势主流"
             continue
@@ -1454,7 +1509,7 @@ def _pass5_defaults(registry: InteractionRegistry) -> None:
         if registry.is_absorbed(item.get("_iid", -1)):
             item["强度"] = "消融吸收"
             continue
-        itype = item.get("类型", "")
+        itype = item.get("类型", "无")
         is_adj = item.get("紧贴", False)
         item["强度"] = DEFAULT_STRENGTH.get((itype, is_adj), "强势主流")
 
@@ -1482,7 +1537,7 @@ def apply_bazi_master_priority(
     _pass5_defaults(registry)
 
     result = registry.all_items()
-    result.sort(key=lambda x: INTERACTION_TIER_ORDER.get(x.get("类型", ""), 999))
+    result.sort(key=lambda x: INTERACTION_TIER_ORDER.get(x.get("类型", "无"), 999))
     return result
 
 
@@ -1497,8 +1552,8 @@ def _get_shi_shen_for_stem_pair(day_stem: str, hidden_stem: str) -> str:
     Returns a Chinese ten-god label.
     All ten-god relationships in BaZi are always computed relative to the day master.
     """
-    day_elem = stem_elements.get(day_stem, "")
-    hidden_elem = stem_elements.get(hidden_stem, "")
+    day_elem = stem_elements.get(day_stem, "无")
+    hidden_elem = stem_elements.get(hidden_stem, "无")
 
     day_yin = day_stem in "乙丁己辛癸"
     hidden_yin = hidden_stem in "乙丁己辛癸"
@@ -1514,15 +1569,15 @@ def _get_shi_shen_for_stem_pair(day_stem: str, hidden_stem: str) -> str:
     if _generates.get(hidden_elem) == day_elem:
         return "正印" if same_polarity else "偏印"
     if _controls.get(day_elem) == hidden_elem:
-        return "正财" if same_polarity else "偏财"
+        return "偏财" if same_polarity else "正财"
     if _controls.get(hidden_elem) == day_elem:
-        return "正官" if same_polarity else "七杀"
+        return "七杀" if same_polarity else "正官"
     return "未知"
 
 
 def _detect_san_hui(zhis: list, registry: InteractionRegistry) -> None:
     """Detect full 三会 and partial 拱会/残会."""
-    for direction, group in directional_he.items():
+    for element, group in directional_he.items():
         matched: dict[str, int] = {}
         for branch in group:
             for k, zhi in enumerate(zhis):
@@ -1539,10 +1594,28 @@ def _detect_san_hui(zhis: list, registry: InteractionRegistry) -> None:
         )
         combo_detail = {_PILLAR_NAMES_CN[k]: zhis[k] for k in matched.values()}
 
+        # Determine direction from branch set
+        branch_set = frozenset(matched.keys())
+        # For partials (2 branches), find direction if both are in same directional group
+        direction = None
+        if len(branch_set) == 2:
+            for dir_branches, dir_name in SAN_HUI_DIRECTION.items():
+                if branch_set.issubset(dir_branches):
+                    direction = dir_name
+                    break
+        else:
+            # For full 三会 (3 branches), direct lookup
+            direction = SAN_HUI_DIRECTION.get(branch_set)
+
+        element_from_direction = (
+            DIRECTION_TO_ELEMENT.get(direction) if direction else element
+        )
+
         if len(matched) == 3:
             registry.register(
                 {
                     "类型": "三会",
+                    "元素": element_from_direction,
                     "方位": direction,
                     "组合": "-".join(match_names),
                     "组合明细": combo_detail,
@@ -1551,13 +1624,14 @@ def _detect_san_hui(zhis: list, registry: InteractionRegistry) -> None:
             )
 
         elif len(matched) == 2:
-            cardinal = cardinal_branches.get(direction)
+            cardinal = cardinal_branches.get(element)
             cardinal_present = cardinal in matched
             itype_partial = "残会" if cardinal_present else "拱会"
             missing = next((b for b in group if b not in matched), None)
             idxs = list(matched.values())
             item = {
                 "类型": itype_partial,
+                "元素": element_from_direction,
                 "方位": direction,
                 "组合": "-".join(match_names),
                 "组合明细": combo_detail,
@@ -1603,6 +1677,14 @@ def _detect_san_he(zhis: list, registry: InteractionRegistry) -> None:
         )
 
 
+_PT_KEY_MAP: dict[str, str] = {
+    "无恩之刑": "ungrateful",
+    "恃势之刑": "bullying",
+    "无礼之刑": "uncivilized",
+    "自刑": "self",
+}
+
+
 def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> None:
     """
     Detect all pairwise branch and stem interactions.
@@ -1642,13 +1724,13 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
                 )
             if six_he_map.get(b_i) == b_j:
                 pk = tuple(sorted([b_i, b_j]))
-                elem = six_he_element_map.get(pk, {}).get("primary", "")
+                elem = six_he_element_map.get(pk, {}).get("primary", "无")
                 registry.register(
                     {
                         "类型": "六合",
                         "组合": combo,
                         "组合明细": detail,
-                        "结果": f"化{elem}",
+                        "元素": elem,
                         "紧贴": is_adjacent,
                         "状态": get_status(
                             "六合", {"key": "adjacent" if is_adjacent else "distant"}
@@ -1728,12 +1810,6 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
             #   b_i != b_j → 无恩/恃势/无礼 where applicable
             result = is_valid_punishment(b_i, b_j, natal_branches=zhis)
             if result:
-                _PT_KEY_MAP = {
-                    "无恩之刑": "ungrateful",
-                    "恃势之刑": "bullying",
-                    "无礼之刑": "uncivilized",
-                    "自刑": "self",
-                }
                 pt_key = _PT_KEY_MAP.get(result["type"], "ungrateful")
                 registry.register(
                     {
@@ -1785,7 +1861,7 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
                                 "藏干": _hs,
                                 "藏干层": _hidden_labels[_hi] if _hi < 3 else "余气",
                                 "藏干十神": _get_shi_shen_for_stem_pair(_day_stem, _hs),
-                                "合化五行": _STEM_COMBINE_ELEMENT.get(_stem_i, ""),
+                                "合化五行": _STEM_COMBINE_ELEMENT.get(_stem_i, "无"),
                             },
                             "干方索引": i,
                             "支方索引": j,
@@ -1806,7 +1882,7 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
                                 "藏干": _hs,
                                 "藏干层": _hidden_labels[_hi] if _hi < 3 else "余气",
                                 "藏干十神": _get_shi_shen_for_stem_pair(_day_stem, _hs),
-                                "合化五行": _STEM_COMBINE_ELEMENT.get(_stem_j, ""),
+                                "合化五行": _STEM_COMBINE_ELEMENT.get(_stem_j, "无"),
                             },
                             "干方索引": j,
                             "支方索引": i,
@@ -1960,23 +2036,19 @@ def _detect_gong_gong(registry: InteractionRegistry, zhis: list) -> None:
                 detail = {pn_lo: zhis[lo], pn_hi: zhis[hi]}
                 frame = _ARCH_CLASSIFICATION[missing_branch]
 
-                # Element / direction from the directional group if 三会共拱,
+                # Element from the directional group if 三会共拱,
                 # else from branch_elements of the missing branch
                 if frame.startswith("三会共拱"):
-                    direction = next(
-                        (d for d, g in directional_he.items() if a in g and b in g), ""
-                    )
                     element = next(
                         (
                             el
                             for el, cb in cardinal_branches.items()
                             if cb == missing_branch
                         ),
-                        "",
+                        "无",
                     )
                 else:
-                    direction = ""
-                    element = branch_elements.get(missing_branch, "")
+                    element = branch_elements.get(missing_branch, "无")
 
                 clashed = bool(
                     clash_map.get(zhis[lo]) in present
@@ -1992,11 +2064,10 @@ def _detect_gong_gong(registry: InteractionRegistry, zhis: list) -> None:
                 item = {
                     "类型": "共拱",
                     "元素": element,
-                    "方位": direction,
                     "框架": frame,
                     "组合": combo,
                     "组合明细": detail,
-                    "共拱": missing_branch,
+                    "拱向": missing_branch,
                     "紧贴": hi - lo == 1,
                     "状态": status,
                     "混杂": clashed,
@@ -2007,10 +2078,10 @@ def _detect_gong_gong(registry: InteractionRegistry, zhis: list) -> None:
                     for it in registry.active_items():
                         if (
                             it.get("类型") in {"半合", "拱会", "残会"}
-                            and idx in extract_pillar_indices(it.get("组合", ""))
+                            and idx in extract_pillar_indices(it.get("组合", "无"))
                             and _gong_gong_target(it) == missing_branch
                         ):
-                            it["共拱"] = missing_branch
+                            it["拱向"] = missing_branch
 
     # ── Layer 2: Structural 共拱 (multi-partial convergence) ──────────────────
     partials: list[dict] = [
@@ -2037,22 +2108,8 @@ def _detect_gong_gong(registry: InteractionRegistry, zhis: list) -> None:
                     combined_detail[pname] = branch
 
         all_names_sorted = sorted(all_names, key=lambda p: _PILLAR_IDX_MAP[p])
-        element = next(
-            (
-                c.get("元素", "")
-                for c in contributors
-                if c.get("类型") == "半合" and c.get("元素")
-            ),
-            "",
-        )
-        direction = next(
-            (
-                c.get("方位", "")
-                for c in contributors
-                if c.get("类型") in {"拱会", "残会"} and c.get("方位")
-            ),
-            "",
-        )
+        # Derive element from the missing branch directly — not inherited from contributors.
+        element = branch_elements.get(missing_branch, "无")
 
         itypes = {c.get("类型") for c in contributors}
         if "拱会" in itypes and "半合" in itypes:
@@ -2076,17 +2133,36 @@ def _detect_gong_gong(registry: InteractionRegistry, zhis: list) -> None:
         item = {
             "类型": "共拱",
             "元素": element,
-            "方位": direction,
             "框架": frame_label,
             "组合": "-".join(all_names_sorted),
             "组合明细": combined_detail,
-            "共拱": missing_branch,
+            "拱向": missing_branch,
             "状态": status,
             "混杂": clashed,
+            "_layer": 2,
         }
         registry.register(item)
         for sub in contributors:
-            sub["共拱"] = missing_branch
+            sub["拱向"] = missing_branch
+
+    # ── Unified subsumption: L2 composite absorbs everything it encompasses ───
+    # One rule (以大局为主): if a composite 共拱 (L2) exists for a given
+    # missing branch, every other active item stamped with the same 拱向 target
+    # — contributors (拱会/半合/残会) AND any smaller L1 positional 共拱 —
+    # is fully absorbed. The stamp "拱向": missing_branch is the sole flag;
+    # no branch-set arithmetic needed.
+    for item in list(registry.active_items()):
+        if item.get("类型") != "共拱" or item.get("_layer") != 2:
+            continue
+        target = item["拱向"]
+        frame = item["框架"]
+        for sub in list(registry.active_items()):
+            if sub["_iid"] == item["_iid"]:
+                continue
+            if sub.get("拱向") == target:
+                registry.absorb(sub["_iid"])
+                sub["强度"] = "消融吸收"
+                sub["备注"] = f"已被复合共拱（{frame}，拱{target}）涵盖，消融吸收"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2107,7 +2183,7 @@ _TIER3_TYPES = {
 }
 
 
-_OUTPUT_STRIP_KEYS = {"_iid", "_synthetic"}
+_OUTPUT_STRIP_KEYS = {"_iid", "_synthetic", "_layer", "干方索引", "支方索引"}
 
 
 def _build_pillar_dynamics(filtered: list) -> dict:
@@ -2124,8 +2200,8 @@ def _build_pillar_dynamics(filtered: list) -> dict:
     stripped: set[int] = set()  # id(item) — track which items are already clean
     added: set[tuple] = set()
     for item in filtered:
-        itype = item.get("类型", "")
-        indices = extract_pillar_indices(item.get("组合", ""))
+        itype = item.get("类型", "无")
+        indices = extract_pillar_indices(item.get("组合", "无"))
         if not indices:
             continue
         if itype in _TIER1_TYPES:
@@ -2242,7 +2318,8 @@ def get_interactions(lunar_birthday) -> dict:
                     "干支透合",
                 ],
             },
-        }
+        },
+        "_raw_priority_list": filtered,
     }
 
 
@@ -2260,19 +2337,19 @@ if __name__ == "__main__":
     # python -m src.astronomer_calculations.interactions_gan_zhi_zuo_yong
 
     # Desmond's birthday example
-    # solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)  # Create solar date
-    # datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)  # Create datetime object
-    # tst_birthday, _ = get_true_solar_time(
-    #     datetime_birthday, 1.3253, 103.808053
-    # )  # Get true solar time
+    solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)  # Create solar date
+    datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)  # Create datetime object
+    tst_birthday, _ = get_true_solar_time(
+        datetime_birthday, 1.3253, 103.808053
+    )  # Get true solar time
 
     # Corinne's birthday example
-    solar_birthday = Solar.fromYmdHms(
-        1987, 6, 3, 12, 6, 0
-    )  # Create solar date June 3, 1987 at 12:06 PM
-    tst_birthday, inputs_report = get_true_solar_time(
-        datetime(1987, 6, 3, 12, 6, 0), 1.4759, 103.808053
-    )
+    # solar_birthday = Solar.fromYmdHms(
+    #     1987, 6, 3, 12, 6, 0
+    # )  # Create solar date June 3, 1987 at 12:06 PM
+    # tst_birthday, inputs_report = get_true_solar_time(
+    #     datetime(1987, 6, 3, 12, 6, 0), 1.4759, 103.808053
+    # )
     lunar_birthday = tst_birthday.getLunar()
 
     logger.info("阳历生日: " + solar_birthday.toYmdHms())
