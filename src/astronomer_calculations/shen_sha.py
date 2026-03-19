@@ -19,13 +19,35 @@ Architecture:
 - Gender-dependent calculations (元辰, for example)
 
 Public API:
-    get_shen_sha(lunar_birthday, gender): Main entry point
+    get_shen_sha(lunar_birthday, gender): Main entry point for natal chart analysis.
 
     Returns: {
         "神煞": {
-            "柱位神煞": {...},      # Per-pillar stars
-            "系统神煞": {...}       # Relational/advanced stars (互禄, 虚邀, 德秀, 暗禄)
+            "柱位神煞": {
+                "年柱": {"神煞": [...]},
+                "月柱": {"神煞": [...]},
+                "日柱": {"神煞": [...]},
+                "时柱": {"神煞": [...]}
+            },
+            "系统神煞": {
+                "互禄明细": [...],       # Mutual lu (互禄) pairs
+                "虚邀禄": [...],         # Virtual lu (拱禄/夹禄) formations
+                "虚邀贵": [...],         # Virtual noble (拱贵/夹贵) formations
+                "禄元互换": [...],       # Present only if activated
+                "进退真禄": [...],       # Present only if activated
+                "德秀贵人": {...},       # Present only if activated
+                "暗禄": {...}            # Present only if activated
+            }
         }
+    }
+
+    ShenShaCalculator.get_cycle_shen_sha(cycle_stem, cycle_branch): Cycle analysis.
+
+    Returns: {
+        "日系": [...],   # Day-branch and day-stem derived stars
+        "年系": [...],   # Year-branch derived stars
+        "月系": [...],   # Month-branch derived stars
+        "杂项": [...]    # Pillar-specific and seasonal formations
     }
 """
 
@@ -915,14 +937,15 @@ class ShenShaCalculator:
 
     Supports both:
     - Natal chart analysis: calculate()
-    - Cycle (da yun, xiao yun, liu nian) analysis: get_cycle_shen_sha(cycle_stem, cycle_branch)
+    - Cycle (da yun, xiao yun, liu nian, liu yue) analysis: get_cycle_shen_sha(cycle_stem, cycle_branch)
 
     Architecture:
     - __init__ extracts and caches all natal state (8-char, gender, season, etc.)
-    - Shared derived state used by all calc methods (no parameter passing)
-    - ~20 _calc_*() methods compute specific shen groups
-    - calculate() orchestrates all methods
-    - get_cycle_shen_sha() checks cycle pillars against cached natal state
+    - _from_natal_dict() constructs from a pre-parsed natal_chart dict (used by cycle callers)
+    - Shared derived state used by all _calc_*() methods (no parameter passing)
+    - ~20 _calc_*() methods compute specific shen groups, organized by derivation source
+    - calculate() orchestrates all _calc_*() methods and caches the result
+    - get_cycle_shen_sha() checks a single cycle pillar against cached natal state
 
     Gender convention: 0 = Female, 1 = Male (consistent with BaZi library)
     """
@@ -1832,9 +1855,11 @@ class ShenShaCalculator:
 
     def calculate(self) -> Dict[str, Any]:
         """
-        Orchestrate all shen sha calculations for natal chart.
-        Calls all _calc_*() methods in logical order.
-        Results are cached within the instance to avoid redundant calculations.
+        Orchestrate all shen sha calculations for the natal chart.
+
+        Calls all _calc_*() methods in logical order, grouped by derivation source:
+        年系, 月系, 日系, 日干, 年干, 衍生特殊, 柱位/季节, 关系, 高级关系.
+        Results are cached within the instance to avoid redundant recalculation.
 
         Returns:
             dict: {"神煞": {"柱位神煞": {...}, "系统神煞": {...}}}
@@ -2103,14 +2128,6 @@ class ShenShaCalculator:
         if cycle_pillar in self_lu_map:
             add_day(self_lu_map[cycle_pillar])
 
-        # 8c. HIDDEN STEM REVELATIONS (日系) — classical 藏干 for specific cycle pillars
-        hidden_map = {
-            "丁巳": "巳中藏丙",
-            "癸亥": "亥中藏壬",
-        }
-        if cycle_pillar in hidden_map:
-            add_day(hidden_map[cycle_pillar])
-
         # 9. PILLAR SPECIALS (杂项)
         for shen_name, target_list in {
             "阴阳差错": pillar_shens.get("阴阳差错", []),
@@ -2202,11 +2219,13 @@ def get_shen_sha(lunar_birthday: Lunar, gender: int) -> Dict[str, Any]:
                     "时柱": {"神煞": [...]}
                 },
                 "系统神煞": {
-                    "互禄明细": [...],
-                    "虚邀禄": [...],
-                    "虚邀贵": [...],
-                    "德秀贵人": {...},   # if triggered
-                    "暗禄": {...}        # if triggered
+                    "互禄明细": [...],       # always present (may be empty)
+                    "虚邀禄": [...],         # always present (may be empty)
+                    "虚邀贵": [...],         # always present (may be empty)
+                    "禄元互换": [...],       # present only if activated
+                    "进退真禄": [...],       # present only if activated
+                    "德秀贵人": {...},       # present only if activated
+                    "暗禄": {...}            # present only if activated
                 }
             }
         }
