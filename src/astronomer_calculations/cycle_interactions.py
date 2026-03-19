@@ -157,6 +157,11 @@ CYCLE_PRIORITY_RULE_TABLE: dict[tuple, str] = {
     ("PRIMARY_六合", "干支透合"): "大幅衰减",
     ("PRIMARY_六冲", "干支透合"): "大幅衰减",
     ("STEM_天干合",  "干支透合"): "消融吸收",
+    # ── PREPASS_伏吟 branch lock ──
+    # 伏吟 means the cycle pillar IS the natal pillar; any co-registered branch
+    # interaction on the same pillar is absorbed into the stagnation field.
+    ("PREPASS_伏吟", "比和"):     "消融吸收",
+    ("PREPASS_伏吟", "干支透合"): "消融吸收",
 }
 
 # ── Remark templates ──────────────────────────────────────────────────────────
@@ -619,8 +624,11 @@ def _detect_cycle_structural(
             )
         elif len(natal_in_group) == 1:
             # Partial 三会: cycle branch + exactly 1 distinct natal branch in group.
-            # Find the first pillar that holds the matching branch.
+            # Guard: if the only natal branch in the group IS the cycle branch itself
+            # (伏吟 case), skip — a branch cannot form 拱会/残会 with itself.
             matching_branch = next(iter(natal_in_group))
+            if matching_branch == cycle_branch:
+                continue
             natal_idx = next(i for i, z in natal_matches if z == matching_branch)
             natal_branch = matching_branch
             cardinal = cardinal_branches.get(element)
@@ -1065,55 +1073,36 @@ def _detect_cycle_gong_gong(
             continue  # cannot arch toward oneself
 
         # Check if cycle_branch and a natal branch form the flanking pair.
-        # Iterate all matching natal indices — a branch may appear in multiple pillars.
-        for pair in [(a, b), (b, a)]:
-            lo, hi = pair
-            if cycle_branch == lo:
-                for natal_idx, natal_zhi in enumerate(natal_zhis):
-                    if natal_zhi == hi:
-                        combo = f"{cycle_label}-{_PILLAR_NAMES[natal_idx]}"
-                        clashed = bool(
-                            clash_map.get(cycle_branch) in all_present
-                            or clash_map.get(natal_zhi) in all_present
-                        )
-                        registry.register(
-                            {
-                                "类型": "共拱",
-                                "框架": f"岁运拱{missing_branch}",
-                                "组合": combo,
-                                "组合明细": {
-                                    _PILLAR_NAMES[natal_idx]: hi,
-                                    cycle_label: lo,
-                                },
-                                "拱向": missing_branch,
-                                "涉及月柱": natal_idx == 1,
-                                "混杂": clashed,
-                                "日柱特殊": natal_idx == 2,
-                            }
-                        )
-            elif cycle_branch == hi:
-                for natal_idx, natal_zhi in enumerate(natal_zhis):
-                    if natal_zhi == lo:
-                        combo = f"{cycle_label}-{_PILLAR_NAMES[natal_idx]}"
-                        clashed = bool(
-                            clash_map.get(cycle_branch) in all_present
-                            or clash_map.get(natal_zhi) in all_present
-                        )
-                        registry.register(
-                            {
-                                "类型": "共拱",
-                                "框架": f"岁运拱{missing_branch}",
-                                "组合": combo,
-                                "组合明细": {
-                                    _PILLAR_NAMES[natal_idx]: lo,
-                                    cycle_label: hi,
-                                },
-                                "拱向": missing_branch,
-                                "涉及月柱": natal_idx == 1,
-                                "混杂": clashed,
-                                "日柱特殊": natal_idx == 2,
-                            }
-                        )
+        # Determine which side cycle_branch occupies, then scan for the other.
+        if cycle_branch == a:
+            other = b
+        elif cycle_branch == b:
+            other = a
+        else:
+            continue
+
+        for natal_idx, natal_zhi in enumerate(natal_zhis):
+            if natal_zhi == other:
+                combo = f"{cycle_label}-{_PILLAR_NAMES[natal_idx]}"
+                clashed = bool(
+                    clash_map.get(cycle_branch) in all_present
+                    or clash_map.get(natal_zhi) in all_present
+                )
+                registry.register(
+                    {
+                        "类型": "共拱",
+                        "框架": f"岁运拱{missing_branch}",
+                        "组合": combo,
+                        "组合明细": {
+                            _PILLAR_NAMES[natal_idx]: other,
+                            cycle_label: cycle_branch,
+                        },
+                        "拱向": missing_branch,
+                        "涉及月柱": natal_idx == 1,
+                        "混杂": clashed,
+                        "日柱特殊": natal_idx == 2,
+                    }
+                )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1252,6 +1241,8 @@ def _pass1_identity(
     liu_he = registry.get_by_type(["六合"], actor="branch")
     liu_chong = registry.get_by_type(["六冲", "开库"], actor="branch")
 
+    fu_yin = registry.get_by_type(["伏吟"], actor="branch")
+
     branch_winner: dict | None = None
     if structural:
         branch_winner = structural[0]
@@ -1264,6 +1255,11 @@ def _pass1_identity(
         ri_zhu_chong = [it for it in liu_chong if _is_ri_zhu(it)]
         branch_winner = ri_zhu_chong[0] if ri_zhu_chong else liu_chong[0]
         branch.lock_type = "PRIMARY_六冲"
+    elif fu_yin:
+        # 伏吟: cycle pillar IS the natal pillar — lowest branch lock priority,
+        # only claimed when no structural/六合/六冲 winner exists.
+        branch_winner = fu_yin[0]
+        branch.lock_type = "PREPASS_伏吟"
 
     if branch_winner is not None:
         branch.lock_item_id = branch_winner["_iid"]
