@@ -39,20 +39,32 @@ from lunar_python.EightChar import EightChar
 from datetime import datetime, timedelta
 from typing import Optional
 
-# Import shared maps, functions, and constants from da_yun module
-from src.astronomer_calculations.da_yun import (
-    # Helper functions
-    _get_stem_wu_xing,
-    _get_branch_wu_xing,
-    _get_nayin,
-    _get_di_shi,
-    _get_shi_shen_for_stem_pair,
-    _get_hidden_stems_shi_shen,
-    _detect_da_yun_interactions,
-    DI_SHI_TABLE,
-    STR_STEM,
-    STR_BRANCH,
+from src.astronomer_calculations.interactions_gan_zhi_zuo_yong import (
+    clash_map,
+    harm_map,
+    six_he_map,
+    triple_he,
+    cardinal_branches,
+    directional_he,
+    break_map,
+    hidden_stem_he,
+    stem_combines,
+    stem_clashes,
 )
+
+from src.astronomer_calculations.cycle_wu_xing import (
+    get_stem_wu_xing,
+    get_branch_wu_xing,
+)
+
+from src.astronomer_calculations.cycle_na_yin import get_nayin
+from src.astronomer_calculations.cycle_di_shi import get_di_shi, DI_SHI_TABLE
+from src.astronomer_calculations.cycle_shi_shen import (
+    get_shi_shen_for_stem_pair,
+    get_hidden_stems_shi_shen,
+)
+
+from src.astronomer_calculations.cycle_interactions import get_cycle_interactions
 
 from src.astronomer_calculations.wu_xing import (
     Pillar,
@@ -66,56 +78,56 @@ _NINE_STAR_DESCRIPTIONS = {
         "描述": "桃花星，主人缘、姻缘、社交。利感情发展，旺人脉关系。",
         "关键词": ["桃花", "人缘", "姻缘", "社交", "大吉", "水"],
         "宜": ["婚恋", "社交", "签约", "交友"],
-        "忌": []
+        "忌": [],
     },
     2: {
         "描述": "病符星，主疾病、灾祸、伤痛。易有健康问题，需注意身体。",
         "关键词": ["病符", "疾病", "灾祸", "伤痛", "大凶", "土"],
         "宜": ["静养", "祈福", "体检"],
-        "忌": ["动土", "装修", "嘈杂"]
+        "忌": ["动土", "装修", "嘈杂"],
     },
     3: {
         "描述": "是非星，主口舌、官非、争斗。易有纠纷争执，需谨言慎行。",
         "关键词": ["是非", "官非", "争斗", "口舌", "凶", "木"],
         "宜": ["低调", "忍耐", "独处"],
-        "忌": ["争吵", "诉讼", "冲动"]
+        "忌": ["争吵", "诉讼", "冲动"],
     },
     4: {
         "描述": "文昌星，主学业、考试、功名。利读书进取，旺文采才华。",
         "关键词": ["文昌", "学业", "考试", "功名", "吉", "木"],
         "宜": ["读书", "考试", "创作", "学习"],
-        "忌": []
+        "忌": [],
     },
     5: {
         "描述": "五黄煞，主凶灾、意外、破败。最凶之星，诸事不宜，宜静不宜动。",
         "关键词": ["五黄", "凶灾", "意外", "破败", "大凶", "土"],
         "宜": ["静养", "避让", "祈福"],
-        "忌": ["动土", "搬迁", "开工", "重大决策"]
+        "忌": ["动土", "搬迁", "开工", "重大决策"],
     },
     6: {
         "描述": "偏财星，主武贵、偏财、远行。利出差远行，旺偏财机遇。",
         "关键词": ["偏财", "武贵", "远行", "晋升", "吉", "金"],
         "宜": ["投资", "出差", "晋升", "求偏财"],
-        "忌": []
+        "忌": [],
     },
     7: {
         "描述": "破军星，主破财、盗贼、损失。易有财物损失，需防盗防骗。",
         "关键词": ["破财", "盗贼", "损失", "破坏", "凶", "金"],
         "宜": ["清理", "整顿", "断舍离"],
-        "忌": ["投资", "借贷", "担保"]
+        "忌": ["投资", "借贷", "担保"],
     },
     8: {
         "描述": "正财星，主事业、置业、财运。利求财创业，旺事业成就。",
         "关键词": ["正财", "事业", "置业", "财运", "大吉", "土"],
         "宜": ["求财", "置业", "开业", "求正财"],
-        "忌": []
+        "忌": [],
     },
     9: {
         "描述": "喜庆星，主喜事、庆典、姻缘。利婚嫁喜事，旺家庭和睦。",
         "关键词": ["喜庆", "喜事", "庆典", "姻缘", "吉", "火"],
         "宜": ["婚嫁", "聚会", "庆典", "喜事"],
-        "忌": []
-    }
+        "忌": [],
+    },
 }
 
 
@@ -128,7 +140,9 @@ def get_nine_star(nine_star_obj) -> dict:
 
     # 1. Extract all raw data first
     number = nine_star_obj.getNumber()
-    index = nine_star_obj.getIndex() + 1  # Convert 0-based index to 1-based for descriptions
+    index = (
+        nine_star_obj.getIndex() + 1
+    )  # Convert 0-based index to 1-based for descriptions
 
     # 2. Build structured Qi Men data
     qi_men = _build_qi_men_data(nine_star_obj)
@@ -143,17 +157,17 @@ def get_nine_star(nine_star_obj) -> dict:
         "北斗": nine_star_obj.getNameInBeiDou(),
         "太乙": {
             "名称": nine_star_obj.getNameInTaiYi(),
-            "类型": nine_star_obj.getTypeInTaiYi()
+            "类型": nine_star_obj.getTypeInTaiYi(),
         },
         "玄空": {
             "名称": nine_star_obj.getNameInXuanKong(),
-            "吉凶": nine_star_obj.getLuckInXuanKong()
+            "吉凶": nine_star_obj.getLuckInXuanKong(),
         },
         "奇门": qi_men,
         "描述": _NINE_STAR_DESCRIPTIONS[index]["描述"],
         "关键词": _NINE_STAR_DESCRIPTIONS[index]["关键词"],
         "宜": _NINE_STAR_DESCRIPTIONS[index]["宜"],
-        "忌": _NINE_STAR_DESCRIPTIONS[index]["忌"]
+        "忌": _NINE_STAR_DESCRIPTIONS[index]["忌"],
     }
 
     return star_data
@@ -163,7 +177,7 @@ def _build_qi_men_data(nine_star_obj) -> dict:
     """Build structured Qi Men data from NineStar object."""
     qi_men = {
         "九星": nine_star_obj.getNameInQiMen(),
-        "九星吉凶": nine_star_obj.getLuckInQiMen()
+        "九星吉凶": nine_star_obj.getLuckInQiMen(),
     }
 
     # Handle 八门 (BaMen) if available
@@ -957,10 +971,9 @@ def _detect_liu_nian_interactions(
     Returns:
         dict: Organized interactions by pillar and tier
     """
-    # Leverage the existing Da Yun interaction detection function
-    # Pass "流年" as pillar_prefix to replace "大运" in the output
-    return _detect_da_yun_interactions(
-        liu_nian_stem, liu_nian_branch, birth_chart, pillar_prefix="流年"
+    # Use the shared cycle interaction detector and label this run as 流年
+    return get_cycle_interactions(
+        liu_nian_stem, liu_nian_branch, birth_chart, cycle_label="流年"
     )
 
 
@@ -981,10 +994,9 @@ def _detect_liu_yue_interactions(
     Returns:
         dict: Organized interactions by pillar and tier
     """
-    # Leverage the existing Da Yun interaction detection function
-    # Pass "流月" as pillar_prefix to replace "大运" in the output
-    return _detect_da_yun_interactions(
-        liu_yue_stem, liu_yue_branch, birth_chart, pillar_prefix="流月"
+    # Use the shared cycle interaction detector and label this run as 流月
+    return get_cycle_interactions(
+        liu_yue_stem, liu_yue_branch, birth_chart, cycle_label="流月"
     )
 
 
@@ -1178,18 +1190,18 @@ def get_liu_nian(
             liu_nian_branch = gan_zhi[1]
 
             # Calculate Ten Gods for this 流年
-            stem_shi_shen = _get_shi_shen_for_stem_pair(day_stem, liu_nian_stem)
-            branch_shi_shen = _get_hidden_stems_shi_shen(day_stem, liu_nian_branch)
+            stem_shi_shen = get_shi_shen_for_stem_pair(day_stem, liu_nian_stem)
+            branch_shi_shen = get_hidden_stems_shi_shen(day_stem, liu_nian_branch)
 
             # Life Stage (地势) for the Liu Nian branch using birth day stem as reference
-            di_shi = _get_di_shi(day_stem, liu_nian_branch)
+            di_shi = get_di_shi(day_stem, liu_nian_branch)
 
             # Five Elements (五行) for Stem and Branch
-            stem_wu_xing = _get_stem_wu_xing(liu_nian_stem)
-            branch_wu_xing = _get_branch_wu_xing(liu_nian_branch)
+            stem_wu_xing = get_stem_wu_xing(liu_nian_stem)
+            branch_wu_xing = get_branch_wu_xing(liu_nian_branch)
 
             # Nayin (纳音) for the Liu Nian stem-branch pair
-            nayin = _get_nayin(liu_nian_stem, liu_nian_branch)
+            nayin = get_nayin(liu_nian_stem, liu_nian_branch)
 
             # Get Xun (旬) and Xun Kong (旬空)
             xun, xun_kong = _get_xun_and_xun_kong_from_object(liu_nian_obj)
@@ -1420,7 +1432,7 @@ def get_liu_yue(
         branch_wu_xing = _get_branch_wu_xing(liu_yue_branch)
 
         # Nayin (纳音) for the Liu Yue stem-branch pair
-        nayin = _get_nayin(liu_yue_stem, liu_yue_branch)
+        nayin = get_nayin(liu_yue_stem, liu_yue_branch)
 
         # Get Xun (旬) and Xun Kong (旬空)
         xun, xun_kong = _get_xun_and_xun_kong_from_object(liu_yue_obj)
