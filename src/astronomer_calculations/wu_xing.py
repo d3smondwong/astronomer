@@ -42,7 +42,7 @@ Key Functions:
                         "季节状态": "相 (次强)", "十二长生": "死",
                         "通根": {"年": "本气根"},  # dict of pillar→root, or "无根"
                         "干支五行": {"天干五行": "木", "地支五行": "水",
-                                 "主导气势": "截脚 (水克木)"},
+                                  "主导气势": "截脚 (水克木)"},
                         "藏干": [{"干": "壬", "强度": "本气根"}, ...]
                     },
                     "月柱": {...}, "日柱": {...}, "时柱": {...}
@@ -54,7 +54,7 @@ Key Functions:
                 "组合加成": [...],  # 三合/三会/半合/天干合 etc. (priority-resolved)
                 "六合加成": [...],  # 六合 pairs
                 "相冲减损": [...],  # 六冲 clashes
-                "刑减损":   [...],  # 三刑/相刑 etc.
+                "刑减损":   [...],  # 三刑/无礼之刑/自刑
                 "害减损":   [...],  # 六害
                 "破减损":   [...]   # 六破
             },
@@ -909,17 +909,39 @@ class WuXingDynamicsCalculator:
         priority_list: list,
         seasonal: Optional["SeasonalFactors"] = None,
     ) -> Dict:
-        """Main entry point — returns full result dict.
+        """
+        Compute Five Elements dynamics and return a structured result dict.
 
         Args:
-            pillars: Four BaZi pillars (or natal + cycle pillars in interactive mode).
-            priority_list: Priority-resolved interaction list from apply_bazi_master_priority(),
-                ensuring proper priority resolution (贪合忘冲, 三会>三合, etc.).
-            seasonal: Pre-computed seasonal factors. If omitted, derived from the first
-                month-position pillar in ``pillars`` (pure natal case). Callers such as
-                cycle_wu_xing should pass the *natal* month's seasonal factors explicitly
-                so that clash resolution always uses the birth chart's elemental season,
-                not the cycle pillar's branch.
+            pillars: Four BaZi Pillar objects (year, month, day, hour). In cycle
+                overlay mode callers may pass natal + cycle pillars.
+            priority_list: Priority-resolved interaction list from
+                apply_bazi_master_priority() (or apply_cycle_master_priority()).
+                Ensures correct priority logic (贪合忘冲, 三会>三合, etc.) before
+                numeric scoring.
+            seasonal: Pre-computed SeasonalFactors. If omitted, derived from the
+                month-position pillar in ``pillars`` (natal-only case). Callers
+                such as cycle_wu_xing should pass the *natal* month's seasonal
+                factors explicitly so that elemental season is anchored to the
+                birth chart, not the cycle pillar's branch.
+
+        Returns:
+            dict with keys:
+                "基本信息"       — 日主 details (stem, element, yin/yang, 旺衰,
+                                   十二长生, 通根) and 出生季节 sub-season label
+                "四柱"           — per-pillar details (天干, 地支, 季节状态,
+                                   十二长生, 通根, 干支五行, 藏干)
+                "五行力量分析"   — per-element dict with 百分比, 旺衰, 能级 tier
+                "组合加成"       — combination bonus interactions (三会/三合/半合 etc.)
+                "六合加成"       — 六合 pair interactions
+                "相冲减损"       — 六冲 clash interactions
+                "刑减损"         — 三刑/无礼之刑/自刑 interactions
+                "害减损"         — 六害 interactions
+                "破减损"         — 六破 interactions
+
+        Raises:
+            ValueError: if seasonal is not provided and no month pillar with a
+                branch is found in pillars.
         """
         month_pillar = next((p for p in pillars if p.position == "month"), None)
         if seasonal is None:
@@ -1392,11 +1414,13 @@ def parse_wu_xing(wu_xing_str: str) -> Dict:
 def get_wu_xing(lunar_birthday, priority_list: list) -> Dict:
     """
     Extract Five Elements (Wu Xing) from a lunar_python Lunar object and
-    calculate 五行力量 using the Ming Dynasty Qi Dynamics engine.
+    calculate 五行力量 using the WuXingDynamicsCalculator engine.
 
     Args:
-        lunar_birthday: lunar_python Lunar calendar object
+        lunar_birthday: lunar_python Lunar calendar object (from Lunar.fromSolar or
+            Solar.getLunar()).
         priority_list: Priority-resolved interaction list from apply_bazi_master_priority().
+            Must be pre-computed by the caller before passing here.
 
     Returns:
         dict with two top-level keys:
@@ -1416,7 +1440,8 @@ def get_wu_xing(lunar_birthday, priority_list: list) -> Dict:
                         "天干": "乙", "地支": "亥",
                         "季节状态": "相 (次强)", "十二长生": "死",
                         "通根": {"年": "本气根"},  # or "无根"
-                        "五行": {"天干五行": "木", "地支五行": "水", "主导气势": "截脚 (水克木)"},
+                        "干支五行": {"天干五行": "木", "地支五行": "水",
+                                  "主导气势": "截脚 (水克木)"},
                         "藏干": [{"干": "壬", "强度": "本气根"}, ...]
                     },
                     "月柱": {...}, "日柱": {...}, "时柱": {...}
@@ -1425,10 +1450,10 @@ def get_wu_xing(lunar_birthday, priority_list: list) -> Dict:
                     "木": {"百分比": 15.5, "旺衰": "相 (次强)", "能级": {...}},
                     "火": {...}, "土": {...}, "金": {...}, "水": {...}
                 },
-                "组合加成": [...],   # 三合/三会/半合/天干合 etc.
+                "组合加成": [...],   # 三会/三合/半合/天干合/共拱 etc.
                 "六合加成": [...],   # 六合 pairs
                 "相冲减损": [...],   # 六冲 clashes
-                "刑减损":   [...],   # 三刑/相刑/无礼之刑 etc.
+                "刑减损":   [...],   # 三刑/无礼之刑/自刑
                 "害减损":   [...],   # 六害
                 "破减损":   [...]    # 六破
             },
