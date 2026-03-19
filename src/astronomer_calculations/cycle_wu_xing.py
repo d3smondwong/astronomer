@@ -19,6 +19,8 @@ from src.astronomer_calculations.cycle_shi_shen import (
     get_shi_shen_for_stem_pair,
     get_hidden_stems_shi_shen,
 )
+from src.astronomer_calculations.cycle_di_shi import get_di_shi
+from src.astronomer_calculations.cycle_na_yin import get_nayin
 
 # ─────────────────────────────────────────────
 # String-to-Enum conversion functions
@@ -147,8 +149,7 @@ class CycleWuXingDynamics:
 
     def _build_cycle_pillar_info(
         self,
-        cycle_stem: str,
-        cycle_branch: str,
+        cycle_object,
         day_master_stem: str,
         seasonal,
         pillars: "List[Pillar]",
@@ -157,11 +158,18 @@ class CycleWuXingDynamics:
         Build enriched cycle pillar (运柱) info structure with all metadata.
 
         Args:
+            cycle_object: A cycle object with getGanZhi() returning a two-character
+                          stem-branch string (e.g. "戊子"). Stem and branch are extracted
+                          automatically.
             pillars: All pillars in scope (natal + cycle for interactive mode, or just the
                      cycle pillar for isolated mode). Used by 通根 to check all branches.
 
         Returns dict with: 天干, 地支, 显示名称, 季节状态, 十二长生, 通根, 五行, 藏干, 十神
         """
+        gan_zhi = cycle_object.getGanZhi()
+        cycle_stem = gan_zhi[0] if len(gan_zhi) > 0 else ""
+        cycle_branch = gan_zhi[1] if len(gan_zhi) > 1 else ""
+
         stem_enum = string_to_stem(cycle_stem)
         branch_enum = string_to_branch(cycle_branch)
 
@@ -187,6 +195,12 @@ class CycleWuXingDynamics:
         }
         state = seasonal.states.get(stem_elem, "囚") if seasonal else "囚"
         state_desc = state_descriptions.get(state, state)
+
+        # Life Stage (地势) for the cycle branch using birth day stem as reference
+        di_shi = get_di_shi(day_master_stem, cycle_branch)
+
+        # Nayin (纳音) for the cycle stem-branch pair
+        nayin = get_nayin(cycle_stem, cycle_branch)
 
         # 十二长生
         sheng_wang_stage = SHENG_WANG_TABLE.get(stem_enum, {}).get(branch_enum)
@@ -233,8 +247,12 @@ class CycleWuXingDynamics:
             "地支": cycle_branch,
             "显示名称": display_name,
             "季节状态": state_desc,
-            "十二长生": sheng_wang_stage,
+            "纳音": nayin,
+            "地势": di_shi,
+            "运干十二长生": sheng_wang_stage,
             "通根": tong_gen,
+            "旬": cycle_object.getXun(),
+            "旬空": cycle_object.getXunKong(),
             "五行": wu_xing_info,
             "藏干": cang_gan,
             "十神": shi_shen,
@@ -242,8 +260,7 @@ class CycleWuXingDynamics:
 
     def calculate_cycle_interaction(
         self,
-        cycle_stem: str,
-        cycle_branch: str,
+        cycle_object,
         lunar_birthday: Lunar,
         priority_list: list,
         cycle_type: str = "大运",
@@ -260,8 +277,9 @@ class CycleWuXingDynamics:
         full interaction result for display without recomputing it here.
 
         Args:
-            cycle_stem: Cycle's heavenly stem character
-            cycle_branch: Cycle's earthly branch character
+            cycle_object: A cycle object (e.g. DaYun, XiaoYun, LiuNian) with a
+                          getGanZhi() method returning a two-character stem-branch string
+                          (e.g. "戊子"). The stem and branch are extracted automatically.
             lunar_birthday: Lunar birthday object (for natal pillars)
             priority_list: Priority-resolved interaction list from get_cycle_interactions()
                            (_raw_priority_list key). Drives combination and clash scoring.
@@ -273,6 +291,9 @@ class CycleWuXingDynamics:
         Returns:
             dict: Combined 五行力量分析 showing cycle + natal interaction
         """
+        gan_zhi = cycle_object.getGanZhi()
+        cycle_stem = gan_zhi[0] if len(gan_zhi) > 0 else ""
+        cycle_branch = gan_zhi[1] if len(gan_zhi) > 1 else ""
         # Get natal pillars
         bazi = lunar_birthday.getEightChar()
 
@@ -346,17 +367,18 @@ class CycleWuXingDynamics:
 
         result = self.calculator.calculate(adjusted_pillars, priority_list=priority_list, seasonal=natal_seasonal)
 
+        # Remove natal-chart-specific sections — not meaningful in cycle context
+        result.pop("基本信息", None)
+        result.pop("四柱", None)
 
-        # Add cycle pillar info and interactions
+        # Build cycle pillar info and place it first in the returned dict
         day_master_stem = bazi.getDayGan()
-
         cycle_label = cycle_type + "柱"
-
-        result[cycle_label] = self._build_cycle_pillar_info(
-            cycle_stem, cycle_branch, day_master_stem, natal_seasonal, adjusted_pillars
+        cycle_pillar_info = self._build_cycle_pillar_info(
+            cycle_object, day_master_stem, natal_seasonal, adjusted_pillars
         )
 
-        return result
+        return {cycle_label: cycle_pillar_info, **result}
 
 
 
@@ -380,6 +402,7 @@ if __name__ == "__main__":
     tst_birthday, _ = get_true_solar_time(
         datetime_birthday, 1.3253, 103.808053
     )  # Get true solar time
+    gender = 0
 
     # # Corinne's birthday example
     # solar_birthday= Solar.fromYmdHms(1987, 6, 3, 12, 6, 0)  # Create solar date June 3, 1987 at 12:06 PM
@@ -403,17 +426,23 @@ if __name__ == "__main__":
         f"\nBaZi: {bazi.getYear()}, {bazi.getMonth()}, {bazi.getDay()}, {bazi.getTime()}"
     )
 
-    # Get Wu Xing in LLM-ready JSON format
     from src.astronomer_calculations.cycle_interactions import get_cycle_interactions
-    cycle_stem, cycle_branch = "戊", "子"
-    interactions = get_cycle_interactions(cycle_stem, cycle_branch, {
+
+    # Use index 1 (first actual 大运 cycle) as example
+    yun = bazi.getYun(gender)
+    da_yun = yun.getDaYun()[1]
+    da_yun_stem = da_yun.getGanZhi()[0]
+    da_yun_branch = da_yun.getGanZhi()[1]
+
+    interactions = get_cycle_interactions(da_yun_stem, da_yun_branch, {
         "year":  {"stem": bazi.getYearGan(),  "branch": bazi.getYearZhi()},
         "month": {"stem": bazi.getMonthGan(), "branch": bazi.getMonthZhi()},
         "day":   {"stem": bazi.getDayGan(),   "branch": bazi.getDayZhi()},
         "hour":  {"stem": bazi.getTimeGan(),  "branch": bazi.getTimeZhi()},
     })
+
     result = CycleWuXingDynamics().calculate_cycle_interaction(
-        cycle_stem, cycle_branch, lunar_birthday,
+        da_yun, lunar_birthday,
         priority_list=interactions.get("_raw_priority_list", []),
         cycle_type="大运",
     )
