@@ -802,7 +802,9 @@ ZHU_DAO_QI_SHI_LOOKUP: Dict[Tuple[str, str], str] = {
 @dataclass
 class Pillar:
     position: str  # "year" | "month" | "day" | "hour"
+    label: str     # Chinese display label: "年" | "月" | "日" | "时"
     position_weight: float
+    stem_weight: float
     stem: Optional[Stem]
     branch: Optional[Branch]
 
@@ -876,9 +878,6 @@ class WuXingDynamicsCalculator:
     _REDUCE_LIU_PO           = 0.88  # 六破
     _REDUCE_LIU_HAI          = 0.90  # 六害
 
-    # Short pillar display names used in 通根 output
-    _PILLAR_SHORT: Dict[str, str] = {"year": "年", "month": "月", "day": "日", "hour": "时"}
-
     @staticmethod
     def _compute_tong_gen(
         stem_elem: Element,
@@ -890,7 +889,7 @@ class WuXingDynamicsCalculator:
         Matching is element-level (e.g. 甲 roots wherever 木 is present, including 乙
         hidden stems), consistent with classical 通根 doctrine.
 
-        Returns a dict mapping short pillar names → root strength label
+        Returns a dict mapping pillar labels → root strength label
         (e.g. {"月": "本气根", "时": "余气根"}), or the string "无根" if no
         root is found in any branch.
         """
@@ -900,7 +899,7 @@ class WuXingDynamicsCalculator:
             if p.branch:
                 for idx, (hidden_stem, _) in enumerate(BRANCH_HIDDEN.get(p.branch, [])):
                     if STEM_ELEMENT[hidden_stem] == stem_elem and idx < len(root_labels):
-                        results[WuXingDynamicsCalculator._PILLAR_SHORT[p.position]] = root_labels[idx]
+                        results[p.label] = root_labels[idx]
                         break
         return results if results else "无根"
 
@@ -965,7 +964,7 @@ class WuXingDynamicsCalculator:
             s_mult = seasonal.mult_visible(elem)
             c_mult = climate_mult(elem, climate)
             sw_mult = get_shengwang_mult(p.stem, p.branch) if p.branch else 1.0
-            stem_w = self.STEM_WEIGHTS[p.position]
+            stem_w = p.stem_weight
             stem_reduction = stem_reductions.get(p.stem, 1.0)
 
             stem_power = stem_w * s_mult * c_mult * sw_mult * stem_reduction
@@ -1044,7 +1043,8 @@ class WuXingDynamicsCalculator:
         root_labels = ["本气根", "中气根", "余气根"]
         si_zhu = {}
         for p in pillars:
-            if not p.stem:
+            pillar_key = pillar_names.get(p.position)
+            if not pillar_key or not p.stem:
                 continue
             stem_elem = STEM_ELEMENT[p.stem]
             state = seasonal.states.get(stem_elem, "囚")
@@ -1069,7 +1069,7 @@ class WuXingDynamicsCalculator:
                     strength = root_labels[idx] if idx < len(root_labels) else "未知"
                     cang_gan.append({"干": hs.value, "强度": strength})
 
-            si_zhu[pillar_names[p.position]] = {
+            si_zhu[pillar_key] = {
                 "天干": p.stem.value,
                 "地支": p.branch.value if p.branch else None,
                 "季节状态": state_desc,
@@ -1459,25 +1459,33 @@ def get_wu_xing(lunar_birthday, priority_list: list) -> Dict:
     pillars = [
         Pillar(
             "year",
+            "年",
             calc.POSITION_WEIGHTS["year"],
+            calc.STEM_WEIGHTS["year"],
             STR_STEM.get(year_stem),
             STR_BRANCH.get(year_branch),
         ),
         Pillar(
             "month",
+            "月",
             calc.POSITION_WEIGHTS["month"],
+            calc.STEM_WEIGHTS["month"],
             STR_STEM.get(month_stem),
             STR_BRANCH.get(month_branch),
         ),
         Pillar(
             "day",
+            "日",
             calc.POSITION_WEIGHTS["day"],
+            calc.STEM_WEIGHTS["day"],
             STR_STEM.get(day_stem),
             STR_BRANCH.get(day_branch),
         ),
         Pillar(
             "hour",
+            "时",
             calc.POSITION_WEIGHTS["hour"],
+            calc.STEM_WEIGHTS["hour"],
             STR_STEM.get(hour_stem),
             STR_BRANCH.get(hour_branch),
         ),
