@@ -1,3 +1,48 @@
+"""
+Cycle Interactions — Shared Engine for External Pillar Analysis
+
+Detects and priority-resolves all interactions between a single external cycle pillar
+(stem + branch) and the four natal pillars of a BaZi chart.  The same engine handles
+大运, 小运, 流年, 流月 — only the cycle_label string differs.
+
+Public API:
+    get_cycle_interactions(cycle_stem, cycle_branch, natal_chart, cycle_label):
+        Main entry point.  Returns a structured dict with three sub-keys under "作用":
+            "关系总览"  — list of active interaction state labels (强势主流 / 显著影响)
+            "柱位动态"  — per-natal-pillar interaction buckets (三梯队 tier structure)
+            "判定优先级" — reference tier classification for all interaction types
+
+        Internally runs:
+            1. 反吟 / 伏吟 pre-pass (turbulence marking)
+            2. Detection: structural 三会/三合, pairwise 1×4, 共拱
+            3. Priority filter: four passes + turbulence post-pass
+            4. Output assembly
+
+Priority Architecture (CYCLE_PRIORITY_RULE_TABLE):
+    Branch lock hierarchy: STRUCTURAL (三会/三合) > PRIMARY_六合 > PRIMARY_六冲/开库
+    Stem lock hierarchy:   STEM_天干合 > STEM_天干克 > STEM_天干冲
+    Downgrades only — never upgrades via the rule table.
+
+Interaction Tier Classification:
+    第一梯队 (纲领层): 反吟, 伏吟, 三会, 三合, 六冲, 开库, 六合
+    第二梯队 (气势层): 共拱, 拱会, 残会, 半合, 比和, 天干合, 天干克, 天干冲
+    第三梯队 (琐碎层): 无恩之刑, 恃势之刑, 无礼之刑, 自刑, 六害, 六破, 暗合, 干支透合
+
+Key Classes:
+    CycleRegistry    — stateful registry for all interactions; manages ACTIVE/LOCKED/ABSORBED states
+    CycleStemActor   — tracks the cycle stem's highest-priority lock
+    CycleBranchActor — tracks the cycle branch's highest-priority lock
+
+Section Map:
+    SECTION 1 — Imports & Cycle-Specific Constants
+    SECTION 2 — CycleRegistry & Actors
+    SECTION 3 — Utilities
+    SECTION 4 — Detection Helpers
+    SECTION 5 — Priority Filter  (apply_cycle_master_priority)
+    SECTION 6 — Output Assembly
+    SECTION 7 — Orchestrator     (get_cycle_interactions)
+"""
+
 # ══════════════════════════════════════════════════════════════════════════════
 # CYCLE INTERACTIONS — Shared Engine for External Pillar Analysis
 #
@@ -11,7 +56,7 @@
 # SECTION 4 — Detection Helpers
 # SECTION 5 — Priority Filter  (apply_cycle_master_priority)
 # SECTION 6 — Output Assembly
-# SECTION 7 — Orchestrator     (_detect_cycle_interactions)
+# SECTION 7 — Orchestrator     (get_cycle_interactions)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
@@ -1681,14 +1726,20 @@ def apply_cycle_master_priority(
     cycle_label: str,
 ) -> list[dict]:
     """
-    Four-Pass Priority Filter orchestrator for external cycle pillars.
+    Five-pass priority filter orchestrator for external cycle pillars.
 
-    PRE-PASS : 反吟 / 伏吟 — mark turbulent pillars, assign 强势主流
-    PASS 1   : Identity — actor locking, 开库 sentinel resolution
-    PASS 2   : Conflict — table-driven downgrade of non-winners
-    PASS 3   : Winners  — assign 强势主流 with contextual remarks
-    PASS 4   : Group    — residual group / environment interactions
-    POST-PASS: Turbulence — one-level downgrade for turbulent pillar items
+    PRE-PASS  : 反吟 / 伏吟 — assign 强势主流, mark turbulent natal pillar indices,
+                absorb 比和 on 伏吟 pillars.
+    PASS 1    : Identity — determine actor lock types and winners; resolve 开库
+                钥匙受困 sentinels based on branch lock type.
+    PASS 2    : Conflict — table-driven downgrade of non-winner interactions
+                (stem actor, cross-actor 干支透合, branch actor in sequence).
+    PASS 3    : Winners  — assign 强势主流 with contextual 备注; cross-actor
+                合中有冲 / 冲中有合 annotation when both actors target the same pillar.
+    PASS 4    : Group    — assign 强度 to all remaining active items (secondary
+                structural, 半合, 拱会, 残会, 共拱, 比和, 暗合, 干支透合, 六害, 六破, 刑).
+    POST-PASS : Turbulence — one-level 强度 downgrade for items touching turbulent
+                natal pillars (floor: 大幅衰减; 反吟/伏吟 and 消融吸收 exempt).
 
     Returns all items sorted by CYCLE_TIER_ORDER.
     """
@@ -1772,31 +1823,31 @@ def get_cycle_interactions(
     """
     Detect all interactions between one external cycle pillar and the natal chart.
 
-    This is the single shared entry point for all cycle types:
-        _detect_cycle_interactions("甲", "子", gans, zhis, "大运")
-        _detect_cycle_interactions("丙", "午", gans, zhis, "流年")
-        _detect_cycle_interactions("庚", "申", gans, zhis, "小运")
-        _detect_cycle_interactions("壬", "戌", gans, zhis, "流月")
+    Single shared entry point for all cycle types — only cycle_label differs:
+        get_cycle_interactions("甲", "子", natal_chart, "大运")
+        get_cycle_interactions("丙", "午", natal_chart, "流年")
+        get_cycle_interactions("庚", "申", natal_chart, "小运")
+        get_cycle_interactions("壬", "戌", natal_chart, "流月")
 
-        Args:
-                cycle_stem   : Heavenly stem of the external pillar
-                cycle_branch : Earthly branch of the external pillar
-                natal_chart  : dict with natal pillars, e.g.
-                                             {
-                                                 "year": {"stem":..., "branch":...},
-                                                 "month": {"stem":..., "branch":...},
-                                                 "day": {"stem":..., "branch":...},
-                                                 "hour": {"stem":..., "branch":...},
-                                             }
-                cycle_label  : Display label for this cycle type (used in combo strings
-                                             and 备注 templates). Default "大运".
+    Args:
+        cycle_stem   : Heavenly stem of the external pillar (e.g. "甲")
+        cycle_branch : Earthly branch of the external pillar (e.g. "子")
+        natal_chart  : dict with natal pillars:
+                       {
+                           "year":  {"stem": str, "branch": str},
+                           "month": {"stem": str, "branch": str},
+                           "day":   {"stem": str, "branch": str},
+                           "hour":  {"stem": str, "branch": str},
+                       }
+        cycle_label  : Display label for this cycle type, used in combo strings
+                       and 备注 templates. Default "大运".
 
     Returns:
         {
             "作用": {
-                "关系总览": [...],         # active interactions summary
-                "柱位动态": {...},          # per-pillar tier buckets
-                "判定优先级": {...},        # tier classification reference
+                "关系总览": [...],         # state labels for 强势主流/显著影响 interactions
+                "柱位动态": {...},          # per-natal-pillar tier buckets
+                "判定优先级": {...},        # reference tier classification
             }
         }
     """
