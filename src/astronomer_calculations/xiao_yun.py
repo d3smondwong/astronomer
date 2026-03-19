@@ -60,106 +60,11 @@ from lunar_python import Lunar, Solar
 from lunar_python.util import LunarUtil
 from lunar_python.EightChar import EightChar
 from datetime import datetime
-
-# Import shared maps, functions, and constants from da_yun module
-from src.astronomer_calculations.da_yun import (
-    # Interaction maps
-    clash_map,
-    harm_map,
-    six_he_map,
-    triple_he,
-    cardinal_branches,
-    directional_he,
-    break_map,
-    hidden_stem_he,
-    stem_combines,
-    stem_clashes,
-    pillar_names,
-    # Helper functions
-    _get_stem_wu_xing,
-    _get_branch_wu_xing,
-    _get_nayin,
-    _get_di_shi,
-    _get_shi_shen_for_stem_pair,
-    _get_hidden_stems_shi_shen,
-    _detect_da_yun_interactions,
-    _detect_global_triple_combinations,
-    DI_SHI_TABLE,
-    STR_STEM,
-    STR_BRANCH,
-)
-
-from src.astronomer_calculations.wu_xing import (
-    Pillar,
-    Stem,
-    Branch,
-)
-
-
-# ============================================================================
-# SEXAGENARY PROGRESSION (干支循环) - Year Index to Stem-Branch Mapping
-# ============================================================================
-
-
-def _get_xun_and_xun_kong_from_object(xiao_yun_obj) -> tuple:
-    """
-    Get Xun (旬) and Xun Kong (旬空) from a Xiao Yun object.
-
-    Args:
-        xiao_yun_obj: Xiao Yun object from lunar-python library
-
-    Returns:
-        tuple: (xun_name: str, xun_kong_pair: str)
-    """
-    try:
-        xun = xiao_yun_obj.getXun() if hasattr(xiao_yun_obj, "getXun") else "Unknown"
-        xun_kong = (
-            xiao_yun_obj.getXunKong()
-            if hasattr(xiao_yun_obj, "getXunKong")
-            else "Unknown"
-        )
-        return (xun, xun_kong)
-    except Exception:
-        return ("Unknown", "Unknown")
-
-
-# ============================================================================
-# XIAO YUN INTERACTIONS - Adapted from Da Yun Logic
-# ============================================================================
-
-
-def _detect_xiao_yun_interactions(
-    xiao_yun_stem: str, xiao_yun_branch: str, birth_chart: dict
-) -> dict:
-    """
-    Detect Xiao Yun interactions with birth chart using same 1×4 scan as Da Yun.
-
-    The Xiao Yun pillar (annual cycle) acts as an External Trigger entering the birth chart system.
-    Uses the same Tier-based priority checks (16 interaction types, tiers 0-14) and Key vs Lock logic for 开库 scenarios.
-
-    Comprehensive interaction types detected:
-    - Structural: 三会, 三合, 六冲, 六合
-    - Dynamics: 共拱, 比和, 拱会, 残会, 半合, 天干合, 天干克, 天干冲
-    - Details: 三刑, 六害, 六破, 暗合
-
-    All branch-pair interactions include 紧贴 field:
-    - 紧贴: true = adjacent pillars (正X, full-force)
-    - 紧贴: false = distant pillars (遥X, attenuated)
-
-    Args:
-        xiao_yun_stem (str): Xiao Yun heavenly stem (year stem)
-        xiao_yun_branch (str): Xiao Yun earthly branch (year branch)
-        birth_chart (dict): Birth chart with keys "year", "month", "day", "hour"
-
-    Returns:
-        dict: Organized interactions by pillar and tier
-    """
-    # Leverage the existing Da Yun interaction detection function
-    # Pass "小运" as pillar_prefix to replace "大运" in the output
-    return _detect_da_yun_interactions(
-        xiao_yun_stem, xiao_yun_branch, birth_chart, pillar_prefix="小运"
-    )
-
+from src.astronomer_calculations.cycle_wu_xing import CycleWuXingDynamics
+from src.astronomer_calculations.cycle_interactions import get_cycle_interactions
+from src.astronomer_calculations.cycle_shen_sha import get_cycle_shen_sha
+# Local pillar names
+pillar_names = ["年柱", "月柱", "日柱", "时柱"]
 
 # ============================================================================
 # MAIN XIAO YUN CALCULATION
@@ -181,9 +86,6 @@ def get_xiao_yun(lunar_birthday: Lunar, gender: int) -> dict:
     """
     # Get the EightChar (八字) object
     bazi = lunar_birthday.getEightChar()
-
-    # Get the Day Stem (日干) - this is the reference for all Ten Gods calculations
-    day_stem = bazi.getDayGan()
 
     # Extract birth chart pillars for interaction detection
     birth_chart = {
@@ -217,34 +119,17 @@ def get_xiao_yun(lunar_birthday: Lunar, gender: int) -> dict:
     # Xiao Yun cycles represent the years from birth until 起运 (inclusive)
     da_yun_array = yun.getDaYun()
 
-    if not da_yun_array or len(da_yun_array) == 0:
-        # No Da Yun data, return empty result
-        return {
-            "小运": {
-                "起运前": {
-                    "性别": "男" if gender == 1 else "女",
-                    "阳历生日": lunar_birthday.getSolar().toYmdHms(),
-                    "农历生日": f"{lunar_birthday.getYear()}-{lunar_birthday.getMonth():02d}-{lunar_birthday.getDay():02d} {lunar_birthday.getHour():02d}:{lunar_birthday.getMinute():02d}:{lunar_birthday.getSecond():02d}",
-                    "起运时间": qi_yun_date.toYmdHms(),
-                    "起运年份": qi_yun_start_year,
-                    "顺逆": "顺推" if yun.isForward() else "逆推",
-                    "小运周期数": 0,
-                },
-                "小运周期": [],
-            }
-        }
-
     # Get Xiao Yun array from the first Da Yun object using lunar-python's built-in method
     xiao_yun_array = da_yun_array[0].getXiaoYun()
 
     # Process each 小运 (year) from birth to 起运
     xiao_yun_data = []
 
-    for i, xiao_yun_obj in enumerate(xiao_yun_array):
+    for i, xiao_yun in enumerate(xiao_yun_array):
         # Get data from the Xiao Yun object (lunar-python library methods)
-        gan_zhi = xiao_yun_obj.getGanZhi()
-        calendar_year = xiao_yun_obj.getYear()
-        age = xiao_yun_obj.getAge()
+        gan_zhi = xiao_yun.getGanZhi()
+        calendar_year = xiao_yun.getYear()
+        age = xiao_yun.getAge()
 
         if gan_zhi == "Unknown" or len(gan_zhi) < 2:
             continue
@@ -257,51 +142,32 @@ def get_xiao_yun(lunar_birthday: Lunar, gender: int) -> dict:
         xiao_yun_stem = gan_zhi[0]
         xiao_yun_branch = gan_zhi[1]
 
-        # Calculate Ten Gods for this 小运
-        # Stem Ten God (天干十神) - the primary life theme for this year
-        stem_shi_shen = _get_shi_shen_for_stem_pair(day_stem, xiao_yun_stem)
-
-        # Branch Ten Gods (地支十神) - hidden themes from hidden stems
-        branch_shi_shen = _get_hidden_stems_shi_shen(day_stem, xiao_yun_branch)
-
-        # Life Stage (地势) for the Xiao Yun branch using birth day stem as reference
-        di_shi = _get_di_shi(day_stem, xiao_yun_branch)
-
-        # Five Elements (五行) for Stem and Branch
-        stem_wu_xing = _get_stem_wu_xing(xiao_yun_stem)
-        branch_wu_xing = _get_branch_wu_xing(xiao_yun_branch)
-
-        # Nayin (纳音) for the Xiao Yun stem-branch pair
-        nayin = _get_nayin(xiao_yun_stem, xiao_yun_branch)
-
-        # Get Xun (旬) and Xun Kong (旬空) from the Xiao Yun object
-        xun, xun_kong = _get_xun_and_xun_kong_from_object(xiao_yun_obj)
-
         # Detect interactions (作用) with birth chart using 1x4 scan
-        interactions_result = _detect_xiao_yun_interactions(
-            xiao_yun_stem, xiao_yun_branch, birth_chart
+        interactions_result = get_cycle_interactions(
+            xiao_yun_stem, xiao_yun_branch, birth_chart, cycle_label="小运"
         )
         interactions = interactions_result.get("作用", [])
+
+        # Five Elements dynamics: enriched cycle pillar info + combined natal+cycle 五行力量
+        cycle_wu_xing_info = CycleWuXingDynamics().calculate_cycle_interaction(
+            xiao_yun, lunar_birthday,
+            priority_list=interactions_result.get("_raw_priority_list", []),
+            cycle_type="小运",
+        )
+        cycle_pillar_info = cycle_wu_xing_info.pop("小运柱", {})
+        cycle_wu_xing_result = cycle_wu_xing_info.get("五行力量分析", "无数据")
+
+        # Extract Shen Sha (神煞) for this cycle
+        shen_sha = get_cycle_shen_sha(xiao_yun_stem, xiao_yun_branch, birth_chart, gender)
 
         xiao_yun_info = {
             "序号": i + 1,  # 1-based sequence number
             "日历年份": calendar_year,  # Calendar year
             "年龄": age,  # Age at start of year (from library)
-            "干支": gan_zhi,  # Gan-Zhi (stem-branch pair)
-            "旬": xun,  # Xun (10-day cycle)
-            "旬空": xun_kong,  # Xun Kong (void periods)
-            "五行": {
-                "干": stem_wu_xing,  # Stem Five Element and Polarity
-                "支": branch_wu_xing,  # Branch Five Element and Polarity
-            },
-            "纳音": nayin,  # Nayin element (harmonic resonance)
-            "地势": di_shi,  # Life Stage (长生十二神)
-            "十神": {
-                "天干十神": stem_shi_shen,  # Year Stem Ten God (for clarity)
-                "地支十神": branch_shi_shen,  # Hidden themes (Main/Middle/Residual)
-            },
+            "运柱": cycle_pillar_info,  # Enriched cycle pillar: 五行, 十神, 通根, 藏干, 季节状态, 地势, 纳音, 旬, 旬空
+            "五行力量": cycle_wu_xing_result,  # Combined natal+cycle 五行力量分析
+            "神煞": shen_sha,  # Shen Sha stars for this cycle
             "作用": interactions,  # Branch and Stem interactions with birth chart
-
         }
         xiao_yun_data.append(xiao_yun_info)
 
@@ -330,6 +196,11 @@ if __name__ == "__main__":
     import json
     from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
     from src.astronomer_calculations.bazi_pillars import get_bazi_pillars
+    from src.utils.logging import configure_logging, get_logger
+
+    # Configure logging system (creates logs in logs/YYYY-MM-DD/HH-MM-SS/app.log)
+    configure_logging()
+    logger = get_logger(__name__)
 
     # python -m src.astronomer_calculations.xiao_yun
 
@@ -352,14 +223,13 @@ if __name__ == "__main__":
     # )
     lunar_birthday = tst_birthday.getLunar()
 
-    print("八字")
     bazi_json = get_bazi_pillars(tst_birthday.getLunar())
-    print(f"八字: {bazi_json}")
+    logger.info(f"八字: {bazi_json}")
 
-    # print("\n=== Xiao Yun (Female, Gender=0) ===")
+    # logger.info("=== Xiao Yun (Female, Gender=0) ===")
     # result = get_xiao_yun(lunar_birthday, gender=0)
-    # print(json.dumps(result, ensure_ascii=False, indent=2))
+    # logger.info(json.dumps(result, ensure_ascii=False, indent=2))
 
-    # print("\n=== Xiao Yun (Male, Gender=1) ===")
+    logger.info("=== Xiao Yun (Male, Gender=1) ===")
     result = get_xiao_yun(lunar_birthday, gender=1)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    logger.info(json.dumps(result, ensure_ascii=False, indent=2))

@@ -121,12 +121,8 @@ from lunar_python.EightChar import EightChar
 from src.astronomer_calculations.cycle_na_yin import get_nayin
 from src.astronomer_calculations.cycle_interactions import get_cycle_interactions
 from src.astronomer_calculations.cycle_di_shi import get_di_shi
-from src.astronomer_calculations.cycle_wu_xing import get_stem_wu_xing, get_branch_wu_xing
+from src.astronomer_calculations.cycle_wu_xing import CycleWuXingDynamics
 from src.astronomer_calculations.cycle_shen_sha import get_cycle_shen_sha
-from src.astronomer_calculations.cycle_shi_shen import (
-    get_shi_shen_for_stem_pair,
-    get_hidden_stems_shi_shen,
-)
 
 # Pillar names for reference
 pillar_names = ["年柱", "月柱", "日柱", "时柱"]
@@ -189,71 +185,42 @@ def get_da_yun(lunar_birthday: Lunar, gender: int) -> dict:
 
         # Calculate for this 大运
         if i > 0:  # Skip first cycle (no Gan-Zhi)
-            # Stem Ten God (天干十神) - the primary life theme
-            stem_shi_shen = get_shi_shen_for_stem_pair(day_stem, da_yun_stem)
-
-            # Branch Ten Gods (地支十神) - hidden themes from hidden stems
-            branch_shi_shen = get_hidden_stems_shi_shen(day_stem, da_yun_branch)
-
-            # Life Stage (地势) for the Da Yun branch using birth day stem as reference
-            di_shi = get_di_shi(day_stem, da_yun_branch)
-
-            # Five Elements (五行) for Stem and Branch
-            stem_wu_xing = get_stem_wu_xing(da_yun_stem)
-            branch_wu_xing = get_branch_wu_xing(da_yun_branch)
-
-            # Nayin (纳音) for the Da Yun stem-branch pair
-            nayin = get_nayin(da_yun_stem, da_yun_branch)
-
             # Detect interactions (作用) with natal chart using sophisticated 1x4 scan
             interactions_result = get_cycle_interactions(
                 da_yun_stem, da_yun_branch, natal_chart
             )
             interactions = interactions_result.get("作用", [])
 
+            # Five Elements dynamics: enriched cycle pillar info + combined natal+cycle 五行力量
+            cycle_wu_xing_info = CycleWuXingDynamics().calculate_cycle_interaction(
+                da_yun, lunar_birthday,
+                priority_list=interactions_result.get("_raw_priority_list", []),
+                cycle_type="大运",
+            )
+            cycle_pillar_info = cycle_wu_xing_info.pop("大运柱", {})
+            cycle_wu_xing_result = cycle_wu_xing_info.get("五行力量分析", "无数据")
+
             # Extract Shen Sha (神煞) for this cycle
-            shen_sha = get_cycle_shen_sha(da_yun_stem, da_yun_branch, natal_chart)
+            cycle_shen_sha = get_cycle_shen_sha(da_yun_stem, da_yun_branch, natal_chart, gender)
         else:
-            stem_shi_shen = "未行大运"
-            branch_shi_shen = "未行大运"
-            di_shi = "未行大运"
-            stem_wu_xing = {"五行": "未行大运", "阴阳": "未行大运"}
-            branch_wu_xing = {"五行": "未行大运", "阴阳": "未行大运"}
-            nayin = "未行大运"
             interactions = "未行大运"
-            shen_sha = "未行大运"
-            interactions = "未行大运"
+            cycle_pillar_info = "未行大运"
+            cycle_wu_xing_result = "未行大运"
+            cycle_shen_sha = "未行大运"
 
         # Assemble Da Yun data for this cycle
         da_yun_info = {
-            "序号": (
-                "未行大运" if i == 0 else i
-            ),  # Index/sequence number (0 = before start)
+            # "序号": (
+            #     "未行大运" if i == 0 else i
+            # ),  # Index/sequence number (0 = before start)
             "开始年份": da_yun.getStartYear(),  # Start calendar year
             "结束年份": da_yun.getEndYear(),  # End calendar year
             "开始年龄": da_yun.getStartAge(),  # Start age (from birth)
             "结束年龄": da_yun.getEndAge(),  # End age (from birth)
             "周期": f"{da_yun.getStartAge()}-{da_yun.getEndAge()}岁",  # Age range display
-            "干支": gan_zhi if i > 0 else "未行大运",  # Gan-Zhi (empty for first cycle)
-            "旬": da_yun.getXun() if i > 0 else "未行大运",  # Xun (10-day cycle)
-            "旬空": (
-                da_yun.getXunKong() if i > 0 else "未行大运"
-            ),  # Xun Kong (void periods)
-            "五行": {
-                "干": stem_wu_xing,  # Stem Five Element and Polarity
-                "支": branch_wu_xing,  # Branch Five Element and Polarity
-            },
-            "纳音": nayin,  # Nayin element (harmonic resonance)
-            "地势": di_shi,  # Life Stage (长生十二神)
-            "神煞": shen_sha if i > 0 else "未行大运",  # Shen Sha stars for this cycle
-            "十神": {
-                "天干十神": (
-                    stem_shi_shen if i > 0 else "未行大运"
-                ),  # Stem Ten God (for clarity)
-                "地支十神": (
-                    branch_shi_shen if i > 0 else "未行大运"
-                ),  # Hidden themes (Main/Middle/Residual)
-            },
+            "运柱": cycle_pillar_info,  # Enriched cycle pillar: 五行, 十神, 通根, 藏干, 季节状态, 十二长生
+            "五行力量": cycle_wu_xing_result,  # Combined natal+cycle 五行力量分析
+            "神煞": cycle_shen_sha if i > 0 else "未行大运",  # Shen Sha stars for this cycle
             "作用": interactions,  # Branch and Stem interactions with birth chart
         }
         da_yun_data.append(da_yun_info)
