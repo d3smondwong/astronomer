@@ -51,7 +51,7 @@ class AstroDataAggregator:
         gender: int,
     ) -> dict:
         """Single entry point for complete data collection"""
-        # Run interactions first so the priority list can be passed to wu_xing scoring
+        # Run interactions (self-contained with internal xun kong computation)
         interactions_result = self.interactions.get_interactions(lunar_birthday)
 
         result = {
@@ -61,7 +61,7 @@ class AstroDataAggregator:
             "bazi": self.bazi_pillars.get_bazi_pillars(lunar_birthday),
             "wu_xing": self.wu_xin.get_wu_xing(
                 lunar_birthday,
-                priority_list=interactions_result.get("_raw_priority_list"),
+                priority_list=interactions_result.get("_raw_priority_list", []),
             ),
             "shen_sha": self.shen_sha.get_shen_sha(lunar_birthday, gender),
             "xun_kong": self.xun_kong.get_xun_kong(lunar_birthday),
