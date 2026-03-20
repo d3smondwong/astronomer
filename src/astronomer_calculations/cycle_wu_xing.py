@@ -14,6 +14,7 @@ from src.astronomer_calculations.wu_xing import (
     get_seasonal_factors,
     get_zhu_dao_qi_shi,
     Element,
+    _compute_xk_reductions,
 )
 from src.astronomer_calculations.cycle_shi_shen import (
     get_shi_shen_for_stem_pair,
@@ -265,6 +266,8 @@ class CycleWuXingDynamics:
         priority_list: list,
         cycle_type: str = "大运",
         cycle_weight: float = 0.20,
+        xun_kong_data: dict | None = None,
+        cycle_xk_str: str | None = None,
     ) -> Dict:
         """
         Calculate 五行力量 for a cycle pillar interaction with the natal chart.
@@ -365,7 +368,21 @@ class CycleWuXingDynamics:
         natal_month_p = next((p for p in natal_pillars if p.position == "month"), None)
         natal_seasonal = get_seasonal_factors(natal_month_p.branch) if natal_month_p and natal_month_p.branch else None
 
-        result = self.calculator.calculate(adjusted_pillars, priority_list=priority_list, seasonal=natal_seasonal)
+        xk_red = (
+            _compute_xk_reductions(
+                adjusted_pillars,
+                xun_kong_data or {},
+                cycle_xk_str or "",
+            )
+            if (xun_kong_data or cycle_xk_str)
+            else None
+        )
+        result = self.calculator.calculate(
+            adjusted_pillars,
+            priority_list=priority_list,
+            seasonal=natal_seasonal,
+            xun_kong_reductions=xk_red,
+        )
 
         # Remove natal-chart-specific sections — not meaningful in cycle context
         result.pop("基本信息", None)
@@ -427,6 +444,13 @@ if __name__ == "__main__":
     )
 
     from src.astronomer_calculations.cycle_interactions import get_cycle_interactions
+     # Compute natal xun kong from birth chart
+    from src.astronomer_calculations.void_xun_kong import get_xun_kong
+
+    natal_xun_kong_result = get_xun_kong(tst_birthday.getLunar())
+    natal_xk = natal_xun_kong_result.get("旬空", {})
+
+    cycle_label = "大运"
 
     # Use index 1 (first actual 大运 cycle) as example
     yun = bazi.getYun(gender)
@@ -434,17 +458,25 @@ if __name__ == "__main__":
     da_yun_stem = da_yun.getGanZhi()[0]
     da_yun_branch = da_yun.getGanZhi()[1]
 
+    # Compute cycle pillar's own xun kong
+    cycle_xk_str = da_yun.getXunKong()
+
     interactions = get_cycle_interactions(da_yun_stem, da_yun_branch, {
         "year":  {"stem": bazi.getYearGan(),  "branch": bazi.getYearZhi()},
         "month": {"stem": bazi.getMonthGan(), "branch": bazi.getMonthZhi()},
         "day":   {"stem": bazi.getDayGan(),   "branch": bazi.getDayZhi()},
         "hour":  {"stem": bazi.getTimeGan(),  "branch": bazi.getTimeZhi()},
-    })
+    },
+        cycle_xk_str=cycle_xk_str,
+        natal_xk=natal_xk,
+    )
 
     result = CycleWuXingDynamics().calculate_cycle_interaction(
         da_yun, lunar_birthday,
         priority_list=interactions.get("_raw_priority_list", []),
         cycle_type="大运",
+        xun_kong_data=natal_xk,
+        cycle_xk_str=cycle_xk_str,
     )
 
     logger.info(f"\n--- JSON Output for LLM ---")

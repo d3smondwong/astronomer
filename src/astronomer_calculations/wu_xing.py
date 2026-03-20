@@ -93,6 +93,7 @@ Climate System:
 
 from datetime import datetime
 from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
+from src.astronomer_calculations.void_xun_kong import get_xun_kong
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Tuple, Union
@@ -837,6 +838,9 @@ class WuXingDynamicsCalculator:
     # Single source of truth for all positional weights
     POSITION_WEIGHTS = {"year": 0.15, "month": 0.45, "day": 0.25, "hour": 0.15}
 
+    # Xun kong void factor: void branch hidden stems retain 50% power
+    _XUN_KONG_VOID_FACTOR = 0.50
+
     # Heavenly stem weights mirror branch positional weights to reflect their authority
     # Month stem (月干) carries greater weight closer to 月令 (Seasonal Command)
     # Ratio: year:month:day:hour = 0.15:0.45:0.25:0.15 → scaled to sum=0.10
@@ -908,6 +912,7 @@ class WuXingDynamicsCalculator:
         pillars: List[Pillar],
         priority_list: list,
         seasonal: Optional["SeasonalFactors"] = None,
+        xun_kong_reductions: dict | None = None,
     ) -> Dict:
         """
         Compute Five Elements dynamics and return a structured result dict.
@@ -962,7 +967,12 @@ class WuXingDynamicsCalculator:
             if not p.branch:
                 continue
             reduction = branch_reductions.get(p.branch, 1.0)
-            base_w = p.position_weight * reduction
+            xk_factor = (
+                xun_kong_reductions.get(p.position, 1.0)
+                if xun_kong_reductions
+                else 1.0
+            )
+            base_w = p.position_weight * reduction * xk_factor
 
             for hidden_stem, depth in BRANCH_HIDDEN[p.branch]:
                 elem = STEM_ELEMENT[hidden_stem]
@@ -1411,6 +1421,41 @@ def parse_wu_xing(wu_xing_str: str) -> Dict:
     return {"天干五行": "", "地支五行": ""}
 
 
+_POSITION_TO_PILLAR_CN = {
+    "year": "年柱",
+    "month": "月柱",
+    "day": "日柱",
+    "hour": "时柱",
+}
+
+
+def _compute_xk_reductions(
+    pillars: list,
+    xun_kong_data: dict,
+    cycle_xk_str: str = "",
+) -> dict:
+    """
+    Return {position: factor} for each pillar whose branch is in void (旬空).
+
+    Natal branches are checked against 日柱's void pair (day pillar anchors chart).
+    The cycle pillar (position="cycle") is checked against cycle_xk_str.
+    """
+    # Day pillar void pair applies to all natal branches
+    day_xk_str = xun_kong_data.get("日柱", {}).get("旬空", "")
+
+    reductions = {}
+    for p in pillars:
+        if not p.branch:
+            continue
+        if p.position == "cycle":
+            if cycle_xk_str and p.branch.value in cycle_xk_str:
+                reductions["cycle"] = WuXingDynamicsCalculator._XUN_KONG_VOID_FACTOR
+        else:
+            if p.branch.value in day_xk_str:
+                reductions[p.position] = WuXingDynamicsCalculator._XUN_KONG_VOID_FACTOR
+    return reductions
+
+
 def get_wu_xing(lunar_birthday, priority_list: list) -> Dict:
     """
     Extract Five Elements (Wu Xing) from a lunar_python Lunar object and
@@ -1516,9 +1561,15 @@ def get_wu_xing(lunar_birthday, priority_list: list) -> Dict:
         ),
     ]
 
+    # Compute natal xun kong internally
+    xun_kong_data = get_xun_kong(lunar_birthday).get("旬空", {})
+
     # Organize pillar data: (name, wu_xing_string, hide_gan)
+    xk_red = _compute_xk_reductions(pillars, xun_kong_data) if xun_kong_data else None
     result = {
-        "五行力量": calc.calculate(pillars, priority_list=priority_list),
+        "五行力量": calc.calculate(
+            pillars, priority_list=priority_list, xun_kong_reductions=xk_red
+        ),
         "五行相位动力": get_all_wu_xing_tiers(),
     }
 

@@ -6,7 +6,8 @@ Detects and priority-resolves all interactions between a single external cycle p
 大运, 小运, 流年, 流月 — only the cycle_label string differs.
 
 Public API:
-    get_cycle_interactions(cycle_stem, cycle_branch, natal_chart, cycle_label):
+    get_cycle_interactions(cycle_stem, cycle_branch, natal_chart, cycle_label,
+                           cycle_xk_str=None, natal_xk=None):
         Main entry point.  Returns a structured dict with three sub-keys under "作用":
             "关系总览"  — list of active interaction state labels (强势主流 / 显著影响)
             "柱位动态"  — per-natal-pillar interaction buckets (三梯队 tier structure)
@@ -16,7 +17,8 @@ Public API:
             1. 反吟 / 伏吟 pre-pass (turbulence marking)
             2. Detection: structural 三会/三合, pairwise 1×4, 共拱
             3. Priority filter: four passes + turbulence post-pass
-            4. Output assembly
+            4. Xun kong pass (Pass 5 natal, Pass 6 cycle)
+            5. Output assembly
 
 Priority Architecture (CYCLE_PRIORITY_RULE_TABLE):
     Branch lock hierarchy: STRUCTURAL (三会/三合) > PRIMARY_六合 > PRIMARY_六冲/开库
@@ -28,10 +30,31 @@ Interaction Tier Classification:
     第二梯队 (气势层): 共拱, 拱会, 残会, 半合, 比和, 天干合, 天干克, 天干冲
     第三梯队 (琐碎层): 无恩之刑, 恃势之刑, 无礼之刑, 自刑, 六害, 六破, 暗合, 干支透合
 
+Output Fields (per interaction dict):
+    - 类型: Interaction type
+    - 组合: Pillar composition (e.g., "大运-月柱")
+    - 组合明细: Branch/stem mapping per pillar
+    - 状态: Status (from INTERACTION_STATUSES)
+    - 涉及月柱: Boolean — whether the natal pillar in this interaction is 月柱
+    - 日柱特殊: Boolean — whether the natal pillar in this interaction is 日柱
+    - 元素: Produced/transformed element (applicable to: 三会, 三合, 半合 — triple element;
+      六合 — transformation element; 比和 — shared peer element; 共拱 — arched-toward
+      branch element; 拱会/残会 — directional element; 天干合 — 合化五行)
+    - 方位: Directional info (三会, 拱会, 残会 only)
+    - 邀出: Missing third branch for 半合; "已全" for complete 三合
+    - 待会 / 犹出: Missing branch for 拱会/残会 (犹出 on 拱会 only)
+    - 拱向: The missing target branch a 共拱 is arching toward
+    - 混杂: Clash turbidity flag (共拱 only)
+    - 强度: Modulated strength (强势主流/显著影响/中等衰减/大幅衰减/消融吸收)
+    - 备注: Causal note (if suppressed/absorbed)
+    - 根基强度 / 根基说明: Branch rooting info (天干合, 开库)
+
 Key Classes:
     CycleRegistry    — stateful registry for all interactions; manages ACTIVE/LOCKED/ABSORBED states
     CycleStemActor   — tracks the cycle stem's highest-priority lock
     CycleBranchActor — tracks the cycle branch's highest-priority lock
+                       (lock types: STRUCTURAL_三会, STRUCTURAL_三合, PRIMARY_六合,
+                        PRIMARY_六冲, PREPASS_伏吟)
 
 Section Map:
     SECTION 1 — Imports & Cycle-Specific Constants
@@ -68,6 +91,7 @@ from lunar_python.util import LunarUtil
 
 from src.astronomer_calculations.interactions_gan_zhi_zuo_yong import (
     # Branch maps
+    branch_elements,
     six_he_map,
     six_he_element_map,
     clash_map,
@@ -94,6 +118,9 @@ from src.astronomer_calculations.interactions_gan_zhi_zuo_yong import (
     _get_shi_shen_for_stem_pair,
     _STEM_COMBINE_ELEMENT,
 )
+
+# ── Sentinel for unresolved states (开库 钥匙受困 / 库藏释放) ────────────────
+_PENDING = "pending"
 
 # ── Pillar name constants (shared with natal; redefined here for locality) ───
 _PILLAR_NAMES = ["年柱", "月柱", "日柱", "时柱"]
@@ -143,28 +170,47 @@ CYCLE_TIER_ORDER: dict[str, int] = {
 #     interaction exists, so there is nothing to suppress.
 
 CYCLE_PRIORITY_RULE_TABLE: dict[tuple, str] = {
-    # ── STRUCTURAL branch lock (三会 or 三合) ──
-    ("STRUCTURAL", "六合"): "大幅衰减",
-    ("STRUCTURAL", "六冲"): "中等衰减",
-    ("STRUCTURAL", "开库"): "中等衰减",
-    ("STRUCTURAL", "半合"): "大幅衰减",
-    ("STRUCTURAL", "拱会"): "大幅衰减",
-    ("STRUCTURAL", "残会"): "大幅衰减",
-    ("STRUCTURAL", "共拱"): "大幅衰减",
-    ("STRUCTURAL", "六害"): "大幅衰减",
-    ("STRUCTURAL", "六破"): "大幅衰减",
-    ("STRUCTURAL", "无恩之刑"): "大幅衰减",
-    ("STRUCTURAL", "恃势之刑"): "大幅衰减",
-    ("STRUCTURAL", "无礼之刑"): "大幅衰减",
-    ("STRUCTURAL", "自刑"): "大幅衰减",
+    # ── STRUCTURAL_三会 branch lock (stronger structure) ──
+    ("STRUCTURAL_三会", "三合"): "消融吸收",
+    ("STRUCTURAL_三会", "六合"): "大幅衰减",
+    ("STRUCTURAL_三会", "六冲"): "大幅衰减",
+    ("STRUCTURAL_三会", "开库"): "大幅衰减",
+    ("STRUCTURAL_三会", "半合"): "大幅衰减",
+    ("STRUCTURAL_三会", "拱会"): "大幅衰减",
+    ("STRUCTURAL_三会", "残会"): "大幅衰减",
+    ("STRUCTURAL_三会", "共拱"): "消融吸收",
+    ("STRUCTURAL_三会", "比和"): "显著影响",
+    ("STRUCTURAL_三会", "暗合"): "显著影响",
+    ("STRUCTURAL_三会", "六害"): "大幅衰减",
+    ("STRUCTURAL_三会", "六破"): "大幅衰减",
+    ("STRUCTURAL_三会", "无恩之刑"): "大幅衰减",
+    ("STRUCTURAL_三会", "恃势之刑"): "大幅衰减",
+    ("STRUCTURAL_三会", "无礼之刑"): "大幅衰减",
+    ("STRUCTURAL_三会", "自刑"): "大幅衰减",
+    # ── STRUCTURAL_三合 branch lock (moderate structure) ──
+    ("STRUCTURAL_三合", "六合"): "大幅衰减",
+    ("STRUCTURAL_三合", "六冲"): "中等衰减",
+    ("STRUCTURAL_三合", "开库"): "中等衰减",
+    ("STRUCTURAL_三合", "半合"): "大幅衰减",
+    ("STRUCTURAL_三合", "拱会"): "大幅衰减",
+    ("STRUCTURAL_三合", "残会"): "大幅衰减",
+    ("STRUCTURAL_三合", "共拱"): "大幅衰减",
+    ("STRUCTURAL_三合", "比和"): "显著影响",
+    ("STRUCTURAL_三合", "暗合"): "显著影响",
+    ("STRUCTURAL_三合", "六害"): "大幅衰减",
+    ("STRUCTURAL_三合", "六破"): "大幅衰减",
+    ("STRUCTURAL_三合", "无恩之刑"): "大幅衰减",
+    ("STRUCTURAL_三合", "恃势之刑"): "大幅衰减",
+    ("STRUCTURAL_三合", "无礼之刑"): "大幅衰减",
+    ("STRUCTURAL_三合", "自刑"): "大幅衰减",
     # ── PRIMARY_六合 branch lock (贪合忘冲) ──
     ("PRIMARY_六合", "六合"): "显著影响",  # same-partner 六合 appears twice in natal
     ("PRIMARY_六合", "六冲"): "消融吸收",
     ("PRIMARY_六合", "开库"): "消融吸收",
-    ("PRIMARY_六合", "半合"): "显著影响",
-    ("PRIMARY_六合", "拱会"): "显著影响",
-    ("PRIMARY_六合", "残会"): "显著影响",
-    ("PRIMARY_六合", "共拱"): "显著影响",
+    ("PRIMARY_六合", "半合"): "中等衰减",
+    ("PRIMARY_六合", "拱会"): "中等衰减",
+    ("PRIMARY_六合", "残会"): "中等衰减",
+    ("PRIMARY_六合", "共拱"): "中等衰减",
     ("PRIMARY_六合", "六害"): "大幅衰减",
     ("PRIMARY_六合", "六破"): "大幅衰减",
     ("PRIMARY_六合", "无恩之刑"): "大幅衰减",
@@ -174,7 +220,7 @@ CYCLE_PRIORITY_RULE_TABLE: dict[tuple, str] = {
     # ── PRIMARY_六冲 branch lock ──
     ("PRIMARY_六冲", "六冲"): "显著影响",  # same-target 六冲 appears twice in natal
     ("PRIMARY_六冲", "开库"): "显著影响",  # same-target tomb appears twice in natal
-    ("PRIMARY_六冲", "六合"): "大幅衰减",
+    ("PRIMARY_六冲", "六合"): "消融吸收",  # symmetric: 冲散合 (clash dominates harmony)
     ("PRIMARY_六冲", "半合"): "大幅衰减",
     ("PRIMARY_六冲", "拱会"): "大幅衰减",
     ("PRIMARY_六冲", "残会"): "大幅衰减",
@@ -198,7 +244,8 @@ CYCLE_PRIORITY_RULE_TABLE: dict[tuple, str] = {
     # PRIMARY_六冲: natal branch clashed, hidden stems scattered (冲则气散).
     # STEM_天干合: cycle stem already directly locked; second covert combination absorbed (贪合忘合).
     # STEM_天干克 omitted: 克 operates stem-to-stem; branch hidden stem is a different layer.
-    ("STRUCTURAL",   "干支透合"): "大幅衰减",
+    ("STRUCTURAL_三会", "干支透合"): "大幅衰减",
+    ("STRUCTURAL_三合", "干支透合"): "大幅衰减",
     ("PRIMARY_六合", "干支透合"): "大幅衰减",
     ("PRIMARY_六冲", "干支透合"): "大幅衰减",
     ("STEM_天干合",  "干支透合"): "消融吸收",
@@ -213,20 +260,36 @@ CYCLE_PRIORITY_RULE_TABLE: dict[tuple, str] = {
 # Key: (lock_type, itype) → remark string template (use .format(cycle=...) to fill)
 # Causal explanations only — generic noise belongs in the LLM layer.
 CYCLE_REMARKS: dict[tuple, str] = {
-    # Branch lock → other branch interactions
-    ("STRUCTURAL", "六合"): "{cycle}支{cb}参与三会/三合结构，与{nb_pillar}{nb}之合力被宏观场压制",
-    ("STRUCTURAL", "六冲"): "{cycle}支参与结构场，冲力与方位场形成内部张力，被部分吸收",
-    ("STRUCTURAL", "开库"): "{cycle}支参与结构场，开库冲力被部分吸收",
-    ("STRUCTURAL", "六害"): "被三会/三合方位场压制，害力衰减",
-    ("STRUCTURAL", "六破"): "被三会/三合方位场压制，破力衰减",
-    ("STRUCTURAL", "无恩之刑"): "被三会/三合方位场压制，刑力衰减",
-    ("STRUCTURAL", "恃势之刑"): "被三会/三合方位场压制，刑力衰减",
-    ("STRUCTURAL", "无礼之刑"): "被三会/三合方位场压制，刑力衰减",
-    ("STRUCTURAL", "自刑"): "被三会/三合方位场压制，刑力衰减",
+    # ── STRUCTURAL_三会 branch lock → other branch interactions ──
+    ("STRUCTURAL_三会", "三合"): "{cycle}支参与三会结构方位场已成，三合独立性被吸收",
+    ("STRUCTURAL_三会", "六合"): "{cycle}支{cb}参与三会结构，与{nb_pillar}{nb}之合力被方位场压制",
+    ("STRUCTURAL_三会", "六冲"): "{cycle}支参与三会方位场，冲力被宏观场压制",
+    ("STRUCTURAL_三会", "开库"): "{cycle}支参与三会方位场，开库冲力被宏观场压制",
+    ("STRUCTURAL_三会", "六害"): "被三会方位场压制，害力衰减",
+    ("STRUCTURAL_三会", "六破"): "被三会方位场压制，破力衰减",
+    ("STRUCTURAL_三会", "无恩之刑"): "被三会方位场压制，刑力衰减",
+    ("STRUCTURAL_三会", "恃势之刑"): "被三会方位场压制，刑力衰减",
+    ("STRUCTURAL_三会", "无礼之刑"): "被三会方位场压制，刑力衰减",
+    ("STRUCTURAL_三会", "自刑"): "被三会方位场压制，刑力衰减",
+    ("STRUCTURAL_三会", "比和"): "被三会方位场压制，比和共鸣衰减",
+    ("STRUCTURAL_三会", "暗合"): "被三会方位场压制，暗合潜力衰减",
+    ("STRUCTURAL_三会", "共拱"): "{cycle}支参与三会结构方位场已成，共拱虚局被吸收",
+    # ── STRUCTURAL_三合 branch lock → other branch interactions ──
+    ("STRUCTURAL_三合", "六合"): "{cycle}支{cb}参与三合结构，与{nb_pillar}{nb}之合力被宏观场压制",
+    ("STRUCTURAL_三合", "六冲"): "{cycle}支参与三合结构场，冲力与方位场形成内部张力，被部分吸收",
+    ("STRUCTURAL_三合", "开库"): "{cycle}支参与三合结构场，开库冲力被部分吸收",
+    ("STRUCTURAL_三合", "六害"): "被三合方位场压制，害力衰减",
+    ("STRUCTURAL_三合", "六破"): "被三合方位场压制，破力衰减",
+    ("STRUCTURAL_三合", "无恩之刑"): "被三合方位场压制，刑力衰减",
+    ("STRUCTURAL_三合", "恃势之刑"): "被三合方位场压制，刑力衰减",
+    ("STRUCTURAL_三合", "无礼之刑"): "被三合方位场压制，刑力衰减",
+    ("STRUCTURAL_三合", "自刑"): "被三合方位场压制，刑力衰减",
+    ("STRUCTURAL_三合", "比和"): "被三合方位场压制，比和共鸣衰减",
+    ("STRUCTURAL_三合", "暗合"): "被三合方位场压制，暗合潜力衰减",
     (
         "PRIMARY_六合",
         "六合",
-    ): "{cycle}支{cb}已六合{pillar}{lock_nb}，同一合伴再现于他柱，辅助共鸣，合力降级",
+    ): "{cycle}支{cb}已六合{pillar}{lock_nb}，同支争合，合力降级",
     ("PRIMARY_六合", "六冲"): "贪合忘冲：{cycle}支{cb}已六合{pillar}{lock_nb}，冲力被合化消融",
     (
         "PRIMARY_六合",
@@ -241,23 +304,24 @@ CYCLE_REMARKS: dict[tuple, str] = {
     (
         "PRIMARY_六冲",
         "六冲",
-    ): "{cycle}支{cb}已锁定{pillar}{lock_nb}为主冲目标，同一冲伴再现于他柱，次级冲力",
+    ): "{cycle}支{cb}已锁定{pillar}{lock_nb}为主冲目标，同支争冲，冲力降级",
     (
         "PRIMARY_六冲",
         "开库",
-    ): "{cycle}支{cb}已锁定{pillar}{lock_nb}为主冲目标，同一库支再现于他柱，次级开库",
+    ): "{cycle}支{cb}已锁定{pillar}{lock_nb}为主冲目标，同支争库，开库力降级",
     (
         "PRIMARY_六冲",
         "六合",
-    ): "冲位已占：{cycle}支{cb}已以{pillar}{lock_nb}为冲击目标，此合力大幅减弱",
-    ("PRIMARY_六冲", "六害"): "刑冲并见：冲位不稳，害力乘势协同",
-    ("PRIMARY_六冲", "六破"): "刑冲并见：冲位不稳，破力乘势协同",
+    ): "冲散合：{cycle}支{cb}已以{pillar}{lock_nb}为冲击目标，合力被冲力消融吸收",
+    ("PRIMARY_六冲", "六害"): "害冲并见：冲位不稳，害力乘势",
+    ("PRIMARY_六冲", "六破"): "破冲并见：冲位不稳，破力乘势",
     ("PRIMARY_六冲", "无恩之刑"): "刑冲并见：冲位已破，无恩之刑乘虚而入",
     ("PRIMARY_六冲", "恃势之刑"): "刑冲并见：冲位已破，恃势之刑乘虚而入",
     ("PRIMARY_六冲", "无礼之刑"): "刑冲并见：冲位已破，无礼之刑乘虚而入",
     ("PRIMARY_六冲", "自刑"): "刑冲并见：冲位已破，自刑内耗加剧",
     # Branch/Stem locks → 干支透合
-    ("STRUCTURAL",   "干支透合"): "结构场锁定地支，藏干不得透出，干支透合受压",
+    ("STRUCTURAL_三会", "干支透合"): "三会结构场锁定地支，藏干不得透出，干支透合受压",
+    ("STRUCTURAL_三合", "干支透合"): "三合结构场锁定地支，藏干不得透出，干支透合受压",
     ("PRIMARY_六合", "干支透合"): "{pillar}{lock_nb}已被六合占位，藏干潜合力被合力压制",
     ("PRIMARY_六冲", "干支透合"): "{pillar}{lock_nb}支被六冲气散，藏干无力应合",
     ("STEM_天干合",  "干支透合"): "{cycle}干{cs}已与{pillar}{lock_ns}天干直合，贪合之下，藏干透合消融",
@@ -265,6 +329,9 @@ CYCLE_REMARKS: dict[tuple, str] = {
     ("STEM_天干合", "天干克"): "天干合化锁定，克力被合化消融",
     ("STEM_天干合", "天干冲"): "天干合化锁定，冲力被合化消融",
     ("STEM_天干克", "天干冲"): "天干克在位，冲势被制化消融",
+    # ── PREPASS_伏吟 lock → absorbed interactions ──
+    ("PREPASS_伏吟", "比和"): "伏吟局中，比和冗余，消融吸收",
+    ("PREPASS_伏吟", "干支透合"): "伏吟局中，藏干重复，透合无义，消融吸收",
 }
 
 # ── 开库 strength by 钥匙受困 state ──────────────────────────────────────────
@@ -339,6 +406,54 @@ _TURBULENCE_DOWNGRADE: dict[str, str] = {
     # 消融吸收 → unchanged (already nullified)
 }
 
+# ── Xun Kong (旬空) Constants & Helpers ──────────────────────────────────────
+_STRENGTH_BY_RANK = {v: k for k, v in STRENGTH_ORDER.items()}
+_PILLAR_NAMES_SET = frozenset(_PILLAR_NAMES)
+
+_XK_HE_TYPES = frozenset({"六合", "三合", "三会", "半合", "拱会", "残会"})
+_XK_CHONG_TYPES = frozenset({"六冲"})
+_XK_XING_TYPES = frozenset({"无恩之刑", "恃势之刑", "无礼之刑", "自刑"})
+_XK_HAI_PO_TYPES = frozenset({"六害", "六破"})
+_XK_MISC_TYPES = frozenset({"暗合", "干支透合", "比和", "共拱"})
+_XK_STEM_ONLY = frozenset({"天干合", "天干克", "天干冲"})
+
+_XK_REMARKS = {
+    "合_single": "{pillars}旬空，合力虚浮，力场不实",
+    "冲开旬空": "冲开旬空，虚局受激",
+    "双空相冲": "{pillars}双空相冲，冲力涣散",
+    "刑_single": "{pillars}旬空，刑力减弱",
+    "害破_single": "{pillars}旬空，害破力场减弱",
+    "misc_single": "{pillars}旬空，合力虚浮",
+}
+
+
+def _is_natal_branch_void(branch: str, pillar_name: str, natal_xk: dict) -> bool:
+    pd = natal_xk.get(pillar_name)
+    return bool(pd and branch in pd.get("旬空", ""))
+
+
+def _is_cycle_branch_void(branch: str, cycle_xk_str: str) -> bool:
+    return bool(cycle_xk_str and branch in cycle_xk_str)
+
+
+def _build_xk_remark(void_pillars: list, rule: str) -> str:
+    template = _XK_REMARKS.get(rule, "{pillars}旬空")
+    return template.format(pillars="、".join(void_pillars))
+
+
+def _downgrade_by_one_tier_xk(item: dict, remark: str) -> None:
+    current_rank = STRENGTH_ORDER.get(item.get("强度", "强势主流"), 0)
+    new_rank = min(current_rank + 1, 4)
+    if new_rank > current_rank:
+        item["强度"] = _STRENGTH_BY_RANK[new_rank]
+    existing = item.get("备注", "")
+    item["备注"] = (existing + "；" + remark) if existing else remark
+
+
+def _append_remark_xk(item: dict, remark: str) -> None:
+    existing = item.get("备注", "")
+    item["备注"] = (existing + "；" + remark) if existing else remark
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION 2 — CycleRegistry & Actors
@@ -370,9 +485,10 @@ class CycleBranchActor:
 
     lock_type values:
         None           — no branch interaction present
-        "STRUCTURAL"   — locked by 三会 or 三合 (highest priority)
+        "STRUCTURAL_三会" / "STRUCTURAL_三合" — locked by structural group (highest priority)
         "PRIMARY_六合" — locked by 六合
-        "PRIMARY_六冲" — locked by 六冲 or 开库 (lowest branch priority)
+        "PRIMARY_六冲" — locked by 六冲 or 开库
+        "PREPASS_伏吟" — locked by 伏吟 (lowest branch priority; only when no other lock)
     """
 
     __slots__ = ("lock_type", "lock_item_id", "item_ids")
@@ -548,6 +664,13 @@ def _apply_rule(
         if STRENGTH_ORDER.get(new_strength, 99) <= STRENGTH_ORDER.get(current, 99):
             return  # would be an upgrade — skip
     item["强度"] = new_strength
+    # Relabel duplicates under primary locks with contention terminology
+    if lock_type == "PRIMARY_六合" and itype == "六合":
+        item["类型"] = "六合 (争合)"
+    elif lock_type == "PRIMARY_六冲" and itype == "六冲":
+        item["类型"] = "六冲 (争冲)"
+    elif lock_type == "PRIMARY_六冲" and itype == "开库":
+        item["类型"] = "开库 (争库)"
     if "备注" not in item:
         template = CYCLE_REMARKS.get((lock_type, itype), "")
         if template:
@@ -791,6 +914,9 @@ def _detect_cycle_pairwise(
         反吟, 伏吟, 六合, 六冲, 开库, 六害, 六破, 三刑, 暗合, 干支透合, 比和,
         天干合, 天干克, 天干冲
     """
+    # Rooting is invariant per cycle pillar — compute once outside the loop.
+    rooting = _check_branch_rooting(cycle_stem, cycle_branch)
+
     for i in range(4):
         target_gan = natal_gans[i]
         target_zhi = natal_zhis[i]
@@ -860,14 +986,13 @@ def _detect_cycle_pairwise(
             if target_zhi in _TOMB_BRANCHES:
                 # 开库: cycle branch is the key, natal branch is the tomb
                 hidden_data = TOMB_HIDDEN_STEMS[target_zhi]
-                rooting_info = _check_branch_rooting(cycle_stem, cycle_branch)
                 ku_cang = [
                     {
                         "天干": stem,
                         "十神": _get_shi_shen_for_stem_pair(day_stem, stem),
                         "层次": ceng,
-                        "释放性质": "pending",  # resolved in Pass 1 post-patch
-                        "受阻": "pending",
+                        "释放性质": _PENDING,  # resolved in Pass 1 post-patch
+                        "受阻": _PENDING,
                     }
                     for stem, ceng in hidden_data
                 ]
@@ -878,16 +1003,16 @@ def _detect_cycle_pairwise(
                         "组合明细": combo_detail_branch,
 
                         "涉及月柱": i == 1,
-                    "日柱特殊": is_ri_zhu,
+                        "日柱特殊": is_ri_zhu,
                         "月令开库": (i == 1),
                         "库体": {
                             "库支": target_zhi,
                             "钥匙": cycle_branch,
-                            "钥匙受困": "pending",  # sentinel — resolved after Pass 1
+                            "钥匙受困": _PENDING,  # sentinel — resolved after Pass 1
                         },
                         "库藏释放": ku_cang,
-                        "根基强度": rooting_info["strength"],
-                        "根基说明": rooting_info["interpretation"],
+                        "根基强度": rooting["strength"],
+                        "根基说明": rooting["interpretation"],
                     }
                 )
             else:
@@ -898,7 +1023,7 @@ def _detect_cycle_pairwise(
                         "组合明细": combo_detail_branch,
 
                         "涉及月柱": i == 1,
-                    "日柱特殊": is_ri_zhu,
+                        "日柱特殊": is_ri_zhu,
                         "状态": get_status(
                             "六冲", {"key": "adjacent"}
                         ),
@@ -961,7 +1086,7 @@ def _detect_cycle_pairwise(
                         "组合明细": combo_detail_branch,
 
                         "涉及月柱": i == 1,
-                    "日柱特殊": is_ri_zhu,
+                        "日柱特殊": is_ri_zhu,
                         "状态": get_status(
                             "三刑",
                             {
@@ -1007,7 +1132,7 @@ def _detect_cycle_pairwise(
                             "合化五行": _STEM_COMBINE_ELEMENT.get(cycle_stem, ""),
                         },
                         "涉及月柱": i == 1,
-                    "日柱特殊": is_ri_zhu,
+                        "日柱特殊": is_ri_zhu,
                         "状态": get_status("干支透合"),
                     }
                 )
@@ -1033,10 +1158,10 @@ def _detect_cycle_pairwise(
 
         # ── 天干合 ───────────────────────────────────────────────────────────
         if stem_combines.get(cycle_stem) == target_gan:
-            rooting = _check_branch_rooting(cycle_stem, cycle_branch)
             registry.register(
                 {
                     "类型": "天干合",
+                    "元素": _STEM_COMBINE_ELEMENT.get(cycle_stem, ""),
                     "组合": combo,
                     "组合明细": combo_detail_stem,
                     "涉及月柱": i == 1,
@@ -1049,7 +1174,6 @@ def _detect_cycle_pairwise(
 
         # ── 天干冲 — mutual opposition (甲庚 乙辛 丙壬 丁癸) ─────────────────
         if stem_clashes.get(cycle_stem) == target_gan:
-            rooting = _check_branch_rooting(cycle_stem, cycle_branch)
             registry.register(
                 {
                     "类型": "天干冲",
@@ -1072,7 +1196,6 @@ def _detect_cycle_pairwise(
         _ke_cycle_to_natal = (cycle_stem, target_gan) in stem_controls
         _ke_natal_to_cycle = (target_gan, cycle_stem) in stem_controls
         if _ke_cycle_to_natal or _ke_natal_to_cycle:
-            rooting = _check_branch_rooting(cycle_stem, cycle_branch)
             registry.register(
                 {
                     "类型": "天干克",
@@ -1136,6 +1259,7 @@ def _detect_cycle_gong_gong(
                 registry.register(
                     {
                         "类型": "共拱",
+                        "元素": branch_elements.get(missing_branch, ""),
                         "框架": f"岁运拱{missing_branch}",
                         "组合": combo,
                         "组合明细": {
@@ -1229,7 +1353,7 @@ def _pre_pass(
         idx = _cycle_pillar_index(item.get("组合", ""))
         if idx in fuyin_pillars:
             item["强度"] = "消融吸收"
-            item.setdefault("备注", "比和被伏吟吸收：同柱同支，比和信息已含于伏吟之内")
+            item.setdefault("备注", "伏吟局中，比和冗余，消融吸收")
             registry.absorb(item["_iid"])
 
     return turbulent
@@ -1291,7 +1415,9 @@ def _pass1_identity(
     branch_winner: dict | None = None
     if structural:
         branch_winner = structural[0]
-        branch.lock_type = "STRUCTURAL"
+        # Distinguish between 三会 and 三合 for precise suppression rules
+        structure_type = branch_winner.get("类型", "")
+        branch.lock_type = f"STRUCTURAL_{structure_type}"  # "STRUCTURAL_三会" or "STRUCTURAL_三合"
     elif liu_he:
         ri_zhu_he = [it for it in liu_he if _is_ri_zhu(it)]
         branch_winner = ri_zhu_he[0] if ri_zhu_he else liu_he[0]
@@ -1315,7 +1441,7 @@ def _pass1_identity(
     # free            — branch lock is 六冲 (the 开库 itself) or no lock
     # partially_trapped — branch locked by STRUCTURAL (三会/三合 absorbs some energy)
     # fully_trapped   — branch locked by PRIMARY_六合 (bilateral lock; key immobilised)
-    if branch.lock_type == "STRUCTURAL":
+    if branch.lock_type and branch.lock_type.startswith("STRUCTURAL"):
         trapped_state = "partially_trapped"
     elif branch.lock_type == "PRIMARY_六合":
         trapped_state = "fully_trapped"
@@ -1326,7 +1452,7 @@ def _pass1_identity(
         if item.get("类型") != "开库":
             continue
         ku_ti = item.get("库体", {})
-        if ku_ti.get("钥匙受困") != "pending":
+        if ku_ti.get("钥匙受困") != _PENDING:
             continue
         ku_ti["钥匙受困"] = trapped_state
         for entry in item.get("库藏释放", []):
@@ -1426,114 +1552,112 @@ def _pass3_winners(
     # ── Stem winner ───────────────────────────────────────────────────────────
     if stem.lock_item_id is not None:
         item = registry.item_by_id(stem.lock_item_id)
-        if item is None:
-            return
-        itype = item.get("类型", "")
-        is_ri = _is_ri_zhu(item)
-        pillar_idx = _cycle_pillar_index(item.get("组合", ""))
-        pillar = _pillar_name(pillar_idx)
-        detail = item.get("组合明细", {})
-        cs = detail.get(f"{cycle_label}干", "")
-        ns = detail.get(pillar, "")
+        if item is not None:
+            itype = item.get("类型", "")
+            is_ri = _is_ri_zhu(item)
+            pillar_idx = _cycle_pillar_index(item.get("组合", ""))
+            pillar = _pillar_name(pillar_idx)
+            detail = item.get("组合明细", {})
+            cs = detail.get(f"{cycle_label}干", "")
+            ns = detail.get(pillar, "")
 
-        if itype == "天干合":
-            item["强度"] = "强势主流"
-            item.setdefault(
-                "备注",
-                (
-                    f"{cycle_label}干{cs}合绑日主，为干元首要合化，意义重大"
-                    if is_ri
-                    else f"{cycle_label}干{cs}合绑{pillar}{ns}，干元主要合化激活"
-                ),
-            )
-        elif itype == "天干克":
-            item["强度"] = "强势主流" if item.get("根基强度") == "有根" else "显著影响"
-            ke_xiang = item.get("克向", "顺克")
-            if is_ri:
+            if itype == "天干合":
+                item["强度"] = "强势主流"
                 item.setdefault(
                     "备注",
                     (
-                        f"{cycle_label}干{cs}顺克日主，外力克制日元，压力极大"
-                        if ke_xiang == "顺克"
-                        else f"日主逆克{cycle_label}干{cs}，命主元气抑制来运，被压而不从"
+                        f"{cycle_label}干{cs}合绑日主，为干元首要合化，意义重大"
+                        if is_ri
+                        else f"{cycle_label}干{cs}合绑{pillar}{ns}，干元主要合化激活"
                     ),
                 )
-            else:
+            elif itype == "天干克":
+                item["强度"] = "强势主流" if item.get("根基强度") == "有根" else "显著影响"
+                ke_xiang = item.get("克向", "顺克")
+                if is_ri:
+                    item.setdefault(
+                        "备注",
+                        (
+                            f"{cycle_label}干{cs}顺克日主，外力克制日元，压力极大"
+                            if ke_xiang == "顺克"
+                            else f"日主逆克{cycle_label}干{cs}，命主元气抑制来运，被压而不从"
+                        ),
+                    )
+                else:
+                    item.setdefault(
+                        "备注",
+                        (
+                            f"{cycle_label}干{cs}顺克{pillar}{ns}，克力向外施压"
+                            if ke_xiang == "顺克"
+                            else f"{pillar}{ns}逆克{cycle_label}干{cs}，来运受制，力道受阻"
+                        ),
+                    )
+            elif itype == "天干冲":
+                item["强度"] = "强势主流"
                 item.setdefault(
                     "备注",
                     (
-                        f"{cycle_label}干{cs}顺克{pillar}{ns}，克力向外施压"
-                        if ke_xiang == "顺克"
-                        else f"{pillar}{ns}逆克{cycle_label}干{cs}，来运受制，力道受阻"
+                        f"{cycle_label}干{cs}冲撞日主，干元主要冲力激活，动荡剧烈"
+                        if is_ri
+                        else f"{cycle_label}干{cs}冲击{pillar}{ns}，干元主要冲力激活"
                     ),
                 )
-        elif itype == "天干冲":
-            item["强度"] = "强势主流"
-            item.setdefault(
-                "备注",
-                (
-                    f"{cycle_label}干{cs}冲撞日主，干元主要冲力激活，动荡剧烈"
-                    if is_ri
-                    else f"{cycle_label}干{cs}冲击{pillar}{ns}，干元主要冲力激活"
-                ),
-            )
 
     # ── Branch winner ─────────────────────────────────────────────────────────
     if branch.lock_item_id is not None:
         item = registry.item_by_id(branch.lock_item_id)
-        if item is None:
-            return
-        itype = item.get("类型", "")
-        is_ri = _is_ri_zhu(item)
-        pillar_idx = _cycle_pillar_index(item.get("组合", ""))
-        pillar = _pillar_name(pillar_idx)
-        detail = item.get("组合明细", {})
-        cb = detail.get(f"{cycle_label}支", "")
-        nb = detail.get(pillar, "")
+        if item is not None:
+            itype = item.get("类型", "")
+            is_ri = _is_ri_zhu(item)
+            pillar_idx = _cycle_pillar_index(item.get("组合", ""))
+            pillar = _pillar_name(pillar_idx)
+            detail = item.get("组合明细", {})
+            cb = detail.get(f"{cycle_label}支", "")
+            nb = detail.get(pillar, "")
 
-        if itype in _STRUCTURAL_TYPES:
-            item["强度"] = "强势主流"
-            item.setdefault(
-                "备注", f"{itype}方位场成局，{cycle_label}支参与结构主导，全局牵引"
-            )
+            if itype in _STRUCTURAL_TYPES:
+                item["强度"] = "强势主流"
+                item.setdefault(
+                    "备注", f"{itype}方位场成局，{cycle_label}支参与结构主导，全局牵引"
+                )
 
-        elif itype == "六合":
-            item["强度"] = "强势主流"
-            item.setdefault(
-                "备注",
-                (
-                    f"{cycle_label}支{cb}六合日柱，支元首要合化，与日主紧密相系"
-                    if is_ri
-                    else f"{cycle_label}支{cb}六合{pillar}{nb}，支元主要合化激活"
-                ),
-            )
+            elif itype == "六合":
+                item["强度"] = "强势主流"
+                item.setdefault(
+                    "备注",
+                    (
+                        f"{cycle_label}支{cb}六合日柱，支元首要合化，与日主紧密相系"
+                        if is_ri
+                        else f"{cycle_label}支{cb}六合{pillar}{nb}，支元主要合化激活"
+                    ),
+                )
 
-        elif itype in ("六冲", "开库"):
-            if itype == "六冲":
-                if pillar_idx is not None and pillar_idx in natal_protected:
-                    item["强度"] = "大幅衰减"
-                    item["备注"] = f"命盘三会/三合护{pillar}{nb}，{cycle_label}支{cb}冲力大幅衰减"
-                else:
-                    item["强度"] = "强势主流"
-                    item.setdefault(
-                        "备注", f"{cycle_label}支{cb}六冲{pillar}{nb}，冲力完整激活，结构破位"
-                    )
-            else:  # 开库
-                trapped = item.get("库体", {}).get("钥匙受困", "free")
-                item["强度"] = KAIKU_STRENGTH.get(trapped, "强势主流")
-                if not item.get("备注"):
-                    if trapped == "free":
-                        item["备注"] = (
-                            f"{cycle_label}支{cb}开{item.get('库体',{}).get('库支','')}库，"
-                            f"钥匙自由，库藏主气涌现"
-                        )
-                    elif trapped == "partially_trapped":
-                        item["备注"] = (
-                            f"{cycle_label}支{cb}开{item.get('库体',{}).get('库支','')}库，"
-                            f"钥匙受三会/三合牵制，库藏受压渗出"
-                        )
+            elif itype in ("六冲", "开库"):
+                if itype == "六冲":
+                    if pillar_idx is not None and pillar_idx in natal_protected:
+                        item["强度"] = "大幅衰减"
+                        item["备注"] = f"命盘三会/三合护{pillar}{nb}，{cycle_label}支{cb}冲力大幅衰减"
                     else:
-                        item["备注"] = f"{cycle_label}支{cb}开库钥匙已被六合锁定，库门封闭"
+                        item["强度"] = "强势主流"
+                        item.setdefault(
+                            "备注", f"{cycle_label}支{cb}六冲{pillar}{nb}，冲力完整激活，结构破位"
+                        )
+                else:  # 开库
+                    trapped = item.get("库体", {}).get("钥匙受困", "free")
+                    item["强度"] = KAIKU_STRENGTH.get(trapped, "强势主流")
+                    if not item.get("备注"):
+                        if trapped == "free":
+                            item["备注"] = (
+                                f"{cycle_label}支{cb}开{item.get('库体',{}).get('库支','')}库，"
+                                f"钥匙自由，库藏主气涌现"
+                            )
+                        elif trapped == "partially_trapped":
+                            item["备注"] = (
+                                f"{cycle_label}支{cb}开{item.get('库体',{}).get('库支','')}库，"
+                                f"钥匙受三会/三合牵制，库藏受压渗出"
+                            )
+                        else:
+                            item["备注"] = f"{cycle_label}支{cb}开库钥匙已被六合锁定，库门封闭"
 
     # ── Cross-actor annotation: 合中有冲 / 冲中有合 ───────────────────────────
     # If stem is bonded (天干合) while branch clashes the same natal pillar,
@@ -1603,9 +1727,9 @@ def _pass4_group(
 
         elif itype in ("半合", "拱会", "残会", "共拱"):
             if lock == "PRIMARY_六合":
-                item["强度"] = "显著影响"
-                item.setdefault("备注", f"{cycle_label}支已六合，此{itype}仅作背景共鸣")
-            elif lock in ("STRUCTURAL", "PRIMARY_六冲"):
+                item["强度"] = "中等衰减"
+                item.setdefault("备注", f"{cycle_label}支已六合，此{itype}合力衰减")
+            elif lock and (lock.startswith("STRUCTURAL") or lock == "PRIMARY_六冲"):
                 item["强度"] = "大幅衰减"
                 item.setdefault(
                     "备注", f"{cycle_label}支已被{lock}锁定，此{itype}势力被吸收"
@@ -1757,6 +1881,115 @@ def apply_cycle_master_priority(
     return result
 
 
+# ── Pass 6 — Xun Kong (旬空) Post-Filter for Cycle Interactions ──────────────
+# Numbering aligns with the natal module's pass structure; Pass 5 is natal-only
+# (十神 strength assignment) and does not apply to cycle interactions.
+
+def _pass6_cycle_xun_kong(
+    filtered: list,
+    cycle_label: str,
+    cycle_branch: str,
+    cycle_xk_str: str,
+    natal_xk: dict,
+) -> None:
+    """
+    Post-filter: downgrade cycle interactions involving void (旬空) branches.
+
+    Two void sources:
+    - Cycle branch checked against cycle's own xun kong string
+    - Natal branches checked against 日柱's xun kong (day pillar anchors entire chart)
+
+    Rules mirror natal Pass 6:
+    - 合类: 1+ void → downgrade 1 tier
+    - 六冲: 1 void → 冲开旬空 remark only; both void → downgrade 1 tier
+    - 刑/害/破/暗合/比和: 1+ void → downgrade 1 tier
+    - 共拱: 1+ void participant branches → downgrade 1 tier
+    - 天干: skip
+    """
+    # Day pillar void pair applies to all natal branches
+    day_xk_str = natal_xk.get("日柱", {}).get("旬空", "")
+    cycle_branch_key = f"{cycle_label}支"
+
+    for item in filtered:
+        itype = item.get("类型", "")
+        if itype in _XK_STEM_ONLY:
+            continue
+
+        detail = item.get("组合明细", {})
+
+        # ── 干支透合: special key format "{pillar}支" for natal branch ──
+        if itype == "干支透合":
+            for key, val in detail.items():
+                if not key.endswith("支") or key == cycle_branch_key:
+                    continue
+                pillar_name = key[:-1]  # "年柱支" → "年柱"
+                if pillar_name not in _PILLAR_NAMES_SET:
+                    continue
+                if isinstance(val, str) and len(val) == 1 and val in branch_elements:
+                    if val in day_xk_str:
+                        _downgrade_by_one_tier_xk(
+                            item, _build_xk_remark([pillar_name], "misc_single")
+                        )
+                        item["旬空涉及"] = [pillar_name]
+                break
+            continue
+
+        # ── All other branch interactions ──
+        void_parts: list[str] = []
+        total_branch_count = 0
+
+        for key, val in detail.items():
+            if not isinstance(val, str) or len(val) != 1:
+                continue
+            is_cycle_key = key == cycle_branch_key
+            is_natal_key = key in _PILLAR_NAMES_SET
+            if not (is_cycle_key or is_natal_key):
+                continue
+            if val not in branch_elements:
+                continue
+
+            total_branch_count += 1
+            if is_cycle_key:
+                if _is_cycle_branch_void(val, cycle_xk_str):
+                    void_parts.append(cycle_label)
+            else:
+                if val in day_xk_str:
+                    void_parts.append(key)
+
+        if not total_branch_count or not void_parts:
+            continue
+
+        if itype in _XK_HE_TYPES:
+            _downgrade_by_one_tier_xk(
+                item, _build_xk_remark(void_parts, "合_single")
+            )
+            item["旬空涉及"] = void_parts
+        elif itype in _XK_CHONG_TYPES:
+            if len(void_parts) == total_branch_count:
+                _downgrade_by_one_tier_xk(
+                    item, _build_xk_remark(void_parts, "双空相冲")
+                )
+                item["旬空涉及"] = void_parts
+            else:
+                _append_remark_xk(item, _build_xk_remark(void_parts, "冲开旬空"))
+                item["旬空涉及"] = void_parts
+        elif itype in _XK_XING_TYPES:
+            _downgrade_by_one_tier_xk(
+                item, _build_xk_remark(void_parts, "刑_single")
+            )
+            item["旬空涉及"] = void_parts
+        elif itype in _XK_HAI_PO_TYPES:
+            _downgrade_by_one_tier_xk(
+                item, _build_xk_remark(void_parts, "害破_single")
+            )
+            item["旬空涉及"] = void_parts
+        elif itype in _XK_MISC_TYPES:
+            _downgrade_by_one_tier_xk(
+                item, _build_xk_remark(void_parts, "misc_single")
+            )
+            item["旬空涉及"] = void_parts
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION 6 — Output Assembly
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1819,6 +2052,8 @@ def get_cycle_interactions(
     cycle_branch: str,
     natal_chart: dict,
     cycle_label: str = "大运",
+    cycle_xk_str: str | None = None,
+    natal_xk: dict | None = None,
 ) -> dict:
     """
     Detect all interactions between one external cycle pillar and the natal chart.
@@ -1898,21 +2133,30 @@ def get_cycle_interactions(
     # ── Priority filter ───────────────────────────────────────────────────────
     filtered = apply_cycle_master_priority(registry, natal_gans, natal_zhis, cycle_label)
 
+    # ── Pass 6: Xun Kong (旬空) post-filter ──────────────────────────────
+    if cycle_xk_str is not None or natal_xk is not None:
+        _pass6_cycle_xun_kong(
+            filtered, cycle_label, cycle_branch,
+            cycle_xk_str or "", natal_xk or {},
+        )
+
     # ── Output assembly ───────────────────────────────────────────────────────
-    # _build_cycle_pillar_dynamics strips _iid/_synthetic in-place
-    pillar_dynamics = _build_cycle_pillar_dynamics(filtered)
 
     # 关系总览: 强势主流 / 显著影响 items only
+    # Built before _build_cycle_pillar_dynamics which strips _iid in-place.
     summary: list[str] = []
     seen: set[str] = set()
     for item in filtered:
         if item.get("强度") not in ("强势主流", "显著影响"):
             continue
-        detail_vals = "".join(item.get("组合明细", {}).values())
+        detail_vals = "".join(v for v in item.get("组合明细", {}).values() if isinstance(v, str))
         label = item.get("状态") or f"{item.get('类型', '')}({detail_vals})"
         if label not in seen:
             summary.append(label)
             seen.add(label)
+
+    # _build_cycle_pillar_dynamics strips _iid/_synthetic in-place
+    pillar_dynamics = _build_cycle_pillar_dynamics(filtered)
 
     return {
         "作用": {
@@ -1971,13 +2215,14 @@ if __name__ == "__main__":
     # --- Birthday examples (uncomment one) ---
 
     # Desmond
-    # solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)
-    # datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)
-    # tst_birthday, _ = get_true_solar_time(datetime_birthday, 1.3253, 103.808053)
+    solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)
+    datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)
+    tst_birthday, _ = get_true_solar_time(datetime_birthday, 1.3253, 103.808053)
+    gender = 0  # 0 for male
 
     # Corinne
-    solar_birthday = Solar.fromYmdHms(1987, 6, 3, 12, 6, 0)
-    tst_birthday, _ = get_true_solar_time(datetime(1987, 6, 3, 12, 6, 0), 1.4759, 103.808053)
+    # solar_birthday = Solar.fromYmdHms(1987, 6, 3, 12, 6, 0)
+    # tst_birthday, _ = get_true_solar_time(datetime(1987, 6, 3, 12, 6, 0), 1.4759, 103.808053)
 
     # Lara
     # solar_birthday = Solar.fromYmdHms(2025, 7, 31, 9, 10, 0)
@@ -1992,9 +2237,6 @@ if __name__ == "__main__":
     )
 
     # --- Cycle pillar to test ---
-    cycle_stem, cycle_branch = "戊", "子"
-    cycle_label = "大运"
-
     natal_chart = {
         "year":  {"stem": bazi.getYearGan(),  "branch": bazi.getYearZhi()},
         "month": {"stem": bazi.getMonthGan(), "branch": bazi.getMonthZhi()},
@@ -2002,7 +2244,27 @@ if __name__ == "__main__":
         "hour":  {"stem": bazi.getTimeGan(),  "branch": bazi.getTimeZhi()},
     }
 
-    result = get_cycle_interactions(cycle_stem, cycle_branch, natal_chart, cycle_label)
+    # Compute natal xun kong from birth chart
+    from src.astronomer_calculations.void_xun_kong import get_xun_kong
 
-    logger.info(f"\n--- JSON Output for LLM ({cycle_label} {cycle_stem}{cycle_branch}) ---")
+    natal_xun_kong_result = get_xun_kong(tst_birthday.getLunar())
+    natal_xk = natal_xun_kong_result.get("旬空", {})
+
+    # Use index 1 (first actual 大运 cycle) as example
+    yun = bazi.getYun(gender)
+    da_yun = yun.getDaYun()[1]
+    da_yun_stem = da_yun.getGanZhi()[0]
+    da_yun_branch = da_yun.getGanZhi()[1]
+    cycle_label = "大运"
+
+    # Compute cycle pillar's own xun kong
+    cycle_xk_str = da_yun.getXunKong()
+
+    result = get_cycle_interactions(
+        da_yun_stem, da_yun_branch, natal_chart, cycle_label,
+        cycle_xk_str=cycle_xk_str,
+        natal_xk=natal_xk,
+    )
+
+    logger.info(f"\n--- JSON Output for LLM ({cycle_label} {da_yun_stem}{da_yun_branch}) ---")
     logger.info(json.dumps(result, ensure_ascii=False, indent=2))

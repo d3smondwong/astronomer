@@ -206,18 +206,27 @@ Output Format:
     - 组合: Pillar composition (e.g., "年柱-月柱")
     - 组合明细: Branch/stem mapping per pillar
     - 状态: Status (from INTERACTION_STATUSES)
-    - 紧贴: Boolean (adjacency for applicable types)
-    - 邀出 / 待会 / 拱向 / 混杂: Context fields (when applicable)
-      (拱向: the missing target branch a 共拱/拱会/残会/半合 is arching toward)
-    - 元素 / 方位: Element or directional info (方位 only on 三会/拱会/残会)
-    - 强度: Modulated strength (strong/significant/weakened/etc.)
+    - 紧贴: Boolean adjacency flag (applicable to: 六冲, 六合, 六害, 六破, 三刑,
+      天干冲, 天干克, 比和, 半合, 三合, 拱会/残会, 共拱)
+    - 元素: Produced/transformed element (applicable to: 三会, 三合, 半合 — triple element;
+      六合 — transformation element; 比和 — shared peer element; 共拱 — arched-toward
+      branch element; 拱会/残会 — directional element; 天干合 — 合化五行)
+    - 方位: Directional info (三会, 拱会, 残会 only)
+    - 邀出: Missing third branch for 半合; "已全" for complete 三合
+    - 待会 / 犹出: Missing branch for 拱会/残会 (犹出 on 拱会 only)
+    - 拱向: The missing target branch a 共拱/拱会/残会/半合 is arching toward
+    - 混杂: Clash turbidity flag (共拱 only)
+    - 强度: Modulated strength (强势主流/显著影响/中等衰减/大幅衰减/消融吸收)
     - 备注: Causal note (if suppressed/absorbed)
+
+Improvement Feature for future iterations: to include 根基强度 and 根基说明 branch rooting
 """
 
 from lunar_python import Solar, Lunar
 from lunar_python.util import LunarUtil
 from datetime import datetime
 from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
+from src.astronomer_calculations import void_xun_kong
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -742,11 +751,66 @@ DEFAULT_STRENGTH = {
     ("共拱", False): "强势主流",
 }
 
+# ── Xun Kong (旬空) Constants ────────────────────────────────────────────────
+_STRENGTH_BY_RANK = {v: k for k, v in STRENGTH_ORDER.items()}
+
+_XK_HE_TYPES = frozenset({"六合", "三合", "三会", "半合", "拱会", "残会"})
+_XK_CHONG_TYPES = frozenset({"六冲"})
+_XK_XING_TYPES = frozenset({"无恩之刑", "恃势之刑", "无礼之刑", "自刑"})
+_XK_HAI_PO_TYPES = frozenset({"六害", "六破"})
+_XK_MISC_TYPES = frozenset({"暗合", "干支透合", "比和", "共拱"})
+_XK_STEM_ONLY = frozenset({"天干合", "天干克", "天干冲"})
+
+_XK_REMARKS = {
+    "合_single": "{pillars}旬空，合力虚浮，力场不实",
+    "冲开旬空": "冲开旬空，虚局受激",
+    "双空相冲": "{pillars}双空相冲，冲力涣散",
+    "刑_single": "{pillars}旬空，刑力减弱",
+    "害破_single": "{pillars}旬空，害破力场减弱",
+    "misc_single": "{pillars}旬空，合力虚浮",
+}
+
 # Pillar name constants
 _PILLAR_NAMES_CN = ["年柱", "月柱", "日柱", "时柱"]
 _PILLAR_IDX_MAP = {"年柱": 0, "月柱": 1, "日柱": 2, "时柱": 3}
 _PILLAR_ABBR_MAP = {"年": 0, "月": 1, "日": 2, "时": 3}
 _STEM_LOCK_PRIORITY = [2, 1, 3, 0]  # 日柱=2 absolute anchor
+
+# ── Xun Kong (旬空) Helpers ───────────────────────────────────────────────────
+
+def _is_branch_in_xun_kong(branch: str, pillar_name: str, xun_kong_data: dict) -> bool:
+    pd = xun_kong_data.get(pillar_name)
+    return bool(pd and branch in pd.get("旬空", ""))
+
+
+def _extract_branch_pairs(combo_detail: dict) -> list:
+    pairs = []
+    for pn, val in combo_detail.items():
+        if pn not in set(_PILLAR_NAMES_CN):
+            continue
+        if isinstance(val, str) and len(val) == 1 and val in branch_elements:
+            pairs.append((pn, val))
+    return pairs
+
+
+def _build_xk_remark(void_pillars: list, rule: str) -> str:
+    template = _XK_REMARKS.get(rule, "{pillars}旬空")
+    return template.format(pillars="、".join(void_pillars))
+
+
+def _downgrade_by_one_tier_xk(item: dict, remark: str) -> None:
+    current_rank = STRENGTH_ORDER.get(item.get("强度", "强势主流"), 0)
+    new_rank = min(current_rank + 1, 4)
+    if new_rank > current_rank:
+        item["强度"] = _STRENGTH_BY_RANK[new_rank]
+    existing = item.get("备注", "")
+    item["备注"] = (existing + "；" + remark) if existing else remark
+
+
+def _append_remark_xk(item: dict, remark: str) -> None:
+    existing = item.get("备注", "")
+    item["备注"] = (existing + "；" + remark) if existing else remark
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION 2 — Validators & Utilities
@@ -1276,6 +1340,9 @@ def _pass2_dual(registry: InteractionRegistry) -> None:
                             chong_partner.lock_item_id = None
 
     # Round 1b — Assign PRIMARY_六冲 to unlocked branches with 六冲 (no 六合 available)
+    # Mirror 六合 Round 1: propagate lock to the clash partner so both sides
+    # are recognised as engaged in the clash (enables correct suppression of
+    # interactions targeting the partner branch, e.g. 干支透合).
     for idx, actor in registry.branch_actors.items():
         if actor.lock_type is not None:
             continue
@@ -1286,6 +1353,13 @@ def _pass2_dual(registry: InteractionRegistry) -> None:
         actor.lock_type = "PRIMARY_六冲"
         actor.lock_item_id = winner["_iid"]
         registry.lock(winner["_iid"])
+        # Propagate to clash partner (if still unlocked)
+        chong_partner_idx = registry.partner_branch_idx(winner, idx)
+        if chong_partner_idx is not None:
+            chong_partner = registry.branch_actors.get(chong_partner_idx)
+            if chong_partner and chong_partner.lock_type is None:
+                chong_partner.lock_type = "PRIMARY_六冲"
+                chong_partner.lock_item_id = winner["_iid"]
 
     # Round 2 — VACANT resolution (no new 六合)
     for idx, actor in registry.branch_actors.items():
@@ -1431,15 +1505,18 @@ def _pass4_group(registry: InteractionRegistry) -> None:
         indices = extract_pillar_indices(item.get("组合", "无"))
 
         if itype == "比和":
-            item["强度"] = "显著影响"
+            if not item.get("强度"):
+                item["强度"] = "显著影响"
             continue
 
         if itype == "暗合":
-            item["强度"] = "显著影响"
+            if not item.get("强度"):
+                item["强度"] = "显著影响"
             continue
 
         if itype == "干支透合":
-            item["强度"] = "显著影响"
+            if not item.get("强度"):
+                item["强度"] = "显著影响"
             continue
 
         if itype in {"半合", "拱会", "残会"}:
@@ -1492,17 +1569,24 @@ def _pass4_group(registry: InteractionRegistry) -> None:
                     item["备注"] = STRENGTH_REMARKS.get(("GONG_GONG", "turbid"), "无")
             elif gong_element in structural_elements:
                 # Echo upgrade: same element resonance — legitimate Pass 4 upgrade,
-                # overrides any prior downgrade because structural echo dominates.
-                item["强度"] = "强势主流"
-                item["备注"] = STRENGTH_REMARKS.get(("GONG_GONG", "echo"), "无")
-                # Elevate constituent partials
-                target = item.get("拱向")
-                for sub in registry.active_items():
-                    if sub.get("拱向") == target and sub.get("类型") in {
-                        "半合",
-                        "拱会",
-                    }:
-                        sub["强度"] = "强势主流"
+                # BUT respect Pass 3 suppressions: if already 消融吸收 or 大幅衰减,
+                # the branch is too disrupted for echo to resurrect.
+                if existing and STRENGTH_ORDER.get(existing, 0) >= STRENGTH_ORDER.get("大幅衰减", 0):
+                    pass  # Pass 3 suppression stands — echo cannot resurrect
+                else:
+                    item["强度"] = "强势主流"
+                    item["备注"] = STRENGTH_REMARKS.get(("GONG_GONG", "echo"), "无")
+                    # Elevate constituent partials (same guard: respect Pass 3 suppressions)
+                    target = item.get("拱向")
+                    for sub in registry.active_items():
+                        if sub.get("拱向") == target and sub.get("类型") in {
+                            "半合",
+                            "拱会",
+                        }:
+                            sub_str = sub.get("强度")
+                            if sub_str and STRENGTH_ORDER.get(sub_str, 0) >= STRENGTH_ORDER.get("大幅衰减", 0):
+                                continue  # Pass 3 suppression stands
+                            sub["强度"] = "强势主流"
             elif structural_elements:
                 # Structural suppression — only apply if not already weaker.
                 if not existing or STRENGTH_ORDER.get(
@@ -1559,6 +1643,75 @@ def apply_bazi_master_priority(
     result = registry.all_items()
     result.sort(key=lambda x: INTERACTION_TIER_ORDER.get(x.get("类型", "无"), 999))
     return result
+
+
+# ── Pass 6 — Xun Kong (旬空) Post-Filter ─────────────────────────────────────
+
+def _pass6_xun_kong(filtered: list, xun_kong_data: dict, zhis: list) -> None:
+    """
+    Post-filter: downgrade interactions involving void (旬空) branches.
+
+    The 日柱 (day pillar) is the primary anchor: its xun kong pair applies to the
+    entire natal chart. Any natal branch matching the day pillar's void pair is void.
+    Rules:
+    - 合类: 1+ void → downgrade 1 tier
+    - 六冲: 1 void → 冲开旬空 remark only; both void → downgrade 1 tier
+    - 刑/害/破/暗合/比和: 1+ void → downgrade 1 tier
+    - 共拱: 1+ void participant branches → downgrade 1 tier
+    - 天干: skip
+    """
+    # Day pillar void pair applies to the entire chart
+    day_xk_str = xun_kong_data.get("日柱", {}).get("旬空", "")
+
+    for item in filtered:
+        itype = item.get("类型", "")
+        if itype in _XK_STEM_ONLY:
+            continue
+
+        # 干支透合: use 支方索引 to find the branch side
+        if itype == "干支透合":
+            zhi_idx = item.get("支方索引")
+            if zhi_idx is not None:
+                pn = _PILLAR_NAMES_CN[zhi_idx]
+                if zhis[zhi_idx] in day_xk_str:
+                    _downgrade_by_one_tier_xk(item, _build_xk_remark([pn], "misc_single"))
+                    item["旬空涉及"] = [pn]
+            continue
+
+        pairs = _extract_branch_pairs(item.get("组合明细", {}))
+        if not pairs:
+            continue
+
+        void_pillars = [pn for pn, br in pairs if br in day_xk_str]
+
+        if not void_pillars:
+            continue
+
+        if itype in _XK_HE_TYPES:
+            _downgrade_by_one_tier_xk(item, _build_xk_remark(void_pillars, "合_single"))
+            item["旬空涉及"] = void_pillars
+        elif itype in _XK_CHONG_TYPES:
+            if len(void_pillars) == len(pairs):
+                _downgrade_by_one_tier_xk(
+                    item, _build_xk_remark(void_pillars, "双空相冲")
+                )
+                item["旬空涉及"] = void_pillars
+            else:
+                _append_remark_xk(item, _build_xk_remark(void_pillars, "冲开旬空"))
+                item["旬空涉及"] = void_pillars
+        elif itype in _XK_XING_TYPES:
+            _downgrade_by_one_tier_xk(item, _build_xk_remark(void_pillars, "刑_single"))
+            item["旬空涉及"] = void_pillars
+        elif itype in _XK_HAI_PO_TYPES:
+            _downgrade_by_one_tier_xk(
+                item, _build_xk_remark(void_pillars, "害破_single")
+            )
+            item["旬空涉及"] = void_pillars
+        elif itype in _XK_MISC_TYPES:
+            _downgrade_by_one_tier_xk(
+                item, _build_xk_remark(void_pillars, "misc_single")
+            )
+            item["旬空涉及"] = void_pillars
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1921,6 +2074,7 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
                 registry.register(
                     {
                         "类型": "天干合",
+                        "元素": _STEM_COMBINE_ELEMENT.get(g_i, ""),
                         "组合": combo,
                         "组合明细": stem_detail,
                         "状态": get_status("天干合"),
@@ -2165,12 +2319,12 @@ def _detect_gong_gong(registry: InteractionRegistry, zhis: list) -> None:
         for sub in contributors:
             sub["拱向"] = missing_branch
 
-    # ── Unified subsumption: L2 composite absorbs everything it encompasses ───
+    # ── Unified subsumption: L2 composite weakens its contributors ───
     # One rule (以大局为主): if a composite 共拱 (L2) exists for a given
     # missing branch, every other active item stamped with the same 拱向 target
     # — contributors (拱会/半合/残会) AND any smaller L1 positional 共拱 —
-    # is fully absorbed. The stamp "拱向": missing_branch is the sole flag;
-    # no branch-set arithmetic needed.
+    # is weakened to 中等衰减 (moderately suppressed, not fully absorbed).
+    # If a contributor has void branches, Pass 6 will further downgrade it to 大幅衰减.
     for item in list(registry.active_items()):
         if item.get("类型") != "共拱" or item.get("_layer") != 2:
             continue
@@ -2180,9 +2334,13 @@ def _detect_gong_gong(registry: InteractionRegistry, zhis: list) -> None:
             if sub["_iid"] == item["_iid"]:
                 continue
             if sub.get("拱向") == target:
-                registry.absorb(sub["_iid"])
-                sub["强度"] = "消融吸收"
-                sub["备注"] = f"已被复合共拱（{frame}，拱{target}）涵盖，消融吸收"
+                # Defensive guard: only downgrade — don't upgrade items already
+                # at a stronger suppression (future-proofing against pass reordering).
+                sub_str = sub.get("强度")
+                if sub_str and STRENGTH_ORDER.get(sub_str, 0) > STRENGTH_ORDER.get("中等衰减", 0):
+                    continue  # already more suppressed than 中等衰减
+                sub["强度"] = "中等衰减"
+                sub["备注"] = f"已被复合共拱（{frame}，拱{target}）涵盖，力场衰减"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2284,7 +2442,8 @@ def get_interactions(lunar_birthday) -> dict:
       2. Detect 三会/三合 (structural), then all pairwise interactions
       3. Five-pass priority filter (共拱 detection runs inside, after Pass 1
          so synthetic half-structures from losers are visible)
-      4. Assemble per-pillar dynamics, vacant flags, and 关系总览 summary
+      4. Apply Pass 6 xun kong post-filter (self-computed from lunar_birthday)
+      5. Assemble per-pillar dynamics, vacant flags, and 关系总览 summary
     """
     baZi = lunar_birthday.getEightChar()
     gans = [baZi.getYearGan(), baZi.getMonthGan(), baZi.getDayGan(), baZi.getTimeGan()]
@@ -2306,6 +2465,11 @@ def get_interactions(lunar_birthday) -> dict:
 
     # ── Five-pass priority filter (includes 共拱 detection after Pass 1) ──
     filtered = apply_bazi_master_priority(registry.all_items(), zhis, registry)
+
+    # ── Pass 6: Xun Kong (旬空) post-filter ──────────────────────────────
+    xun_kong_result = void_xun_kong.get_xun_kong(lunar_birthday)
+    xk_inner = xun_kong_result.get("旬空", {})
+    _pass6_xun_kong(filtered, xk_inner, zhis)
 
     # ── Output assembly ───────────────────────────────────────────────────
     # Internal keys (_iid, _synthetic) are stripped inside _build_pillar_dynamics.
@@ -2371,19 +2535,27 @@ if __name__ == "__main__":
     # python -m src.astronomer_calculations.interactions_gan_zhi_zuo_yong
 
     # Desmond's birthday example
-    solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)  # Create solar date
-    datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)  # Create datetime object
-    tst_birthday, _ = get_true_solar_time(
-        datetime_birthday, 1.3253, 103.808053
-    )  # Get true solar time
+    # solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)  # Create solar date
+    # datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)  # Create datetime object
+    # tst_birthday, _ = get_true_solar_time(
+    #     datetime_birthday, 1.3253, 103.808053
+    # )  # Get true solar time
 
-    # Corinne's birthday example
+    # # Corinne's birthday example
     # solar_birthday = Solar.fromYmdHms(
     #     1987, 6, 3, 12, 6, 0
     # )  # Create solar date June 3, 1987 at 12:06 PM
     # tst_birthday, inputs_report = get_true_solar_time(
     #     datetime(1987, 6, 3, 12, 6, 0), 1.4759, 103.808053
     # )
+
+    # Random's birthday example
+    solar_birthday = Solar.fromYmdHms(1999, 2, 11, 9, 7, 0)  # Create solar date
+    datetime_birthday = datetime(1999, 2, 11, 9, 7, 0)  # Create datetime object
+    tst_birthday, _ = get_true_solar_time(
+        datetime_birthday, 1.3253, 103.808053
+    )  # Get true solar time
+
     lunar_birthday = tst_birthday.getLunar()
 
     logger.info("阳历生日: " + solar_birthday.toYmdHms())
