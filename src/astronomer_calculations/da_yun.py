@@ -123,6 +123,7 @@ from src.astronomer_calculations.cycle_interactions import get_cycle_interaction
 from src.astronomer_calculations.cycle_di_shi import get_di_shi
 from src.astronomer_calculations.cycle_wu_xing import CycleWuXingDynamics
 from src.astronomer_calculations.cycle_shen_sha import get_cycle_shen_sha
+from src.astronomer_calculations.void_xun_kong import get_xun_kong
 
 # Pillar names for reference
 pillar_names = ["年柱", "月柱", "日柱", "时柱"]
@@ -141,8 +142,8 @@ def get_da_yun(lunar_birthday: Lunar, gender: int) -> dict:
     # Get the EightChar (八字) object
     bazi = lunar_birthday.getEightChar()
 
-    # Get the Day Stem (日干) - this is the reference for all Ten Gods calculations
-    day_stem = bazi.getDayGan()
+    # Compute natal xun kong internally
+    natal_xk = get_xun_kong(lunar_birthday).get("旬空", {})
 
     # Extract natal chart pillars for interaction detection
     natal_chart = {
@@ -185,9 +186,12 @@ def get_da_yun(lunar_birthday: Lunar, gender: int) -> dict:
 
         # Calculate for this 大运
         if i > 0:  # Skip first cycle (no Gan-Zhi)
+            cycle_xk_str = da_yun.getXunKong()
             # Detect interactions (作用) with natal chart using sophisticated 1x4 scan
             interactions_result = get_cycle_interactions(
-                da_yun_stem, da_yun_branch, natal_chart
+                da_yun_stem, da_yun_branch, natal_chart,
+                cycle_xk_str=cycle_xk_str,
+                natal_xk=natal_xk,
             )
             interactions = interactions_result.get("作用", [])
 
@@ -196,6 +200,8 @@ def get_da_yun(lunar_birthday: Lunar, gender: int) -> dict:
                 da_yun, lunar_birthday,
                 priority_list=interactions_result.get("_raw_priority_list", []),
                 cycle_type="大运",
+                xun_kong_data=natal_xk,
+                cycle_xk_str=cycle_xk_str,
             )
             cycle_pillar_info = cycle_wu_xing_info.pop("大运柱", {})
             cycle_wu_xing_result = cycle_wu_xing_info.get("五行力量分析", "无数据")

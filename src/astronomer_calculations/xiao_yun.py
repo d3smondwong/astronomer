@@ -63,6 +63,7 @@ from datetime import datetime
 from src.astronomer_calculations.cycle_wu_xing import CycleWuXingDynamics
 from src.astronomer_calculations.cycle_interactions import get_cycle_interactions
 from src.astronomer_calculations.cycle_shen_sha import get_cycle_shen_sha
+from src.astronomer_calculations.void_xun_kong import get_xun_kong
 # Local pillar names
 pillar_names = ["年柱", "月柱", "日柱", "时柱"]
 
@@ -86,6 +87,9 @@ def get_xiao_yun(lunar_birthday: Lunar, gender: int) -> dict:
     """
     # Get the EightChar (八字) object
     bazi = lunar_birthday.getEightChar()
+
+    # Compute natal xun kong internally
+    natal_xk = get_xun_kong(lunar_birthday).get("旬空", {})
 
     # Extract birth chart pillars for interaction detection
     birth_chart = {
@@ -117,10 +121,10 @@ def get_xiao_yun(lunar_birthday: Lunar, gender: int) -> dict:
 
     # Get all Da Yun cycles and extract Xiao Yun from the first one
     # Xiao Yun cycles represent the years from birth until 起运 (inclusive)
-    da_yun_array = yun.getDaYun()
+    da_yun_list = yun.getDaYun()
 
     # Get Xiao Yun array from the first Da Yun object using lunar-python's built-in method
-    xiao_yun_array = da_yun_array[0].getXiaoYun()
+    xiao_yun_array = da_yun_list[0].getXiaoYun()
 
     # Process each 小运 (year) from birth to 起运
     xiao_yun_data = []
@@ -142,32 +146,37 @@ def get_xiao_yun(lunar_birthday: Lunar, gender: int) -> dict:
         xiao_yun_stem = gan_zhi[0]
         xiao_yun_branch = gan_zhi[1]
 
+        cycle_xk_str = xiao_yun.getXunKong()
         # Detect interactions (作用) with birth chart using 1x4 scan
-        interactions_result = get_cycle_interactions(
-            xiao_yun_stem, xiao_yun_branch, birth_chart, cycle_label="小运"
+        cycle_interactions_result = get_cycle_interactions(
+            xiao_yun_stem, xiao_yun_branch, birth_chart, cycle_label="小运",
+            cycle_xk_str=cycle_xk_str,
+            natal_xk=natal_xk,
         )
-        interactions = interactions_result.get("作用", [])
+        cycle_interactions = cycle_interactions_result.get("作用", [])
 
         # Five Elements dynamics: enriched cycle pillar info + combined natal+cycle 五行力量
         cycle_wu_xing_info = CycleWuXingDynamics().calculate_cycle_interaction(
             xiao_yun, lunar_birthday,
-            priority_list=interactions_result.get("_raw_priority_list", []),
+            priority_list=cycle_interactions_result.get("_raw_priority_list", []),
             cycle_type="小运",
+            xun_kong_data=natal_xk,
+            cycle_xk_str=cycle_xk_str,
         )
         cycle_pillar_info = cycle_wu_xing_info.pop("小运柱", {})
         cycle_wu_xing_result = cycle_wu_xing_info.get("五行力量分析", "无数据")
 
         # Extract Shen Sha (神煞) for this cycle
-        shen_sha = get_cycle_shen_sha(xiao_yun_stem, xiao_yun_branch, birth_chart, gender)
+        cycle_shen_sha = get_cycle_shen_sha(xiao_yun_stem, xiao_yun_branch, birth_chart, gender)
 
         xiao_yun_info = {
-            "序号": i + 1,  # 1-based sequence number
+            # "序号": i + 1,  # 1-based sequence number
             "日历年份": calendar_year,  # Calendar year
             "年龄": age,  # Age at start of year (from library)
             "运柱": cycle_pillar_info,  # Enriched cycle pillar: 五行, 十神, 通根, 藏干, 季节状态, 地势, 纳音, 旬, 旬空
             "五行力量": cycle_wu_xing_result,  # Combined natal+cycle 五行力量分析
-            "神煞": shen_sha,  # Shen Sha stars for this cycle
-            "作用": interactions,  # Branch and Stem interactions with birth chart
+            "神煞": cycle_shen_sha,  # Shen Sha stars for this cycle
+            "作用": cycle_interactions,  # Branch and Stem interactions with birth chart
         }
         xiao_yun_data.append(xiao_yun_info)
 
