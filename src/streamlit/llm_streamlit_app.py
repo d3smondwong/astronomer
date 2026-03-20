@@ -178,7 +178,7 @@ if analyze_button:
 
         with col2:
             st.metric(
-                "Lunar Date", f"{lunar.getYear()}-{lunar.getMonth()}-{lunar.getDay()}"
+                "Lunar Date", f"{lunar.getYear()}-{abs(lunar.getMonth())}-{lunar.getDay()}"
             )
             lunar_time_str = f"{lunar.getHour():02d}:{lunar.getMinute():02d}"
             st.metric("Lunar Time", lunar_time_str)
