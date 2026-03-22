@@ -9,11 +9,18 @@ priority-resolved interaction bonuses and reductions.
 Core Architecture:
     - Hidden Stem Analysis: Extracts buried elemental stems from branches with depth weighting
       (三命通会 ordering: e.g. 巳 → 丙(本气), 庚(中气), 戊(余气))
-    - Heavenly Stem Scoring: Position-weighted visible stem contributions with seasonal floors
+    - Heavenly Stem Scoring: Position-weighted visible stem contributions with seasonal floors,
+      further amplified by 通根 rooting tier (深根/中根/浅根/无根 → ×1.30/1.18/1.08/1.00)
     - Climate Modulation: 5-category temperature system (very_cold, cold, neutral, warm, hot)
       with element-specific sensitivity multipliers
-    - Branch Relationships: 13 scored interaction types across 三合, 六合, 六冲, 刑, 害, 破,
-      共拱, 半合, 天干合, 干支透合, and more
+    - Interaction Scoring: 13 of 16 interaction types scored; 3 excluded by classical methodology.
+      All bonuses and reductions are priority-resolved (from apply_bazi_master_priority) before
+      numeric conversion, ensuring 贪合忘冲, 三会>三合, and 消融吸收 semantics are respected.
+    - 天干合 Rooting Modulation: combo_factor = min(r_mults) / r_深根 scales the transformation
+      bonus by the weaker stem's rooting. Per-stem retention slides from 0.70 (深根, fully
+      committed) to 1.00 (无根, bond doesn't hold) — compounding with Pass S 强度 downgrade.
+    - 干支透合 uses a dedicated base constant (_BASE_GAN_ZHI_HE = 0.10) weaker than direct
+      天干合 (_BASE_TIAN_GAN_HE = 0.25), reflecting the covert nature of the bond.
 
 Weight Architecture (~1.10 total scale):
     Branch hidden stems:  year=0.15, month=0.45, day=0.25, hour=0.15 (sum=1.00)
@@ -82,7 +89,9 @@ Interaction Scoring Coverage (16 types total):
         • 天干克 (Tian Gan Ke / Stem Control): Control direction only; no power transform
         • 天干冲 (Tian Gan Chong / Stem Clash): Pure opposition; no synthesis
     → These three are contextually informative but do NOT change elemental composition.
-       They are correctly excluded from 五行力量 scoring per classical methodology.
+      They are correctly excluded from 五行力量 scoring per classical methodology.
+      Their rooting-based 强度 downgrade (Pass S) still propagates via the multiplier if
+      they were scored — the exclusion is deliberate, not an omission.
 
     See _score_priority_results() docstring for detailed implementation.
 
@@ -94,6 +103,7 @@ Climate System:
 from datetime import datetime
 from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
 from src.astronomer_calculations.void_xun_kong import get_xun_kong
+from src.astronomer_calculations.natal_interactions import BRANCH_HIDDEN_ROOTING, get_stem_root_tier
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Tuple, Union
@@ -174,38 +184,33 @@ BRANCH_ELEMENT: Dict[Branch, Element] = {
 
 # 天干合 transformation element lookup: 甲己→土, 乙庚→金, 丙辛→水, 丁壬→木, 戊癸→火
 STEM_COMBINE_ELEMENT: Dict[str, Element] = {
-    "甲": Element.EARTH,  "己": Element.EARTH,
-    "乙": Element.METAL,  "庚": Element.METAL,
-    "丙": Element.WATER,  "辛": Element.WATER,
-    "丁": Element.WOOD,   "壬": Element.WOOD,
-    "戊": Element.FIRE,   "癸": Element.FIRE,
+    "甲": Element.EARTH,
+    "己": Element.EARTH,
+    "乙": Element.METAL,
+    "庚": Element.METAL,
+    "丙": Element.WATER,
+    "辛": Element.WATER,
+    "丁": Element.WOOD,
+    "壬": Element.WOOD,
+    "戊": Element.FIRE,
+    "癸": Element.FIRE,
 }
 
 # Strength-to-multiplier mapping for priority-filtered interactions
 # Maps 强度 (strength level from apply_bazi_master_priority) to numeric multiplier
 INTERACTION_STRENGTH_MULTIPLIER: Dict[str, float] = {
-    "强势主流": 1.00,      # Full force
-    "显著影响": 0.75,      # Weakened but influential
-    "中等衰减": 0.50,      # Moderately suppressed
-    "大幅衰减": 0.20,      # Heavily suppressed
-    "消融吸收": 0.00,      # Fully absorbed/neutralised
+    "强势主流": 1.00,  # Full force
+    "显著影响": 0.75,  # Weakened but influential
+    "中等衰减": 0.50,  # Moderately suppressed
+    "大幅衰减": 0.20,  # Heavily suppressed
+    "消融吸收": 0.00,  # Fully absorbed/neutralised
 }
 
 # Hidden stems: (primary, secondary, residual) with depth ratios.
-# Format: [(stem, depth), ...]. All depths sum to 1.0 per branch.
+# Derived from natal_interactions canonical plain-string table — single source of truth.
 BRANCH_HIDDEN: Dict[Branch, List[Tuple[Stem, float]]] = {
-    Branch.ZI: [(Stem.GUI, 1.0)],
-    Branch.CHOU: [(Stem.JI, 0.6), (Stem.GUI, 0.3), (Stem.XIN, 0.1)],
-    Branch.YIN: [(Stem.JIA, 0.6), (Stem.BING, 0.3), (Stem.WU, 0.1)],  # 渊海子平: 甲0.7
-    Branch.MAO: [(Stem.YI, 1.0)],
-    Branch.CHEN: [(Stem.WU, 0.6), (Stem.YI, 0.3), (Stem.GUI, 0.1)],
-    Branch.SI: [(Stem.BING, 0.6), (Stem.GENG, 0.3), (Stem.WU, 0.1)],  # 三命通会: 丙(本气), 庚(中气), 戊(余气)
-    Branch.WU: [(Stem.DING, 0.7), (Stem.JI, 0.3)],
-    Branch.WEI: [(Stem.JI, 0.6), (Stem.DING, 0.3), (Stem.YI, 0.1)],
-    Branch.SHEN: [(Stem.GENG, 0.6), (Stem.REN, 0.3), (Stem.WU, 0.1)],  # 渊海子平: 庚0.7
-    Branch.YOU: [(Stem.XIN, 1.0)],
-    Branch.XU: [(Stem.WU, 0.6), (Stem.XIN, 0.3), (Stem.DING, 0.1)],
-    Branch.HAI: [(Stem.REN, 0.7), (Stem.JIA, 0.3)],
+    Branch(branch_str): [(Stem(stem_str), depth) for stem_str, depth in stems]
+    for branch_str, stems in BRANCH_HIDDEN_ROOTING.items()
 }
 
 # ─────────────────────────────────────────────
@@ -247,7 +252,7 @@ SHENG_WANG_TABLE: Dict[Stem, Dict[Branch, str]] = {
         Branch.YOU: "胎",
         Branch.XU: "养",
     },
-    Stem.YI: {  # Yin Wood — mirrors Yang Metal (庚) cycle, reversed direction
+    Stem.YI: {  # Yin Wood — counterclockwise from 午 (reverse of 甲)
         Branch.WU: "长生",
         Branch.SI: "沐浴",
         Branch.CHEN: "冠带",
@@ -289,7 +294,7 @@ SHENG_WANG_TABLE: Dict[Stem, Dict[Branch, str]] = {
         Branch.HAI: "胎",
         Branch.XU: "养",
     },
-    Stem.WU: {  # Yang Earth — mirrors Yang Fire (丙) cycle, same direction
+    Stem.WU: {  # Yang Earth — same 长生 positions as 丙 per 三命通会
         Branch.YIN: "长生",
         Branch.MAO: "沐浴",
         Branch.CHEN: "冠带",
@@ -303,7 +308,7 @@ SHENG_WANG_TABLE: Dict[Stem, Dict[Branch, str]] = {
         Branch.ZI: "胎",
         Branch.CHOU: "养",
     },
-    Stem.JI: {  # Yin Earth — same cycle as Yin Fire (丁); follows reversed 丙 (Yang Fire) sequence
+    Stem.JI: {  # Yin Earth — same 长生 positions as 丁 per 三命通会
         Branch.YOU: "长生",
         Branch.SHEN: "沐浴",
         Branch.WEI: "冠带",
@@ -433,52 +438,31 @@ class SeasonalFactors:
         return VISIBLE_STEM_MULT.get(self.states.get(element, "囚"), 0.50)
 
 
-def get_seasonal_factors(month_branch: Branch) -> SeasonalFactors:
-    """Map month branch → seasonal states for all five elements."""
-    table = {
-        "spring": {  # 寅卯辰
-            Element.WOOD: "旺",
-            Element.FIRE: "相",
-            Element.EARTH: "死",
-            Element.METAL: "囚",
-            Element.WATER: "休",
-        },
-        "summer": {  # 巳午未
-            Element.WOOD: "休",
-            Element.FIRE: "旺",
-            Element.EARTH: "相",
-            Element.METAL: "死",
-            Element.WATER: "囚",
-        },
-        "autumn": {  # 申酉戌
-            Element.WOOD: "死",
-            Element.FIRE: "囚",
-            Element.EARTH: "休",
-            Element.METAL: "旺",
-            Element.WATER: "相",
-        },
-        "winter": {  # 亥子丑
-            Element.WOOD: "相",
-            Element.FIRE: "死",
-            Element.EARTH: "囚",
-            Element.METAL: "休",
-            Element.WATER: "旺",
-        },
-    }
-    spring = {Branch.YIN, Branch.MAO, Branch.CHEN}
-    summer = {Branch.SI, Branch.WU, Branch.WEI}
-    autumn = {Branch.SHEN, Branch.YOU, Branch.XU}
+_SPRING_BRANCHES = frozenset({Branch.YIN, Branch.MAO, Branch.CHEN})
+_SUMMER_BRANCHES = frozenset({Branch.SI, Branch.WU, Branch.WEI})
+_AUTUMN_BRANCHES = frozenset({Branch.SHEN, Branch.YOU, Branch.XU})
 
-    if month_branch in spring:
+
+def get_seasonal_factors(month_branch: Branch) -> SeasonalFactors:
+    """
+    Map month branch → SeasonalFactors for all five elements.
+
+    Seasons are determined by frozenset membership:
+      春 (spring): 寅卯辰  夏 (summer): 巳午未
+      秋 (autumn): 申酉戌  冬 (winter): 亥子丑
+    Returns a SeasonalFactors with the season name and the element-state dict
+    drawn from _SEASONAL_TABLE, used by both hidden-stem (mult) and visible-stem
+    (mult_visible) scoring paths.
+    """
+    if month_branch in _SPRING_BRANCHES:
         season = "spring"
-    elif month_branch in summer:
+    elif month_branch in _SUMMER_BRANCHES:
         season = "summer"
-    elif month_branch in autumn:
+    elif month_branch in _AUTUMN_BRANCHES:
         season = "autumn"
     else:
         season = "winter"
-
-    return SeasonalFactors(season=season, states=table[season])
+    return SeasonalFactors(season=season, states=_SEASONAL_TABLE[season])
 
 
 # ─────────────────────────────────────────────
@@ -504,17 +488,17 @@ BRANCH_TEMP_QUAL = {
 
 # Sub-season labels: month branch → precise 孟/仲/季 term
 SUB_SEASON: Dict[Branch, str] = {
-    Branch.YIN:  "孟春 (木旺之季)",
-    Branch.MAO:  "仲春 (木旺之季)",
+    Branch.YIN: "孟春 (木旺之季)",
+    Branch.MAO: "仲春 (木旺之季)",
     Branch.CHEN: "季春 (木旺之季)",
-    Branch.SI:   "孟夏 (火旺之季)",
-    Branch.WU:   "仲夏 (火旺之季)",
-    Branch.WEI:  "季夏 (火旺之季)",
+    Branch.SI: "孟夏 (火旺之季)",
+    Branch.WU: "仲夏 (火旺之季)",
+    Branch.WEI: "季夏 (火旺之季)",
     Branch.SHEN: "孟秋 (金旺之季)",
-    Branch.YOU:  "仲秋 (金旺之季)",
-    Branch.XU:   "季秋 (金旺之季)",
-    Branch.HAI:  "孟冬 (水旺之季)",
-    Branch.ZI:   "仲冬 (水旺之季)",
+    Branch.YOU: "仲秋 (金旺之季)",
+    Branch.XU: "季秋 (金旺之季)",
+    Branch.HAI: "孟冬 (水旺之季)",
+    Branch.ZI: "仲冬 (水旺之季)",
     Branch.CHOU: "季冬 (水旺之季)",
 }
 
@@ -765,34 +749,6 @@ def get_all_wu_xing_tiers() -> Dict[str, Dict[str, str]]:
     return tiers
 
 
-# Precomputed 主导气势 lookup for fast direct mapping in parse_wu_xing. Not utilised but can be used in future.
-ZHU_DAO_QI_SHI_LOOKUP: Dict[Tuple[str, str], str] = {
-    ("木", "木"): "比和 (木行纯粹)",
-    ("木", "火"): "天生地 (木生火)",
-    ("木", "土"): "盖头 (木克土)",
-    ("木", "金"): "截脚 (金克木)",
-    ("木", "水"): "地生天 (水生木)",
-    ("火", "木"): "地生天 (木生火)",
-    ("火", "火"): "比和 (火行纯粹)",
-    ("火", "土"): "天生地 (火生土)",
-    ("火", "金"): "盖头 (火克金)",
-    ("火", "水"): "截脚 (水克火)",
-    ("土", "木"): "截脚 (木克土)",
-    ("土", "火"): "地生天 (火生土)",
-    ("土", "土"): "比和 (土行纯粹)",
-    ("土", "金"): "天生地 (土生金)",
-    ("土", "水"): "盖头 (土克水)",
-    ("金", "木"): "盖头 (金克木)",
-    ("金", "火"): "截脚 (火克金)",
-    ("金", "土"): "地生天 (土生金)",
-    ("金", "金"): "比和 (金行纯粹)",
-    ("金", "水"): "天生地 (金生水)",
-    ("水", "木"): "天生地 (水生木)",
-    ("水", "火"): "盖头 (水克火)",
-    ("水", "土"): "截脚 (土克水)",
-    ("水", "金"): "地生天 (金生水)",
-    ("水", "水"): "比和 (水行纯粹)",
-}
 
 
 # ─────────────────────────────────────────────
@@ -803,7 +759,7 @@ ZHU_DAO_QI_SHI_LOOKUP: Dict[Tuple[str, str], str] = {
 @dataclass
 class Pillar:
     position: str  # "year" | "month" | "day" | "hour"
-    label: str     # Chinese display label: "年" | "月" | "日" | "时"
+    label: str  # Chinese display label: "年" | "月" | "日" | "时"
     position_weight: float
     stem_weight: float
     stem: Optional[Stem]
@@ -816,6 +772,59 @@ class Pillar:
 
 STR_STEM = {s.value: s for s in Stem}
 STR_BRANCH = {b.value: b for b in Branch}
+
+_YANG_STEMS: frozenset = frozenset({"甲", "丙", "戊", "庚", "壬"})
+
+_STATE_DESCRIPTIONS: dict = {
+    "旺": "旺 (最强)",
+    "相": "相 (次强)",
+    "囚": "囚 (弱)",
+    "休": "休 (气弱)",
+    "死": "死 (极弱)",
+}
+
+_CLIMATE_DESCRIPTIONS: dict = {
+    "very_cold": "极寒",
+    "cold": "寒冷",
+    "neutral": "常温",
+    "warm": "温暖",
+    "hot": "炎热",
+}
+
+_ROOT_LABELS: tuple = ("本气根", "中气根", "余气根")
+
+_STR_TO_ELEM: dict = {e.value: e for e in Element}
+
+_SEASONAL_TABLE: dict = {
+    "spring": {
+        Element.WOOD: "旺",
+        Element.FIRE: "相",
+        Element.EARTH: "死",
+        Element.METAL: "囚",
+        Element.WATER: "休",
+    },
+    "summer": {
+        Element.WOOD: "休",
+        Element.FIRE: "旺",
+        Element.EARTH: "相",
+        Element.METAL: "死",
+        Element.WATER: "囚",
+    },
+    "autumn": {
+        Element.WOOD: "死",
+        Element.FIRE: "囚",
+        Element.EARTH: "休",
+        Element.METAL: "旺",
+        Element.WATER: "相",
+    },
+    "winter": {
+        Element.WOOD: "相",
+        Element.FIRE: "死",
+        Element.EARTH: "囚",
+        Element.METAL: "休",
+        Element.WATER: "旺",
+    },
+}
 
 
 # ─────────────────────────────────────────────
@@ -833,6 +842,24 @@ class WuXingDynamicsCalculator:
     Stem weights mirror branch weight ratios so that the month stem (月干)
     carries proportionally more authority than year/hour stems, consistent
     with classical 月令 doctrine.
+
+    Interaction base constants (scaled by total_w × multiplier):
+      _BASE_TIAN_GAN_HE = 0.25  — direct 天干合 transformation bonus
+      _BASE_GAN_ZHI_HE  = 0.10  — 干支透合 covert bond (weaker; stem bonds with
+                                   hidden stem rather than another visible stem)
+      Other constants (_BASE_SAN_HUI, _BASE_SAN_HE, etc.) follow classical calibration
+      so that a month-inclusive triplet (total_w ≈ 0.85) reproduces reference values.
+
+    天干合 rooting modulation (see _score_priority_results):
+      combo_factor = min(r_mults) / r_深根   — scales bonus by weaker stem's rooting
+      per_stem_retain = 0.70 + 0.30*(1-commitment)
+        深根 (commitment=1.0) → retain=0.70 (fully bound; largest power reduction)
+        无根 (commitment=0.0) → retain=1.00 (bond doesn't hold; no reduction)
+      This compounds with Pass S 强度 downgrade from natal/cycle_interactions.
+
+    通根 rooting multipliers (STEP 2 heavenly stems only):
+      深根→×1.30, 中根→×1.18, 浅根→×1.08, 无根→×1.00
+      Precomputed once per distinct element via tong_gen_cache in calculate().
     """
 
     # Single source of truth for all positional weights
@@ -852,35 +879,44 @@ class WuXingDynamicsCalculator:
     # earn proportionally more bonus.
     # 三会/三合 calibrated so a month-inclusive triplet (total_w ≈ 0.85) reproduces
     # the classical reference values (三会 ≈ 0.25, 三合 ≈ 0.20).
-    _BASE_SAN_HUI        = 0.30   # 三会  directional combination
-    _BASE_SAN_HE         = 0.24   # 三合  three-harmony full triplet
-    _BASE_BAN_HE_HUB     = 0.15   # 半合  with hub branch present
-    _BASE_BAN_HE_NO_HUB  = 0.08   # 半合  without hub (拱合 style)
-    _BASE_LIU_HE         = 0.06   # 六合  branch-pair combination
-    _BASE_BI_HE          = 0.03   # 比和  same-element pairing
-    _BASE_GONG           = 0.04   # 共拱/拱会/残会  indirect harmonies
-    _BASE_TIAN_GAN_HE    = 0.25   # 天干合  transformed-element bonus
+    _BASE_SAN_HUI = 0.30  # 三会  directional combination
+    _BASE_SAN_HE = 0.24  # 三合  three-harmony full triplet
+    _BASE_BAN_HE_HUB = 0.15  # 半合  with hub branch present
+    _BASE_BAN_HE_NO_HUB = 0.08  # 半合  without hub (拱合 style)
+    _BASE_LIU_HE = 0.06  # 六合  branch-pair combination
+    _BASE_BI_HE = 0.03  # 比和  same-element pairing
+    _BASE_GONG = 0.04  # 共拱/拱会/残会  indirect harmonies
+    _BASE_TIAN_GAN_HE = 0.25  # 天干合  transformed-element bonus
+    _BASE_GAN_ZHI_HE = 0.10  # 干支透合 covert bond — weaker than direct 天干合
 
     # ── 天干合 stem binding ────────────────────────────────────────────────────
     # Bound stems are preoccupied (合而不化) and output only this fraction of
     # their original elemental power. At multiplier=0 (消融吸收) the formula
     # 1-(1-RETAIN)*0 = 1.0 means no reduction, modelling 贪合忘冲 correctly.
-    _RETAIN_TIAN_GAN_HE  = 0.70
+    _RETAIN_TIAN_GAN_HE = 0.70
 
     # ── Branch reduction base factors ─────────────────────────────────────────
     # All reductions follow: actual_factor = 1 - (1 - base) * multiplier.
     # At multiplier=0 (消融吸收) no reduction is applied regardless of base.
-    _REDUCE_CLASH_DOMINANT   = 0.80  # 六冲: stronger branch (ratio > _RATIO_CLASH_HIGH)
-    _REDUCE_CLASH_SUBDUED    = 0.40  # 六冲: weaker branch
-    _REDUCE_CLASH_BALANCED   = 0.65  # 六冲: balanced clash (both sides equal)
-    _RATIO_CLASH_HIGH        = 1.20  # strength ratio above this → asymmetric clash
-    _RATIO_CLASH_LOW         = 0.833 # reciprocal of HIGH; below → reversed asymmetric
-    _REDUCE_SAN_XING_FULL    = 0.75  # 三刑: all three branches present
+    _REDUCE_CLASH_DOMINANT = 0.80  # 六冲: stronger branch (ratio > _RATIO_CLASH_HIGH)
+    _REDUCE_CLASH_SUBDUED = 0.40  # 六冲: weaker branch
+    _REDUCE_CLASH_BALANCED = 0.65  # 六冲: balanced clash (both sides equal)
+    _RATIO_CLASH_HIGH = 1.20  # strength ratio above this → asymmetric clash
+    _RATIO_CLASH_LOW = 0.833  # reciprocal of HIGH; below → reversed asymmetric
+    _REDUCE_SAN_XING_FULL = 0.75  # 三刑: all three branches present
     _REDUCE_SAN_XING_PARTIAL = 0.85  # 三刑: only two of three present
-    _REDUCE_XIANG_XING       = 0.85  # 相刑/无礼之刑 (子卯)
-    _REDUCE_ZI_XING          = 0.92  # 自刑: same branch repeated — mildest punishment
-    _REDUCE_LIU_PO           = 0.88  # 六破
-    _REDUCE_LIU_HAI          = 0.90  # 六害
+    _REDUCE_XIANG_XING = 0.85  # 相刑/无礼之刑 (子卯)
+    _REDUCE_ZI_XING = 0.92  # 自刑: same branch repeated — mildest punishment
+    _REDUCE_LIU_PO = 0.88  # 六破
+    _REDUCE_LIU_HAI = 0.90  # 六害
+
+    # ── 通根 rooting multipliers (applied to stem STEP 2 only) ────────────────
+    _ROOTING_MULTIPLIERS: Dict[str, float] = {
+        "深根": 1.30,
+        "中根": 1.18,
+        "浅根": 1.08,
+        "无根": 1.00,
+    }
 
     @staticmethod
     def _compute_tong_gen(
@@ -897,13 +933,14 @@ class WuXingDynamicsCalculator:
         (e.g. {"月": "本气根", "时": "余气根"}), or the string "无根" if no
         root is found in any branch.
         """
-        root_labels = ["本气根", "中气根", "余气根"]
         results: Dict[str, str] = {}
         for p in pillars:
             if p.branch:
                 for idx, (hidden_stem, _) in enumerate(BRANCH_HIDDEN.get(p.branch, [])):
-                    if STEM_ELEMENT[hidden_stem] == stem_elem and idx < len(root_labels):
-                        results[p.label] = root_labels[idx]
+                    if STEM_ELEMENT[hidden_stem] == stem_elem and idx < len(
+                        _ROOT_LABELS
+                    ):
+                        results[p.label] = _ROOT_LABELS[idx]
                         break
         return results if results else "无根"
 
@@ -944,6 +981,13 @@ class WuXingDynamicsCalculator:
                 "害减损"         — 六害 interactions
                 "破减损"         — 六破 interactions
 
+        Implementation notes:
+            - 通根 is precomputed once per distinct element via tong_gen_cache before
+              building 基本信息 and 四柱, avoiding redundant branch searches when
+              multiple pillars share the same stem element.
+            - 旬空 reductions (xun_kong_reductions) are applied multiplicatively to
+              branch hidden stem power in STEP 1 only; stem power (STEP 2) is unaffected.
+
         Raises:
             ValueError: if seasonal is not provided and no month pillar with a
                 branch is found in pillars.
@@ -962,15 +1006,20 @@ class WuXingDynamicsCalculator:
 
         power = {e: 0.0 for e in Element}
 
+        # ── Rooting tiers (通根) — delegates to natal_interactions ────────
+        _zhis = [q.branch.value for q in pillars if q.branch]
+        rooting_tiers: Dict[str, str] = {
+            p.label: get_stem_root_tier(STEM_ELEMENT[p.stem].value, _zhis)
+            for p in pillars if p.stem
+        }
+
         # ── STEP 1: Branch hidden stems ──────────────────────────────────
         for p in pillars:
             if not p.branch:
                 continue
             reduction = branch_reductions.get(p.branch, 1.0)
             xk_factor = (
-                xun_kong_reductions.get(p.position, 1.0)
-                if xun_kong_reductions
-                else 1.0
+                xun_kong_reductions.get(p.position, 1.0) if xun_kong_reductions else 1.0
             )
             base_w = p.position_weight * reduction * xk_factor
 
@@ -998,8 +1047,9 @@ class WuXingDynamicsCalculator:
             sw_mult = get_shengwang_mult(p.stem, p.branch) if p.branch else 1.0
             stem_w = p.stem_weight
             stem_reduction = stem_reductions.get(p.stem, 1.0)
+            r_mult = self._ROOTING_MULTIPLIERS.get(rooting_tiers.get(p.label, "无根"), 1.00)
 
-            stem_power = stem_w * s_mult * c_mult * sw_mult * stem_reduction
+            stem_power = stem_w * s_mult * c_mult * sw_mult * stem_reduction * r_mult
             power[elem] += stem_power
 
         # ── STEP 3: Combination bonuses ─────────────────────────────────
@@ -1010,15 +1060,16 @@ class WuXingDynamicsCalculator:
 
         # ── STEP 4: Percentages ──────────────────────────────────────────
         total = sum(power.values())
-        percentages = {e.value: round(v / total * 100, 2) for e, v in power.items()} if total else {e.value: 0.0 for e in Element}
+        percentages = (
+            {e.value: round(v / total * 100, 2) for e, v in power.items()}
+            if total
+            else {e.value: 0.0 for e in Element}
+        )
 
-        # Map seasonal states to their descriptions
-        state_descriptions = {
-            "旺": "旺 (最强)",
-            "相": "相 (次强)",
-            "囚": "囚 (弱)",
-            "休": "休 (气弱)",
-            "死": "死 (极弱)",
+        # Precompute 通根 once per distinct element — reused for 日主 and all si_zhu pillars
+        tong_gen_cache = {
+            STEM_ELEMENT[p.stem]: self._compute_tong_gen(STEM_ELEMENT[p.stem], pillars)
+            for p in pillars if p.stem
         }
 
         # Building 基本信息 (Basic Information)
@@ -1028,17 +1079,20 @@ class WuXingDynamicsCalculator:
             stem_val = day_pillar.stem.value
             elem = STEM_ELEMENT[day_pillar.stem]
             # Determine if stem is Yang (甲丙戊庚壬) or Yin (乙丁己辛癸)
-            yang_stems = {"甲", "丙", "戊", "庚", "壬"}
-            yang_yin = "阳" if stem_val in yang_stems else "阴"
+            yang_yin = "阳" if stem_val in _YANG_STEMS else "阴"
 
             # Calculate 旺衰 (seasonal strength)
-            dm_state = state_descriptions.get(seasonal.states.get(elem, "囚"), "未知")
+            dm_state = _STATE_DESCRIPTIONS.get(seasonal.states.get(elem, "囚"), "未知")
 
             # Calculate 十二长生 (12-stage life cycle)
-            dm_stage = SHENG_WANG_TABLE.get(day_pillar.stem, {}).get(day_pillar.branch) if day_pillar.branch else None
+            dm_stage = (
+                SHENG_WANG_TABLE.get(day_pillar.stem, {}).get(day_pillar.branch)
+                if day_pillar.branch
+                else None
+            )
 
             # Calculate 通根 (root connection) — element-level search across all branches
-            tong_gen = self._compute_tong_gen(elem, pillars)
+            tong_gen = tong_gen_cache[elem]
 
             day_master = {
                 "显示名称": f"{stem_val}{elem.value} ({yang_yin}{elem.value})",
@@ -1047,58 +1101,54 @@ class WuXingDynamicsCalculator:
                 "阴阳": yang_yin,
                 "旺衰": dm_state,
                 "十二长生": dm_stage,
-                "通根": tong_gen
+                "通根": tong_gen,
             }
 
         # Map month branch to precise sub-season term (孟/仲/季)
-        birth_season = SUB_SEASON.get(month_pillar.branch, "") if month_pillar and month_pillar.branch else ""
-
-        # Climate characteristics description
-        climate_descriptions = {
-            "very_cold": "极寒",
-            "cold": "寒冷",
-            "neutral": "常温",
-            "warm": "温暖",
-            "hot": "炎热",
-        }
-        climate_char = climate_descriptions.get(climate, climate)
+        birth_season = (
+            SUB_SEASON.get(month_pillar.branch, "")
+            if month_pillar and month_pillar.branch
+            else ""
+        )
 
         # Assemble the final result structure. Commented out climate characteristics for now, can be re-enabled if needed.
         basic_info = {
             "日主": day_master,
             "出生季节": birth_season,
-            # "气候特征": climate_char,
+            # "气候特征": _CLIMATE_DESCRIPTIONS.get(climate, climate),
         }
 
         # Build unified pillar dict: 年柱/月柱/日柱/时柱
-        pillar_names = {"year": "年柱", "month": "月柱", "day": "日柱", "hour": "时柱"}
-        root_labels = ["本气根", "中气根", "余气根"]
         si_zhu = {}
         for p in pillars:
-            pillar_key = pillar_names.get(p.position)
+            pillar_key = _POSITION_TO_PILLAR_CN.get(p.position)
             if not pillar_key or not p.stem:
                 continue
             stem_elem = STEM_ELEMENT[p.stem]
             state = seasonal.states.get(stem_elem, "囚")
-            state_desc = state_descriptions.get(state, state)
-            sheng_wang_stage = SHENG_WANG_TABLE.get(p.stem, {}).get(p.branch) if p.branch else None
+            state_desc = _STATE_DESCRIPTIONS.get(state, state)
+            sheng_wang_stage = (
+                SHENG_WANG_TABLE.get(p.stem, {}).get(p.branch) if p.branch else None
+            )
 
             # 通根: element-level search across all branches
-            tong_gen = self._compute_tong_gen(stem_elem, pillars)
+            tong_gen = tong_gen_cache[stem_elem]
 
             # 干支五行
             branch_elem = BRANCH_ELEMENT.get(p.branch) if p.branch else None
             wu_xing_info = {
                 "天干五行": stem_elem.value,
                 "地支五行": branch_elem.value if branch_elem else None,
-                "主导气势": get_zhu_dao_qi_shi(stem_elem, branch_elem) if branch_elem else None,
+                "主导气势": (
+                    get_zhu_dao_qi_shi(stem_elem, branch_elem) if branch_elem else None
+                ),
             }
 
             # 藏干: hidden stems with strength category
             cang_gan = []
             if p.branch:
                 for idx, (hs, _) in enumerate(BRANCH_HIDDEN.get(p.branch, [])):
-                    strength = root_labels[idx] if idx < len(root_labels) else "未知"
+                    strength = _ROOT_LABELS[idx] if idx < len(_ROOT_LABELS) else "未知"
                     cang_gan.append({"干": hs.value, "强度": strength})
 
             si_zhu[pillar_key] = {
@@ -1117,7 +1167,7 @@ class WuXingDynamicsCalculator:
             elem_name = elem.value
             pct = percentages.get(elem_name, 0)
             state = seasonal.states.get(elem, "囚")
-            state_desc = state_descriptions.get(state, state)
+            state_desc = _STATE_DESCRIPTIONS.get(state, state)
             tier_info = get_wu_xing_tier(pct)
             wu_xing_analysis[elem_name] = {
                 "百分比": round(pct, 2) if isinstance(pct, (int, float)) else pct,
@@ -1158,13 +1208,19 @@ class WuXingDynamicsCalculator:
             • 六合 (六-harmony): Synthesis element bonus (元素)
 
         TIER 2 (Operational):
-            • 共拱 (co-arching): Element bonus (元素)
+            • 共拱 (co-arching): Element bonus (元素) — merged with 拱会/残会 branch
             • 比和 (peer): Peer element bonus (元素)
             • 拱会 (structural arch): Inherited element from 三会 (元素)
             • 残会 (residual): Direction-based bonus from 三会 (方位)
             • 半合 (half-harmony): Conditional element bonus with 邀出 logic (元素)
-            • 天干合 (stem combine): Combination bonus + stem reduction (合化五行)
-            • 干支透合 (stem-branch transparency): Stem-hidden stem combine (合化五行)
+            • 天干合 (stem combine): Rooting-scaled bonus + per-stem retention:
+                combo_factor = min(r_mults) / r_深根   — weaker stem limits the bond
+                per_stem_retain = 0.70 + 0.30*(1−commitment)
+                  深根→0.70 (fully committed), 无根→1.00 (bond doesn't hold)
+                combo_bonus[elem] += total_stem_w × _BASE_TIAN_GAN_HE × multiplier × combo_factor
+            • 干支透合 (stem-branch transparency): Covert bond bonus via _BASE_GAN_ZHI_HE=0.10
+                combo_bonus[elem] += total_w × _BASE_GAN_ZHI_HE × multiplier
+                Source stem gets fixed retention=0.70 (贪合忘冲; no rooting modulation)
 
         TIER 3 (Frictional):
             • 三刑 (三-punishment): Full/partial penalty reduction
@@ -1183,11 +1239,13 @@ class WuXingDynamicsCalculator:
               → Informational only; does NOT alter elemental balance
 
         Returns:
-            combo_bonus       — additive element bonuses (六合 and 组合 combined)
-            branch_reductions — multiplicative reduction factors per branch
-                                (贪合忘冲: 消融吸收 → factor=1.0, no reduction)
-            stem_reductions   — multiplicative reduction factors per stem
-                                (天干合 binds both stems, weakening their original element output)
+            combo_bonus       — additive element bonuses (Dict[Element, float])
+            branch_reductions — multiplicative reduction factors per branch (Dict[Branch, float])
+                                贪合忘冲: 消融吸收 multiplier=0 → factor=1.0, no reduction applied
+            stem_reductions   — multiplicative reduction factors per stem (Dict[Stem, float])
+                                天干合/干支透合 bind stems, weakening their original element output.
+                                For 天干合: factor varies by rooting (深根→larger reduction,
+                                无根→no reduction). For 干支透合: fixed retention=0.70.
         """
         # Build branch-value → (Branch enum, position_weight) lookup.
         # Using branch values (not position names) makes this work for both natal
@@ -1215,8 +1273,6 @@ class WuXingDynamicsCalculator:
             )
             return total_w * weighted_seasonal
 
-        str_to_elem: Dict[str, Element] = {e.value: e for e in Element}
-
         combo_bonus: Dict[Element, float] = {e: 0.0 for e in Element}
         branch_reductions: Dict[Branch, float] = {}
         stem_reductions: Dict[Stem, float] = {}
@@ -1224,7 +1280,9 @@ class WuXingDynamicsCalculator:
         for item in priority_list:
             itype: str = item.get("类型", "")
             strength_label: str = item.get("强度", "强势主流")
-            multiplier: float = INTERACTION_STRENGTH_MULTIPLIER.get(strength_label, 1.00)
+            multiplier: float = INTERACTION_STRENGTH_MULTIPLIER.get(
+                strength_label, 1.00
+            )
 
             # Resolve participating branches and total positional weight via branch value matching.
             # This is position-name-agnostic: works for natal ("年柱") and cycle ("大运柱") alike.
@@ -1233,7 +1291,9 @@ class WuXingDynamicsCalculator:
             seen_branches: set = set()
             for branch_val in combo_detail.values():
                 entry = branch_val_map.get(branch_val)
-                if entry and entry[0] not in seen_branches:  # Avoid duplicates (e.g., 自刑: 午午)
+                if (
+                    entry and entry[0] not in seen_branches
+                ):  # Avoid duplicates (e.g., 自刑: 午午)
                     participating.append(entry)
                     seen_branches.add(entry[0])
             total_w = sum(w for _, w in participating)
@@ -1241,40 +1301,38 @@ class WuXingDynamicsCalculator:
 
             # ── Additive bonuses ──────────────────────────────────
             if itype == "三会":
-                elem = str_to_elem.get(item.get("元素", ""))
+                elem = _STR_TO_ELEM.get(item.get("元素", ""))
                 if elem and total_w > 0:
                     combo_bonus[elem] += total_w * self._BASE_SAN_HUI * multiplier
 
             elif itype == "三合":
-                elem = str_to_elem.get(item.get("元素", ""))
+                elem = _STR_TO_ELEM.get(item.get("元素", ""))
                 if elem and total_w > 0:
                     combo_bonus[elem] += total_w * self._BASE_SAN_HE * multiplier
 
             elif itype == "半合":
-                elem = str_to_elem.get(item.get("元素", ""))
+                elem = _STR_TO_ELEM.get(item.get("元素", ""))
                 if elem:
                     # 邀出 == "无" means cardinal hub branch IS present → stronger half-harmony
-                    base = self._BASE_BAN_HE_HUB if item.get("邀出") == "无" else self._BASE_BAN_HE_NO_HUB
+                    base = (
+                        self._BASE_BAN_HE_HUB
+                        if item.get("邀出") == "无"
+                        else self._BASE_BAN_HE_NO_HUB
+                    )
                     combo_bonus[elem] += total_w * base * multiplier
 
             elif itype == "六合":
-                elem = str_to_elem.get(item.get("元素", ""))
+                elem = _STR_TO_ELEM.get(item.get("元素", ""))
                 if elem:
                     combo_bonus[elem] += total_w * self._BASE_LIU_HE * multiplier
 
             elif itype == "比和":
-                elem = str_to_elem.get(item.get("元素", ""))
+                elem = _STR_TO_ELEM.get(item.get("元素", ""))
                 if elem:
                     combo_bonus[elem] += total_w * self._BASE_BI_HE * multiplier
 
-            elif itype in ("共拱", "拱会"):
-                elem = str_to_elem.get(item.get("元素", ""))
-                if elem:
-                    combo_bonus[elem] += total_w * self._BASE_GONG * multiplier
-
-            elif itype == "残会":
-                # 残会 inherits "元素" from parent 三会 (also has "方位" for context)
-                elem = str_to_elem.get(item.get("元素", ""))
+            elif itype in ("共拱", "拱会", "残会"):
+                elem = _STR_TO_ELEM.get(item.get("元素", ""))
                 if elem:
                     combo_bonus[elem] += total_w * self._BASE_GONG * multiplier
 
@@ -1284,29 +1342,54 @@ class WuXingDynamicsCalculator:
                 stem_chars = list(combo_detail.values())
                 total_stem_w = sum(stem_val_map.get(s, 0.0) for s in stem_chars)
                 elem = STEM_COMBINE_ELEMENT.get(stem_chars[0]) if stem_chars else None
+
+                # ── Rooting factor: scales transformation bonus by stem commitment ──
+                # 根基 keys match 组合明细 keys (pillar labels → rooting tier).
+                rooting = item.get("根基", {})
+                r_mults = [
+                    self._ROOTING_MULTIPLIERS.get(rooting.get(k, "无根"), 1.00)
+                    for k in combo_detail.keys()
+                ]
+                # combo_factor: scales transformation bonus by the weaker stem's rooting
+                combo_factor = min(r_mults) / self._ROOTING_MULTIPLIERS["深根"]
+
                 if elem and total_stem_w > 0:
-                    combo_bonus[elem] += total_stem_w * self._BASE_TIAN_GAN_HE * multiplier
-                # Bound stems are preoccupied (合而不化) — retain only _RETAIN_TIAN_GAN_HE of output.
-                f = 1.0 - (1.0 - self._RETAIN_TIAN_GAN_HE) * multiplier
-                for s_char in stem_chars:
+                    combo_bonus[elem] += (
+                        total_stem_w * self._BASE_TIAN_GAN_HE * multiplier * combo_factor
+                    )
+
+                # ── Per-stem retention: more rooted → more committed → stronger reduction ──
+                # commitment = (r - 1.0) / 0.30  → [0.0 (无根), 1.0 (深根)]
+                # per_stem_retain = 0.70 + 0.30 * (1 - commitment)
+                #   深根: retain=0.70 (fully committed, same as before)
+                #   无根: retain=1.00 (not committed — bond doesn't hold)
+                for k, s_char in combo_detail.items():
                     stem_enum = STR_STEM.get(s_char)
                     if stem_enum:
-                        stem_reductions[stem_enum] = stem_reductions.get(stem_enum, 1.0) * f
+                        r = self._ROOTING_MULTIPLIERS.get(rooting.get(k, "无根"), 1.00)
+                        commitment = (r - 1.00) / 0.30
+                        per_stem_retain = self._RETAIN_TIAN_GAN_HE + (1.0 - self._RETAIN_TIAN_GAN_HE) * (1.0 - commitment)
+                        f = 1.0 - (1.0 - per_stem_retain) * multiplier
+                        stem_reductions[stem_enum] = (
+                            stem_reductions.get(stem_enum, 1.0) * f
+                        )
 
             elif itype == "干支透合":
                 # Stem-branch covert combine — stem from one pillar bonds with hidden stem in another.
                 # Provides a combine element bonus (合化五行), similar to 天干合.
                 result_elem = item.get("合化五行", "")
-                elem = str_to_elem.get(result_elem) if result_elem else None
+                elem = _STR_TO_ELEM.get(result_elem) if result_elem else None
                 if elem and total_w > 0:
-                    combo_bonus[elem] += total_w * self._BASE_TIAN_GAN_HE * multiplier
+                    combo_bonus[elem] += total_w * self._BASE_GAN_ZHI_HE * multiplier
                 # Source stem is preoccupied (贪合忘冲) — apply same retention as 天干合.
                 f = 1.0 - (1.0 - self._RETAIN_TIAN_GAN_HE) * multiplier
                 for k, v in combo_detail.items():
                     if k.endswith("干"):
                         stem_enum = STR_STEM.get(v)
                         if stem_enum:
-                            stem_reductions[stem_enum] = stem_reductions.get(stem_enum, 1.0) * f
+                            stem_reductions[stem_enum] = (
+                                stem_reductions.get(stem_enum, 1.0) * f
+                            )
                         break
 
             # ── Reductive factors ─────────────────────────────────
@@ -1319,11 +1402,20 @@ class WuXingDynamicsCalculator:
                     s1, s2 = branch_strength(b1), branch_strength(b2)
                     ratio = s1 / s2 if s2 > 0 else 1.0
                     if ratio > self._RATIO_CLASH_HIGH:
-                        base_r1, base_r2 = self._REDUCE_CLASH_DOMINANT, self._REDUCE_CLASH_SUBDUED
+                        base_r1, base_r2 = (
+                            self._REDUCE_CLASH_DOMINANT,
+                            self._REDUCE_CLASH_SUBDUED,
+                        )
                     elif ratio < self._RATIO_CLASH_LOW:
-                        base_r1, base_r2 = self._REDUCE_CLASH_SUBDUED, self._REDUCE_CLASH_DOMINANT
+                        base_r1, base_r2 = (
+                            self._REDUCE_CLASH_SUBDUED,
+                            self._REDUCE_CLASH_DOMINANT,
+                        )
                     else:
-                        base_r1, base_r2 = self._REDUCE_CLASH_BALANCED, self._REDUCE_CLASH_BALANCED
+                        base_r1, base_r2 = (
+                            self._REDUCE_CLASH_BALANCED,
+                            self._REDUCE_CLASH_BALANCED,
+                        )
                     f1 = 1.0 - (1.0 - base_r1) * multiplier
                     f2 = 1.0 - (1.0 - base_r2) * multiplier
                     branch_reductions[b1] = branch_reductions.get(b1, 1.0) * f1
@@ -1331,7 +1423,11 @@ class WuXingDynamicsCalculator:
 
             elif itype in ("无恩之刑", "恃势之刑"):
                 n = len(branches_present)
-                base_factor = self._REDUCE_SAN_XING_FULL if n >= 3 else self._REDUCE_SAN_XING_PARTIAL
+                base_factor = (
+                    self._REDUCE_SAN_XING_FULL
+                    if n >= 3
+                    else self._REDUCE_SAN_XING_PARTIAL
+                )
                 f = 1.0 - (1.0 - base_factor) * multiplier
                 for b in branches_present:
                     branch_reductions[b] = branch_reductions.get(b, 1.0) * f
@@ -1401,24 +1497,10 @@ class WuXingDynamicsCalculator:
                 result[bucket].append(item)
         return result
 
+
 # ─────────────────────────────────────────────
 # Execution function
 # ─────────────────────────────────────────────
-
-
-def parse_wu_xing(wu_xing_str: str) -> Dict:
-    """
-    Split a Wu Xing string (e.g. '木土') into stem and branch elements.
-
-    Args:
-        wu_xing_str: Wu Xing string with stem and branch (e.g. '木土')
-
-    Returns:
-        dict: Structure with 天干五行 and 地支五行
-    """
-    if len(wu_xing_str) >= 2:
-        return {"天干五行": wu_xing_str[0], "地支五行": wu_xing_str[1]}
-    return {"天干五行": "", "地支五行": ""}
 
 
 _POSITION_TO_PILLAR_CN = {
@@ -1516,13 +1598,10 @@ def get_wu_xing(lunar_birthday, priority_list: list) -> Dict:
     day_pillar_str = bazi.getDay()
     hour_pillar_str = bazi.getTime()
 
-    def _split(s: str) -> tuple:
-        return (s[0] if s else None, s[1] if len(s) > 1 else None)
-
-    year_stem, year_branch = _split(year_pillar_str)
-    month_stem, month_branch = _split(month_pillar_str)
-    day_stem, day_branch = _split(day_pillar_str)
-    hour_stem, hour_branch = _split(hour_pillar_str)
+    year_stem,  year_branch  = (year_pillar_str[0]  if year_pillar_str  else None), (year_pillar_str[1]  if len(year_pillar_str)  > 1 else None)
+    month_stem, month_branch = (month_pillar_str[0] if month_pillar_str else None), (month_pillar_str[1] if len(month_pillar_str) > 1 else None)
+    day_stem,   day_branch   = (day_pillar_str[0]   if day_pillar_str   else None), (day_pillar_str[1]   if len(day_pillar_str)   > 1 else None)
+    hour_stem,  hour_branch  = (hour_pillar_str[0]  if hour_pillar_str  else None), (hour_pillar_str[1]  if len(hour_pillar_str)  > 1 else None)
 
     # Build pillars and run the calculator in one step
     calc = WuXingDynamicsCalculator()
@@ -1532,32 +1611,32 @@ def get_wu_xing(lunar_birthday, priority_list: list) -> Dict:
             "年",
             calc.POSITION_WEIGHTS["year"],
             calc.STEM_WEIGHTS["year"],
-            STR_STEM.get(year_stem),
-            STR_BRANCH.get(year_branch),
+            STR_STEM.get(year_stem or ""),
+            STR_BRANCH.get(year_branch or ""),
         ),
         Pillar(
             "month",
             "月",
             calc.POSITION_WEIGHTS["month"],
             calc.STEM_WEIGHTS["month"],
-            STR_STEM.get(month_stem),
-            STR_BRANCH.get(month_branch),
+            STR_STEM.get(month_stem or ""),
+            STR_BRANCH.get(month_branch or ""),
         ),
         Pillar(
             "day",
             "日",
             calc.POSITION_WEIGHTS["day"],
             calc.STEM_WEIGHTS["day"],
-            STR_STEM.get(day_stem),
-            STR_BRANCH.get(day_branch),
+            STR_STEM.get(day_stem or ""),
+            STR_BRANCH.get(day_branch or ""),
         ),
         Pillar(
             "hour",
             "时",
             calc.POSITION_WEIGHTS["hour"],
             calc.STEM_WEIGHTS["hour"],
-            STR_STEM.get(hour_stem),
-            STR_BRANCH.get(hour_branch),
+            STR_STEM.get(hour_stem or ""),
+            STR_BRANCH.get(hour_branch or ""),
         ),
     ]
 
@@ -1619,7 +1698,8 @@ if __name__ == "__main__":
     )
 
     # Get Wu Xing in LLM-ready JSON format
-    from src.astronomer_calculations.interactions_gan_zhi_zuo_yong import get_interactions
+    from src.astronomer_calculations.natal_interactions import get_interactions
+
     interactions_result = get_interactions(lunar_birthday)
     priority_list = interactions_result.get("_raw_priority_list", [])
     result = get_wu_xing(lunar_birthday, priority_list)

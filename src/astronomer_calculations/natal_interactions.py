@@ -11,7 +11,7 @@ ARCHITECTURE OVERVIEW:
     interactions touch each pillar. The five-pass priority filter systematically resolves
     competing interactions with declarative rules and tie-breaker logic.
 
-CORE INNOVATION — Five-Pass Priority Filter:
+CORE INNOVATION — Five-Pass Priority Filter + Stem Rooting Pass:
 
     Pass 1 (Structural Lock):
         For each branch with multiple triple-structure candidates (三会/三合):
@@ -32,6 +32,16 @@ CORE INNOVATION — Five-Pass Priority Filter:
         - Pass 3: Apply branch-pair suppression rules
         - Pass 4: Co-arching (共拱) detection and conflict marking
         - Pass 5: Final strength consolidation
+
+    Pass S (Stem Rooting Modulation — orthogonal post-pass):
+        Operates on the sorted result list after Pass 5 (bypasses registry/lock logic).
+        Downgrades 天干合/克/冲 strength when participating stems are 无根 (floating).
+        Classical principle: a floating stem cannot execute a 合/克/冲 at full force.
+        - 天干合: one stem 无根 → cap "显著影响" (合而不化); both 无根 → cap "中等衰减"
+        - 天干克: controller 无根 + target rooted → cap "大幅衰减" (克力瓦解);
+                  controller 无根 + target 无根 → cap "中等衰减"
+        - 天干冲: one stem 无根 → cap "显著影响"; both 无根 → cap "中等衰减"
+        Uses _downgrade_if_stronger() — caps only; never upgrades.
 
 KEY FEATURES:
 
@@ -78,7 +88,7 @@ KEY FEATURES:
        All branch-pair interactions include adjacency tracking:
        - 正X (adjacent/adjacent pillars) → DIRECT/IMMEDIATE
        - 遥X (distant/non-adjacent pillars) → MEDIATED/DELAYED
-       Applies to: 六冲, 六合, 六害, 六破, 天干克, 天干冲, 比和, 三刑
+       Applies to: 六冲, 六合, 六害, 六破, 天干合, 天干克, 天干冲, 比和, 三刑
 
     7. Interaction Types (16 total):
        Tier 1 (Structural): 三会, 三合, 六冲, 六合
@@ -89,7 +99,15 @@ KEY FEATURES:
        天干合 (Harmony) locks stems, blocking lower-tier 克/冲.
        天干克 (Control) suppresses 天干冲.
        天干冲 (Clash) is weakest stem interaction.
-       Distance (紧贴) applied to all three types.
+
+       All three types share a consistent field schema:
+         类型, 组合, 组合明细, 状态, 紧贴, 主动方, 根基
+       天干合 additionally carries:
+         元素 (合化五行), 合化判断 ("合化成立" / "合而不化" — rooting-based)
+       主动方: "相互" for 天干合/冲; controller pillar label for 天干克.
+       根基: {pillar_label: tier} for each participating stem — 4-tier system
+             (深根/中根/浅根/无根) computed via get_stem_root_tier().
+       Strength is further modulated by Pass S (see CORE INNOVATION above).
 
     9. Punishment Detection (三刑):
        - Ungrateful (无恩之刑): 寅-巳-申 set
@@ -213,13 +231,21 @@ Output Format:
       branch element; 拱会/残会 — directional element; 天干合 — 合化五行)
     - 方位: Directional info (三会, 拱会, 残会 only)
     - 邀出: Missing third branch for 半合; "已全" for complete 三合
-    - 待会 / 犹出: Missing branch for 拱会/残会 (犹出 on 拱会 only)
+    - 犹出: Missing cardinal branch (拱会 only — the branch the 拱会 is still waiting to form)
+    - 待会: Missing non-cardinal branch (残会 only — the incomplete satellite branch)
     - 拱向: The missing target branch a 共拱/拱会/残会/半合 is arching toward
     - 混杂: Clash turbidity flag (共拱 only)
+    - 主动方: Controller pillar label for 天干克; "相互" for 天干合/冲
+    - 根基: {pillar_label: tier} 4-tier rooting per participating stem (天干合/克/冲 only)
+    - 合化判断: "合化成立" or "合而不化" based on stem rooting (天干合 only)
     - 强度: Modulated strength (强势主流/显著影响/中等衰减/大幅衰减/消融吸收)
     - 备注: Causal note (if suppressed/absorbed)
 
-Improvement Feature for future iterations: to include 根基强度 and 根基说明 branch rooting
+Implemented:
+    - compute_pillar_rooting() — per-pillar 4-tier rooting summary (importable by cycle modules)
+    - get_stem_root_tier()     — single-stem rooting tier against a list of branches
+    - _pass_stem_rooting()     — Pass S stem rooting modulation (importable by cycle modules)
+    - BRANCH_HIDDEN_ROOTING    — hidden-stem rooting weight table
 """
 
 from lunar_python import Solar, Lunar
@@ -358,22 +384,26 @@ break_map = {
 }
 
 # Hidden Stem Combinations (An He) - Secret affairs or hidden wealth
-# 暗合 (hidden stem harmony) — two schools combined:
-# 通合  (tōng hé):    寅-丑 (甲藏己合庚), 亥-午 (壬藏丁合壬)
-# 通禄合 (tōng lù hé): 卯-申 (乙暗合庚), 寅-午 (甲暗合己·丙), 巳-酉 (丙暗合辛), 子-巳 (癸暗合戊)
-# Note: 巳-亥 is 六冲 and is excluded by the clash guard in detection.
-# Values are sets — a branch may have multiple 暗合 partners.
+# Zi Ping (子平) methods
 hidden_stem_he: dict[str, set[str]] = {
-    "寅": {"丑", "午"},
+    "寅": {"丑"},      # Jia-Ji
     "丑": {"寅"},
-    "亥": {"午"},
-    "午": {"亥", "寅"},
-    "卯": {"申"},
+    "卯": {"申"},      # Yi-Geng
     "申": {"卯"},
-    "巳": {"酉", "子"},
-    "酉": {"巳"},
-    "子": {"巳"},
+    "午": {"亥"},      # Ding-Ren
+    "亥": {"午"},
 }
+
+# 通禄合 (Tōng Lù Hé) — Palace/Lu Combination method for an he. not in used.
+# hidden_stem_he: {
+#         "卯": {"申"},
+#         "申": {"卯"},
+#         "寅": {"午"},
+#         "午": {"寅"},
+#         "巳": {"酉", "子"},
+#         "酉": {"巳"},
+#         "子": {"巳"},
+#     }
 
 stem_combines = {
     "甲": "己",
@@ -399,7 +429,7 @@ stem_clashes = {
     "癸": "丁",
 }
 
-stem_controls = [
+stem_controls = frozenset({
     ("庚", "甲"),
     ("庚", "乙"),
     ("辛", "甲"),
@@ -420,7 +450,7 @@ stem_controls = [
     ("丙", "辛"),
     ("丁", "庚"),
     ("丁", "辛"),
-]
+})
 
 stem_elements = {
     "甲": "木",
@@ -434,6 +464,26 @@ stem_elements = {
     "壬": "水",
     "癸": "水",
 }
+
+# ── Branch rooting: canonical plain-string hidden stem table ─────────────────
+# This is the single source of truth. wu_xing.py derives its Enum-keyed BRANCH_HIDDEN
+# from this table via import, eliminating duplication.
+BRANCH_HIDDEN_ROOTING: dict[str, list[tuple[str, float]]] = {
+    "子": [("癸", 1.0)],
+    "丑": [("己", 0.6), ("癸", 0.3), ("辛", 0.1)],
+    "寅": [("甲", 0.6), ("丙", 0.3), ("戊", 0.1)],
+    "卯": [("乙", 1.0)],
+    "辰": [("戊", 0.6), ("乙", 0.3), ("癸", 0.1)],
+    "巳": [("丙", 0.6), ("庚", 0.3), ("戊", 0.1)],
+    "午": [("丁", 0.7), ("己", 0.3)],
+    "未": [("己", 0.6), ("丁", 0.3), ("乙", 0.1)],
+    "申": [("庚", 0.6), ("壬", 0.3), ("戊", 0.1)],
+    "酉": [("辛", 1.0)],
+    "戌": [("戊", 0.6), ("辛", 0.3), ("丁", 0.1)],
+    "亥": [("壬", 0.7), ("甲", 0.3)],
+}
+
+_ROOT_DEPTH_LABELS: list[str] = ["本气根", "中气根", "余气根"]
 
 # ── 合化五行 lookup — element produced by each 天干合 pair ───────────────────
 # 甲己→土, 乙庚→金, 丙辛→水, 丁壬→木, 戊癸→火
@@ -1495,7 +1545,7 @@ def _pass4_group(registry: InteractionRegistry) -> None:
     """
     Pass 4 — Group / Environment Pass.
 
-    比和 / 暗合   : always fixed strengths, bypass locks.
+    比和 / 暗合 / 干支透合 : default 显著影响 if not already downgraded by Pass 3.
     半合/拱会/残会 : capped by participating branch lock types.
                     VACANT branch → treated as open/susceptible → 强势主流.
     共拱          : echo check — same element as structural lock → amplified.
@@ -1504,17 +1554,7 @@ def _pass4_group(registry: InteractionRegistry) -> None:
         itype = item.get("类型", "")
         indices = extract_pillar_indices(item.get("组合", "无"))
 
-        if itype == "比和":
-            if not item.get("强度"):
-                item["强度"] = "显著影响"
-            continue
-
-        if itype == "暗合":
-            if not item.get("强度"):
-                item["强度"] = "显著影响"
-            continue
-
-        if itype == "干支透合":
+        if itype in {"比和", "暗合", "干支透合"}:
             if not item.get("强度"):
                 item["强度"] = "显著影响"
             continue
@@ -1618,6 +1658,72 @@ def _pass5_defaults(registry: InteractionRegistry) -> None:
         item["强度"] = DEFAULT_STRENGTH.get((itype, is_adj), "强势主流")
 
 
+def _downgrade_if_stronger(current: str, cap: str) -> str:
+    """Return cap only if current strength is stronger than cap; otherwise return current unchanged."""
+    return cap if STRENGTH_ORDER.get(current, 99) < STRENGTH_ORDER.get(cap, 99) else current
+
+
+def _pass_stem_rooting(items: list) -> None:
+    """
+    Stem Rooting Modulation Pass.
+    Downgrades 天干合/克/冲 strength based on participating stems' 无根 status (multi-tier).
+    Operates on a flat list (post-priority); does NOT use registry.
+
+    Scenario table:
+        天干合: one stem 无根 → "显著影响"; both 无根 → "中等衰减"
+        天干克: controller 无根 + target rooted → "大幅衰减";
+                controller 无根 + target 无根   → "中等衰减"
+        天干冲: one stem 无根 → "显著影响"; both 无根 → "中等衰减"
+    """
+    for item in items:
+        itype = item.get("类型")
+        if itype not in ("天干合", "天干克", "天干冲"):
+            continue
+        if item.get("强度") == "消融吸收":
+            continue
+        rooting = item.get("根基", {})
+        if not rooting:
+            continue
+        strength = item.get("强度", "")
+        tiers = list(rooting.values())
+        wugen_count = tiers.count("无根")
+
+        if itype == "天干合":
+            if wugen_count == len(tiers):
+                cap, note = "中等衰减", "合而不化，双干无根，合力近无"
+            elif wugen_count > 0:
+                cap, note = "显著影响", "合而不化，浮干无力成合"
+            else:
+                continue
+            item["强度"] = _downgrade_if_stronger(strength, cap)
+            item.setdefault("备注", "")
+            item["备注"] += ("、" if item["备注"] else "") + note
+
+        elif itype == "天干克":
+            controller = item.get("主动方")
+            if not controller or rooting.get(controller) != "无根":
+                continue
+            target_tier = next((v for k, v in rooting.items() if k != controller), "无根")
+            if target_tier != "无根":
+                cap, note = "大幅衰减", "克者无根，被克者有根，克力瓦解"
+            else:
+                cap, note = "中等衰减", "克者无根，克力虚浮"
+            item["强度"] = _downgrade_if_stronger(strength, cap)
+            item.setdefault("备注", "")
+            item["备注"] += ("、" if item["备注"] else "") + note
+
+        elif itype == "天干冲":
+            if wugen_count == len(tiers):
+                cap, note = "中等衰减", "双干无根，冲势空洞"
+            elif wugen_count > 0:
+                cap, note = "显著影响", "一方无根，冲势偏斜"
+            else:
+                continue
+            item["强度"] = _downgrade_if_stronger(strength, cap)
+            item.setdefault("备注", "")
+            item["备注"] += ("、" if item["备注"] else "") + note
+
+
 def apply_bazi_master_priority(
     all_interactions: list, zhis: list, registry: InteractionRegistry
 ) -> list:
@@ -1629,6 +1735,7 @@ def apply_bazi_master_priority(
     Pass 3 — Conflict Pass      (PRIORITY_RULE_TABLE lookup per actor lock)
     Pass 4 — Group/Environment  (半合/共拱/比和/暗合 with echo & VACANT susceptibility)
     Pass 5 — Default Assignment (DEFAULT_STRENGTH table)
+    Pass S — Stem Rooting Modulation (_pass_stem_rooting, orthogonal to priority logic)
     """
     _pass1_structural(registry, zhis)
     # 共拱 detection runs here so synthetic 半合/残会 from Pass 1 tie-breaking
@@ -1642,6 +1749,7 @@ def apply_bazi_master_priority(
 
     result = registry.all_items()
     result.sort(key=lambda x: INTERACTION_TIER_ORDER.get(x.get("类型", "无"), 999))
+    _pass_stem_rooting(result)
     return result
 
 
@@ -1749,7 +1857,18 @@ def _get_shi_shen_for_stem_pair(day_stem: str, hidden_stem: str) -> str:
 
 
 def _detect_san_hui(zhis: list, registry: InteractionRegistry) -> None:
-    """Detect full 三会 and partial 拱会/残会."""
+    """
+    Detect full 三会 and partial 拱会/残会.
+
+    Field assignment for partials:
+      - 拱会 (cardinal branch absent): carries `犹出` = the missing cardinal branch.
+        The cardinal is the most powerful member; its absence means the structure
+        is still arching toward it — hence 犹出 ("still to emerge").
+      - 残会 (cardinal branch present, one satellite missing): carries `待会` = the
+        missing non-cardinal branch. The structure is partially formed; it waits
+        for the last satellite — hence 待会 ("waiting to convene").
+    Both partials carry `方位` and `元素` derived from the directional group.
+    """
     for element, group in directional_he.items():
         matched: dict[str, int] = {}
         for branch in group:
@@ -1808,14 +1927,15 @@ def _detect_san_hui(zhis: list, registry: InteractionRegistry) -> None:
                 "方位": direction,
                 "组合": "-".join(match_names),
                 "组合明细": combo_detail,
-                "待会": missing or "无",
                 "状态": get_status(
                     "三会", {"key": "residual" if cardinal_present else "arch"}
                 ),
                 "紧贴": abs(idxs[0] - idxs[1]) == 1,
             }
-            if not cardinal_present:
-                item["犹出"] = missing or "无"
+            if cardinal_present:
+                item["待会"] = missing or "无"   # 残会: missing non-cardinal branch
+            else:
+                item["犹出"] = missing or "无"   # 拱会: missing cardinal branch
             registry.register(item)
 
 
@@ -1866,10 +1986,21 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
     Stem (all registered independently):    天干合, 天干冲, 天干克
     Suppression is handled by the priority filter, not at detection time.
 
+    Stem interaction field schema (consistent across all three types):
+        类型, 组合, 组合明细, 状态, 紧贴, 主动方, 根基
+      天干合 additionally:
+        元素 (合化五行), 合化判断 ("合化成立" / "合而不化")
+
+      主动方: controller pillar label for 天干克; "相互" for 天干合/冲.
+      根基: {pillar_label: tier} — 4-tier (深根/中根/浅根/无根) via get_stem_root_tier().
+      合化判断: "合化成立" if both stems ≥浅根; "合而不化" if either is 无根.
+
     干支透合 is bidirectional per pair: checks both g_i→zhis[j] and g_j→zhis[i].
     Each item stores 干方索引 (source stem pillar) and 支方索引 (target branch pillar)
     so the priority filter can apply branch locks only from the target branch.
     """
+    _day_stem = gans[2]
+    _hidden_labels = ("本气", "中气", "余气")
     for i in range(4):
         for j in range(i + 1, 4):
             b_i, b_j = zhis[i], zhis[j]
@@ -1948,6 +2079,7 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
                         "组合明细": detail,
                         "元素": peer["element"],
                         "紧贴": is_adjacent,
+                        "状态": get_status("比和"),
                     }
                 )
 
@@ -2001,7 +2133,9 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
                     }
                 )
 
-            if b_j in hidden_stem_he.get(b_i, set()) and clash_map.get(b_i) != b_j:
+            # hidden_stem_he pairs (寅丑, 卯申, 午亥) have no overlap with clash_map;
+            # 六冲 suppression is handled by the priority filter, not at detection.
+            if b_j in hidden_stem_he.get(b_i, set()):
                 registry.register(
                     {
                         "类型": "暗合",
@@ -2018,9 +2152,7 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
             # 冲则气散 and 贪合忘合 are handled by the priority filter (PRIMARY_六冲 and STEM_天干合
             # rules); detection registers all candidates and suppression is applied post-detection.
             # 藏干十神 is always relative to the day master (gans[2]).
-            _day_stem = gans[2]
             _stem_i, _stem_j = gans[i], gans[j]
-            _hidden_labels = ["本气", "中气", "余气"]
             # Direction 1: stem of pillar i covertly bonds with hidden stem in branch of pillar j
             for _hi, _hs in enumerate(LunarUtil.ZHI_HIDE_GAN.get(b_j, [])):
                 if stem_combines.get(_stem_i) == _hs:
@@ -2070,6 +2202,10 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
             # PRIORITY_RULE_TABLE suppresses the weaker via 消融吸收.
             g_i, g_j = gans[i], gans[j]
             stem_detail = {pn_i: g_i, pn_j: g_j}
+            # Pre-compute rooting tiers for both stems across ALL natal branches
+            tier_i = get_stem_root_tier(stem_elements.get(g_i, ""), zhis)
+            tier_j = get_stem_root_tier(stem_elements.get(g_j, ""), zhis)
+            root_detail = {pn_i: tier_i, pn_j: tier_j}
             if stem_combines.get(g_i) == g_j:
                 registry.register(
                     {
@@ -2078,6 +2214,10 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
                         "组合": combo,
                         "组合明细": stem_detail,
                         "状态": get_status("天干合"),
+                        "紧贴": is_adjacent,
+                        "主动方": "相互",
+                        "合化判断": "合化成立" if tier_i != "无根" and tier_j != "无根" else "合而不化",
+                        "根基": root_detail,
                     }
                 )
             if stem_clashes.get(g_i) == g_j:
@@ -2090,9 +2230,12 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
                             "天干冲", {"key": "adjacent" if is_adjacent else "distant"}
                         ),
                         "紧贴": is_adjacent,
+                        "主动方": "相互",
+                        "根基": root_detail,
                     }
                 )
             if (g_i, g_j) in stem_controls or (g_j, g_i) in stem_controls:
+                controller_label = pn_i if (g_i, g_j) in stem_controls else pn_j
                 registry.register(
                     {
                         "类型": "天干克",
@@ -2102,6 +2245,8 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
                             "天干克", {"key": "adjacent" if is_adjacent else "distant"}
                         ),
                         "紧贴": is_adjacent,
+                        "主动方": controller_label,
+                        "根基": root_detail,
                     }
                 )
 
@@ -2416,7 +2561,96 @@ def _build_vacant_flags(registry: InteractionRegistry) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 7 — Orchestrator
+# SECTION 7 — Branch Rooting Helpers
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def get_stem_root_tier(elem: str, zhis: list[str]) -> str:
+    """
+    Returns rooting tier for an element string across given branch strings.
+    Exported for use by wu_xing.py to avoid duplicating BRANCH_HIDDEN_ROOTING.
+
+    Args:
+        elem: element string e.g. "木", "火"
+              From natal_interactions: stem_elements.get(gan) → "木"
+              From wu_xing: STEM_ELEMENT[p.stem].value → Element.WOOD.value → "木"
+              Both produce the same plain string — types are consistent.
+        zhis: list of branch strings e.g. ["寅", "午", "子", "亥"]
+              From wu_xing: [q.branch.value for q in pillars if q.branch]
+
+    Returns:
+        "深根" | "中根" | "浅根" | "无根"
+    """
+    best_idx = len(_ROOT_DEPTH_LABELS)
+    for zhi in zhis:
+        for idx, (hidden_stem, _) in enumerate(BRANCH_HIDDEN_ROOTING.get(zhi, [])):
+            if stem_elements.get(hidden_stem) == elem:
+                if idx < best_idx:
+                    best_idx = idx
+                break
+    return ["深根", "中根", "浅根", "无根"][min(best_idx, 3)]
+
+
+def compute_pillar_rooting(
+    gans: list[str],
+    zhis: list[str],
+    pillar_cn: list[str] | None = None,
+) -> dict:
+    """
+    Qualitative 根基 computation for any set of pillars.
+
+    Tier determined by deepest root type found across all branches:
+    本气根 → 深根 | 中气根 → 中根 | 余气根 → 浅根 | none → 无根
+
+    Args:
+        gans: stems in order (any length)
+        zhis: branches in order, parallel to gans
+        pillar_cn: pillar display names used as result keys
+                   (default: ["年柱","月柱","日柱","时柱"]).
+                   "柱" is stripped when building branch descriptions.
+
+    Returns:
+        {"年柱": {"天干": "甲", "根基强度": "中根", "根基说明": "通根于月支寅(本气根)"}, ...}
+    """
+    if pillar_cn is None:
+        pillar_cn = ["年柱", "月柱", "日柱", "时柱"]
+
+    def _short(label: str) -> str:
+        return label[:-1] if label.endswith("柱") else label
+
+    result = {}
+    for gan, col in zip(gans, pillar_cn):
+        elem = stem_elements.get(gan)
+        best_idx = len(_ROOT_DEPTH_LABELS)  # sentinel: no match
+        matches: list[str] = []
+
+        for j, zhi in enumerate(zhis):
+            for idx, (hidden_stem, _) in enumerate(BRANCH_HIDDEN_ROOTING.get(zhi, [])):
+                if stem_elements.get(hidden_stem) == elem:
+                    if idx < best_idx:
+                        best_idx = idx
+                    tier_label = _ROOT_DEPTH_LABELS[idx] if idx < len(_ROOT_DEPTH_LABELS) else "余气根"
+                    matches.append(f"{_short(pillar_cn[j])}支{zhi}({tier_label})")
+                    break
+
+        if best_idx == 0:
+            strength = "深根"
+        elif best_idx == 1:
+            strength = "中根"
+        elif best_idx == 2:
+            strength = "浅根"
+        else:
+            strength = "无根"
+
+        result[col] = {
+            "天干": gan,
+            "根基强度": strength,
+            "根基说明": "通根于" + "、".join(matches) if matches else "无根浮干",
+        }
+    return result
+
+
+# SECTION 8 — Orchestrator
 # ══════════════════════════════════════════════════════════════════════════════
 
 
@@ -2471,6 +2705,9 @@ def get_interactions(lunar_birthday) -> dict:
     xk_inner = xun_kong_result.get("旬空", {})
     _pass6_xun_kong(filtered, xk_inner, zhis)
 
+    # ── Branch rooting (根基) ─────────────────────────────────────────────
+    rooting = compute_pillar_rooting(gans, zhis)
+
     # ── Output assembly ───────────────────────────────────────────────────
     # Internal keys (_iid, _synthetic) are stripped inside _build_pillar_dynamics.
     pillar_dynamics = _build_pillar_dynamics(filtered)
@@ -2491,6 +2728,7 @@ def get_interactions(lunar_birthday) -> dict:
     return {
         "作用": {
             "关系总览": summary,
+            "根基": rooting,
             "柱位动态": pillar_dynamics,
             "柱位开放": vacant_flags,
             "判定优先级": {
@@ -2532,14 +2770,14 @@ if __name__ == "__main__":
     configure_logging()
     logger = get_logger(__name__)
 
-    # python -m src.astronomer_calculations.interactions_gan_zhi_zuo_yong
+    # python -m src.astronomer_calculations.natal_interactions
 
     # Desmond's birthday example
-    # solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)  # Create solar date
-    # datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)  # Create datetime object
-    # tst_birthday, _ = get_true_solar_time(
-    #     datetime_birthday, 1.3253, 103.808053
-    # )  # Get true solar time
+    solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)  # Create solar date
+    datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)  # Create datetime object
+    tst_birthday, _ = get_true_solar_time(
+        datetime_birthday, 1.3253, 103.808053
+    )  # Get true solar time
 
     # # Corinne's birthday example
     # solar_birthday = Solar.fromYmdHms(
@@ -2550,11 +2788,11 @@ if __name__ == "__main__":
     # )
 
     # Random's birthday example
-    solar_birthday = Solar.fromYmdHms(1999, 2, 11, 9, 7, 0)  # Create solar date
-    datetime_birthday = datetime(1999, 2, 11, 9, 7, 0)  # Create datetime object
-    tst_birthday, _ = get_true_solar_time(
-        datetime_birthday, 1.3253, 103.808053
-    )  # Get true solar time
+    # solar_birthday = Solar.fromYmdHms(1999, 2, 11, 9, 7, 0)  # Create solar date
+    # datetime_birthday = datetime(1999, 2, 11, 9, 7, 0)  # Create datetime object
+    # tst_birthday, _ = get_true_solar_time(
+    #     datetime_birthday, 1.3253, 103.808053
+    # )  # Get true solar time
 
     lunar_birthday = tst_birthday.getLunar()
 
