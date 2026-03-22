@@ -1,6 +1,65 @@
+"""
+Cycle 五行力量 (Five Elements Strength Dynamics) Calculator
+===========================================================
+
+Calculates how a BaZi cycle pillar (运柱) modulates the natal chart's 五行力量,
+using the same Ming Dynasty Imperial Qi Dynamics engine as wu_xing.py.
+
+Supported cycle types
+---------------------
+- 大运 (Da Yun)   — 10-year luck pillars
+- 小运 (Xiao Yun) — annual pre-luck pillars (before 大运 starts)
+- 流年 (Liu Nian) — annual pillars during 大运
+- 流月 (Liu Yue)  — monthly pillars during 流年
+
+Architecture
+------------
+CycleWuXingDynamics wraps WuXingDynamicsCalculator and handles the cycle-specific
+concerns before delegating to the core engine:
+
+  1. Pillar weight adjustment
+     Cycle pillar receives `cycle_weight` (default 0.20).
+     Natal pillars are rescaled proportionally: adjustment_ratio = (1 - cycle_weight) / Σnatal_weights.
+     Cycle stem_weight = cycle_weight × 0.1 (same ratio as natal pillars in wu_xing.py).
+
+  2. Seasonal anchoring
+     Seasonal factors (旺/相/囚/休/死) are always derived from the natal month branch,
+     not the cycle pillar's branch. This keeps the birth chart's elemental season as the
+     fixed reference; the cycle pillar acts as a temporary overlay.
+
+  3. 旬空 reductions
+     _compute_xk_reductions() merges natal 旬空 (from get_xun_kong()) and the cycle
+     pillar's own 旬空 (from getXunKong()) into a per-branch reduction map applied before
+     scoring. Skipped if neither source is provided.
+
+  4. Interaction scoring
+     The caller must pre-compute get_cycle_interactions() and pass its _raw_priority_list.
+     This list drives 天干合/克/冲 and branch interaction bonuses in _score_priority_results().
+     Passing the list avoids recomputing interactions inside this class.
+
+  5. 通根 (Tong Gen)
+     _compute_tong_gen() checks the cycle stem against all active branches — both natal
+     and cycle — giving a true rooting depth for the cycle pillar in context.
+
+Output
+------
+calculate_cycle_interaction() returns the full wu_xing.calculate() dict with:
+  - 基本信息 and 四柱 sections stripped (natal-only; not meaningful in cycle context)
+  - A "{cycle_type}柱" key prepended with enriched cycle pillar metadata
+    (天干, 地支, 季节状态, 通根, 旬, 旬空, 五行, 藏干, 十神, 纳音, 地势, 运干十二长生)
+
+Utility functions
+-----------------
+get_stem_wu_xing(stem)   — standalone 五行+阴阳 lookup for a heavenly stem character
+get_branch_wu_xing(branch) — standalone 五行+阴阳 lookup for an earthly branch character
+
+Exports
+-------
+  get_stem_wu_xing, get_branch_wu_xing, CycleWuXingDynamics
+"""
 from lunar_python.util import LunarUtil
 from lunar_python import Lunar
-from typing import Dict, List, Optional
+from typing import Dict, List
 from src.astronomer_calculations.wu_xing import (
     WuXingDynamicsCalculator,
     Pillar,
@@ -15,6 +74,11 @@ from src.astronomer_calculations.wu_xing import (
     get_zhu_dao_qi_shi,
     Element,
     _compute_xk_reductions,
+    STR_STEM,
+    STR_BRANCH,
+    _YANG_STEMS,
+    _STATE_DESCRIPTIONS,
+    _ROOT_LABELS,
 )
 from src.astronomer_calculations.cycle_shi_shen import (
     get_shi_shen_for_stem_pair,
@@ -22,45 +86,6 @@ from src.astronomer_calculations.cycle_shi_shen import (
 )
 from src.astronomer_calculations.cycle_di_shi import get_di_shi
 from src.astronomer_calculations.cycle_na_yin import get_nayin
-
-# ─────────────────────────────────────────────
-# String-to-Enum conversion functions
-# ─────────────────────────────────────────────
-
-def string_to_stem(stem_str: str) -> Optional[Stem]:
-    """Convert Chinese stem character to Stem enum."""
-    stem_map = {
-        "甲": Stem.JIA,
-        "乙": Stem.YI,
-        "丙": Stem.BING,
-        "丁": Stem.DING,
-        "戊": Stem.WU,
-        "己": Stem.JI,
-        "庚": Stem.GENG,
-        "辛": Stem.XIN,
-        "壬": Stem.REN,
-        "癸": Stem.GUI,
-    }
-    return stem_map.get(stem_str)
-
-
-def string_to_branch(branch_str: str) -> Optional[Branch]:
-    """Convert Chinese branch character to Branch enum."""
-    branch_map = {
-        "子": Branch.ZI,
-        "丑": Branch.CHOU,
-        "寅": Branch.YIN,
-        "卯": Branch.MAO,
-        "辰": Branch.CHEN,
-        "巳": Branch.SI,
-        "午": Branch.WU,
-        "未": Branch.WEI,
-        "申": Branch.SHEN,
-        "酉": Branch.YOU,
-        "戌": Branch.XU,
-        "亥": Branch.HAI,
-    }
-    return branch_map.get(branch_str)
 
 
 def get_stem_wu_xing(cycle_stem: str) -> dict:
@@ -131,17 +156,25 @@ def get_branch_wu_xing(cycle_branch: str) -> dict:
 
 class CycleWuXingDynamics:
     """
-    Calculates 五行力量 (Five Elements Strength Dynamics) for different BaZi cycles
-    using the Ming Dynasty Imperial Qi Dynamics system.
+    Five Elements dynamics calculator for BaZi cycle pillars.
 
-    Supports interactive analysis:
-    - 大运 (Da Yun): 10-year cycles
-    - 小运 (Xiao Yun): Annual pre-luck cycles
-    - 流年 (Liu Nian): Annual cycles during da_yun
-    - 流月 (Liu Yue): Monthly cycles during liu_nian
+    Wraps WuXingDynamicsCalculator to add cycle-specific setup:
+    - Proportional weight redistribution (natal pillars scaled down to make room
+      for the cycle pillar; default cycle_weight = 0.20)
+    - Seasonal factors anchored to the natal month branch (birth chart season,
+      not the cycle pillar's own branch)
+    - Optional 旬空 reductions from natal and cycle pillar sources
+    - Enriched cycle pillar metadata block prepended to every result
 
-    Interactive mode combines the cycle pillar with natal pillars to show how
-    the cycle's elemental composition modulates the birth chart's 五行力量.
+    Usage::
+
+        interactions = get_cycle_interactions(cycle_stem, cycle_branch, natal_pillars)
+        result = CycleWuXingDynamics().calculate_cycle_interaction(
+            cycle_object,
+            lunar_birthday,
+            priority_list=interactions["_raw_priority_list"],
+            cycle_type="大运",
+        )
     """
 
     def __init__(self):
@@ -161,18 +194,25 @@ class CycleWuXingDynamics:
         Args:
             cycle_object: A cycle object with getGanZhi() returning a two-character
                           stem-branch string (e.g. "戊子"). Stem and branch are extracted
-                          automatically.
+                          automatically. Must also implement getXun() and getXunKong() for
+                          旬/旬空 output.
+            day_master_stem: Day master heavenly stem character (e.g. "甲"). Used as
+                             reference point for 十神 and 地势 calculations.
+            seasonal: SeasonalFactors object from get_seasonal_factors(). Provides
+                      elemental state (旺/相/囚/休/死) per element. If None, all
+                      elements default to "囚".
             pillars: All pillars in scope (natal + cycle for interactive mode, or just the
                      cycle pillar for isolated mode). Used by 通根 to check all branches.
 
-        Returns dict with: 天干, 地支, 显示名称, 季节状态, 十二长生, 通根, 五行, 藏干, 十神
+        Returns dict with: 天干, 地支, 显示名称, 季节状态, 纳音, 地势, 运干十二长生,
+                           通根, 旬, 旬空, 五行, 藏干, 十神
         """
         gan_zhi = cycle_object.getGanZhi()
         cycle_stem = gan_zhi[0] if len(gan_zhi) > 0 else ""
         cycle_branch = gan_zhi[1] if len(gan_zhi) > 1 else ""
 
-        stem_enum = string_to_stem(cycle_stem)
-        branch_enum = string_to_branch(cycle_branch)
+        stem_enum = STR_STEM.get(cycle_stem)
+        branch_enum = STR_BRANCH.get(cycle_branch)
 
         if not stem_enum or not branch_enum:
             return {}
@@ -182,20 +222,12 @@ class CycleWuXingDynamics:
         branch_elem = BRANCH_ELEMENT.get(branch_enum)
 
         # 显示名称
-        yang_stems = {"甲", "丙", "戊", "庚", "壬"}
-        yang_yin = "阳" if cycle_stem in yang_stems else "阴"
+        yang_yin = "阳" if cycle_stem in _YANG_STEMS else "阴"
         display_name = f"{cycle_stem}{stem_elem.value} ({yang_yin}{stem_elem.value})"
 
-        # 季节状态 and state description
-        state_descriptions = {
-            "旺": "旺 (最强)",
-            "相": "相 (次强)",
-            "囚": "囚 (弱)",
-            "休": "休 (气弱)",
-            "死": "死 (极弱)",
-        }
+        # 季节状态
         state = seasonal.states.get(stem_elem, "囚") if seasonal else "囚"
-        state_desc = state_descriptions.get(state, state)
+        state_desc = _STATE_DESCRIPTIONS.get(state, state)
 
         # Life Stage (地势) for the cycle branch using birth day stem as reference
         di_shi = get_di_shi(day_master_stem, cycle_branch)
@@ -217,19 +249,17 @@ class CycleWuXingDynamics:
         }
 
         # 藏干: hidden stems with strength category
-        root_labels = ["本气根", "中气根", "余气根"]
         cang_gan = []
         if branch_enum:
             for idx, (hs, _) in enumerate(BRANCH_HIDDEN.get(branch_enum, [])):
-                strength = root_labels[idx] if idx < len(root_labels) else "未知"
+                strength = _ROOT_LABELS[idx] if idx < len(_ROOT_LABELS) else "未知"
                 cang_gan.append({"干": hs.value, "强度": strength})
 
         # 十神: both for stem and for hidden stems in branch
-        day_master_stem_enum = string_to_stem(day_master_stem)
         shi_shen = {}
 
         # Stem 十神
-        if day_master_stem_enum:
+        if day_master_stem:
             shi_shen_stem = get_shi_shen_for_stem_pair(day_master_stem, cycle_stem)
             shi_shen["天干"] = {
                 "天干": cycle_stem,
@@ -270,29 +300,51 @@ class CycleWuXingDynamics:
         cycle_xk_str: str | None = None,
     ) -> Dict:
         """
-        Calculate 五行力量 for a cycle pillar interaction with the natal chart.
+        Calculate 五行力量 for a cycle pillar interacting with the natal chart.
 
-        Combines the cycle pillar with natal pillars to show how the cycle's
-        elemental composition interacts with and modulates the natal chart's 五行力量.
+        Combines the cycle pillar with natal pillars to show how the cycle's elemental
+        composition modulates the natal chart's 五行力量. The caller must pre-compute
+        get_cycle_interactions() and pass its _raw_priority_list — this avoids
+        recomputing interactions here and lets the caller display the full interaction
+        result alongside the wu_xing output.
 
-        The caller is responsible for running get_cycle_interactions() first and
-        passing its _raw_priority_list here. This allows the caller to reuse the
-        full interaction result for display without recomputing it here.
+        Weight mechanics:
+            adjustment_ratio = (1.0 - cycle_weight) / Σ natal_position_weights
+            natal_pillar.position_weight *= adjustment_ratio  (for each natal pillar)
+            cycle stem_weight = cycle_weight * 0.1
+
+        Seasonal anchoring:
+            Seasonal factors are derived from the natal month branch, not the cycle
+            branch. This keeps the birth chart's elemental season as the fixed base;
+            the cycle pillar acts as a temporary overlay.
 
         Args:
-            cycle_object: A cycle object (e.g. DaYun, XiaoYun, LiuNian) with a
-                          getGanZhi() method returning a two-character stem-branch string
-                          (e.g. "戊子"). The stem and branch are extracted automatically.
-            lunar_birthday: Lunar birthday object (for natal pillars)
+            cycle_object: A cycle object (e.g. DaYun, XiaoYun, LiuNian) with
+                          getGanZhi() → two-character stem-branch string (e.g. "戊子"),
+                          getXun(), and getXunKong(). Stem and branch extracted automatically.
+            lunar_birthday: Lunar birthday object. Provides the four natal pillars via
+                            getEightChar() and the day master stem for metadata.
             priority_list: Priority-resolved interaction list from get_cycle_interactions()
-                           (_raw_priority_list key). Drives combination and clash scoring.
-            cycle_type: Label identifying the cycle (e.g. "大运", "流年").
-                        Used only to name the output key (e.g. "大运柱"). Does not affect scoring.
-            cycle_weight: Weight assigned to the cycle pillar (default 0.20 = 20%).
-                         Remaining weight distributed proportionally to natal pillars.
+                           (_raw_priority_list key). Drives 天干合/克/冲 and branch
+                           interaction bonuses in WuXingDynamicsCalculator._score_priority_results().
+            cycle_type: Cycle label (e.g. "大运", "流年"). Names the metadata key in the
+                        output (e.g. "大运柱"). Has no effect on scoring.
+            cycle_weight: Fractional weight for the cycle pillar (default 0.20).
+                          Must be in (0.0, 1.0) exclusive.
+            xun_kong_data: Natal 旬空 dict from get_xun_kong(), keyed by branch character.
+                           Merged with cycle_xk_str to compute per-branch reductions.
+            cycle_xk_str: Cycle pillar's own 旬空 string from getXunKong() (e.g. "子丑").
+                          If neither xun_kong_data nor cycle_xk_str is provided,
+                          旬空 reductions are skipped entirely.
 
         Returns:
-            dict: Combined 五行力量分析 showing cycle + natal interaction
+            dict: {"{cycle_type}柱": <cycle pillar metadata>, **五行力量分析}.
+                  基本信息 and 四柱 sections are stripped (natal-only; not meaningful
+                  in cycle context).
+
+        Raises:
+            ValueError: If cycle stem/branch cannot be parsed, or cycle_weight is
+                        outside (0.0, 1.0).
         """
         gan_zhi = cycle_object.getGanZhi()
         cycle_stem = gan_zhi[0] if len(gan_zhi) > 0 else ""
@@ -306,38 +358,38 @@ class CycleWuXingDynamics:
                 "年",
                 0.15,
                 0.015,
-                string_to_stem(bazi.getYearGan()),
-                string_to_branch(bazi.getYearZhi()),
+                STR_STEM.get(bazi.getYearGan()),
+                STR_BRANCH.get(bazi.getYearZhi()),
             ),
             Pillar(
                 "month",
                 "月",
                 0.45,
                 0.045,
-                string_to_stem(bazi.getMonthGan()),
-                string_to_branch(bazi.getMonthZhi()),
+                STR_STEM.get(bazi.getMonthGan()),
+                STR_BRANCH.get(bazi.getMonthZhi()),
             ),
             Pillar(
                 "day",
                 "日",
                 0.25,
                 0.025,
-                string_to_stem(bazi.getDayGan()),
-                string_to_branch(bazi.getDayZhi()),
+                STR_STEM.get(bazi.getDayGan()),
+                STR_BRANCH.get(bazi.getDayZhi()),
             ),
             Pillar(
                 "hour",
                 "时",
                 0.15,
                 0.015,
-                string_to_stem(bazi.getTimeGan()),
-                string_to_branch(bazi.getTimeZhi()),
+                STR_STEM.get(bazi.getTimeGan()),
+                STR_BRANCH.get(bazi.getTimeZhi()),
             ),
         ]
 
         # Create cycle pillar
-        cycle_stem_enum = string_to_stem(cycle_stem)
-        cycle_branch_enum = string_to_branch(cycle_branch)
+        cycle_stem_enum = STR_STEM.get(cycle_stem)
+        cycle_branch_enum = STR_BRANCH.get(cycle_branch)
 
         if not cycle_stem_enum or not cycle_branch_enum:
             raise ValueError(f"Invalid stem '{cycle_stem}' or branch '{cycle_branch}'")
