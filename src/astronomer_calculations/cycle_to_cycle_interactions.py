@@ -41,7 +41,6 @@ All 天干合/克/冲 items carry:
     - 紧贴: True  (all pairwise interactions are adjacent — no distance penalty)
     - 主动方: "相互" for 天干合/冲; controlling pillar label for 天干克
     - 根基: {a_lbl: tier_a, b_lbl: tier_b}  (4-tier per stem)
-    - 合化判断: "合化成立" / "合而不化"  (天干合 only)
 
 六害/六破 主动方 convention: a_lbl (the pillar whose branch appears in the map key
 generates the force; b_lbl is the receiving side).
@@ -255,7 +254,7 @@ def _detect_pairwise_branch(
     a_lbl: str,
     b_lbl: str,
     day_stem: str,
-    day_strength: str = "中和",
+    tong_gen: str = "中根",
 ) -> list[dict]:
     """
     Detect all branch interactions between two cycle pillars.
@@ -351,10 +350,10 @@ def _detect_pairwise_branch(
                     "墓库境况": {
                         "类型": _lib_type_b,
                         "影响": _determine_kai_ku_influence(
-                            day_strength, _lib_type_b, _released_gods_b
+                            tong_gen, _lib_type_b, _released_gods_b
                         ),
                         "说明": _generate_kai_ku_remark(
-                            day_strength, _lib_type_b, _released_gods_b
+                            tong_gen, _lib_type_b, _released_gods_b
                         ),
                     },
                 }
@@ -408,10 +407,10 @@ def _detect_pairwise_branch(
                     "墓库境况": {
                         "类型": _lib_type_a,
                         "影响": _determine_kai_ku_influence(
-                            day_strength, _lib_type_a, _released_gods_a
+                            tong_gen, _lib_type_a, _released_gods_a
                         ),
                         "说明": _generate_kai_ku_remark(
-                            day_strength, _lib_type_a, _released_gods_a
+                            tong_gen, _lib_type_a, _released_gods_a
                         ),
                     },
                 }
@@ -543,7 +542,6 @@ def _detect_pairwise_stem(
         主动方: "相互"    — for 天干合 and 天干冲 (mutual)
                 a_lbl or b_lbl — for 天干克 (controlling side)
         根基: root_detail — 4-tier rooting dict; consumed by _pass_stem_rooting (Pass S)
-        合化判断          — 天干合 only: "合化成立" if both stems rooted; else "合而不化"
         克向              — 天干克 only: directional string (e.g., "大运克流年")
     """
     results = []
@@ -566,7 +564,6 @@ def _detect_pairwise_stem(
                 "主动方": "相互",
                 "状态": get_status("天干合"),
                 "紧贴": True,
-                "合化判断": "合化成立" if tier_a != "无根" and tier_b != "无根" else "合而不化",
                 "根基": root_detail,
             }
         )
@@ -1122,7 +1119,7 @@ def get_pairwise_cycle_interactions(
     cycle_b_label: str = "流年",
     cycle_a_xk_str: str | None = None,
     cycle_b_xk_str: str | None = None,
-    day_strength: str = "中和",
+    tong_gen: str = "中根",
 ) -> dict:
     """
     Detect and priority-resolve all interactions between two cycle pillars.
@@ -1164,7 +1161,7 @@ def get_pairwise_cycle_interactions(
     all_items: list[dict] = []
     all_items.extend(_detect_pairwise_fanyin_fuyin(a_s, a_b, b_s, b_b, a_lbl, b_lbl))
     all_items.extend(
-        _detect_pairwise_branch(a_s, a_b, b_s, b_b, a_lbl, b_lbl, day_stem, day_strength)
+        _detect_pairwise_branch(a_s, a_b, b_s, b_b, a_lbl, b_lbl, day_stem, tong_gen)
     )
     all_items.extend(_detect_pairwise_stem(a_s, a_b, b_s, b_b, a_lbl, b_lbl))
     all_items.extend(

@@ -357,7 +357,7 @@ def _detect_cross_kai_ku(
     b_lbl: str,
     natal_chart: dict,
     day_stem: str,
-    day_strength: str = "中和",
+    tong_gen: str = "中根",
 ) -> list[dict]:
     """
     Detect 开库 when a cycle branch (A or B) acts as the key to a natal tomb branch.
@@ -421,10 +421,10 @@ def _detect_cross_kai_ku(
                     "墓库境况": {
                         "类型": lib_type,
                         "影响": _determine_kai_ku_influence(
-                            day_strength, lib_type, released_gods
+                            tong_gen, lib_type, released_gods
                         ),
                         "说明": _generate_kai_ku_remark(
-                            day_strength, lib_type, released_gods
+                            tong_gen, lib_type, released_gods
                         ),
                     },
                 }
@@ -656,7 +656,8 @@ def _cross_xun_kong_pass(
     Each branch is checked against its own void source:
         Cycle A branch — checked against a_xk_str via _is_cycle_branch_void
         Cycle B branch — checked against b_xk_str via _is_cycle_branch_void
-        Natal branches — checked against natal_xk via _is_natal_branch_void,
+        Natal branches — checked against the DAY pillar's 旬空 via _is_natal_branch_void
+                         (日柱 旬空 anchors the entire natal chart);
                          identified by the "{pillar_name}支" key pattern in 组合明细
                          (e.g. "月柱支"); validated against _PILLAR_NAMES guard.
 
@@ -763,7 +764,7 @@ def get_cross_cycle_interactions(
     cycle_a_xk_str: str | None = None,
     cycle_b_xk_str: str | None = None,
     natal_xk: dict | None = None,
-    day_strength: str = "中和",
+    tong_gen: str = "中根",
 ) -> dict:
     """
     Detect cross-cycle structural formations spanning natal chart + two cycle pillars.
@@ -821,7 +822,7 @@ def get_cross_cycle_interactions(
     all_items.extend(
         _detect_cross_kai_ku(
             a_b, b_b, cycle_a_stem, cycle_b_stem,
-            a_lbl, b_lbl, natal_chart, _day_stem, day_strength,
+            a_lbl, b_lbl, natal_chart, _day_stem, tong_gen,
         )
     )
 
