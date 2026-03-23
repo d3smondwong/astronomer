@@ -175,6 +175,7 @@ class AstroDataLLMFormatter:
         interactions_inner = interactions_outer.get("作用", {})
         zuo_yong_pillar_data = interactions_inner.get("柱位动态", {})
         zuo_yong_relationship_data = interactions_inner.get("关系总览", {})
+        rooting_data = interactions_inner.get("根基", {})
 
         # di_shi data
         di_shi_outer = self.raw_data.get("di_shi", {})
@@ -220,6 +221,7 @@ class AstroDataLLMFormatter:
                 "天干": stem,
                 "地支": branch,
                 "藏干": hidden_stems,
+                "根基": rooting_data,
                 "季节状态": seasonal_state,
                 "干支五行": gan_zhi_wu_xing,
                 "季节状态": seasonal_state,
@@ -303,6 +305,16 @@ class AstroDataLLMFormatter:
 
         return interactions_inner.get("判定优先级")
 
+    def _extract_day_master(self) -> dict:
+        """
+        Extract 日主 (Day Master) analysis for LLM consumption.
+
+        Returns:
+            dict: Day master with 得令/得地/得势/强弱, or empty dict if unavailable
+        """
+        day_master_outer = self.raw_data.get("day_master", {})
+        return day_master_outer.get("日主", {})
+
     def _extract_da_yun(self) -> dict:
         """
         Extract 大运 (Da Yun - Big Luck Cycles) data for LLM consumption.
@@ -373,9 +385,10 @@ class AstroDataLLMFormatter:
                 "三垣": self._extract_three_palaces(),
                 "胎息": self._extract_tai_xi(),
             },
+            "日主": self._extract_day_master(),
             "五行力量": self._extract_wu_xing().get("五行力量", {}),
             "运程": self._organise_yun_cheng(),
-            "流年": self._extract_liu_nian(),
+            # "流年": self._extract_liu_nian(),
             "分析逻辑参考": {
                 "干支作用优先级": self._extract_interactions(),
                 "五行相位动力": self._extract_wu_xing().get("五行相位动力", {}),

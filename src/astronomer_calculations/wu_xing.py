@@ -103,69 +103,23 @@ Climate System:
 from datetime import datetime
 from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
 from src.astronomer_calculations.void_xun_kong import get_xun_kong
-from src.astronomer_calculations.natal_interactions import BRANCH_HIDDEN_ROOTING, get_stem_root_tier
+from src.astronomer_calculations.day_master import (
+    Element, Stem, Branch,
+    STEM_ELEMENT, SHENG_WANG_TABLE,
+    BRANCH_HIDDEN_ROOTING, get_stem_root_tier,
+    SeasonalFactors, get_seasonal_factors,
+    STATE_MULT, VISIBLE_STEM_MULT,
+    _YANG_STEMS, _STATE_DESCRIPTIONS, _SEASONAL_TABLE,
+    _SPRING_BRANCHES, _SUMMER_BRANCHES, _AUTUMN_BRANCHES,
+    stem_elements,
+)
 from dataclasses import dataclass
-from enum import Enum
 from typing import Dict, List, Optional, Tuple, Union
-
-
-# ─────────────────────────────────────────────
-# Enums
-# ─────────────────────────────────────────────
-
-
-class Element(Enum):
-    WOOD = "木"
-    FIRE = "火"
-    EARTH = "土"
-    METAL = "金"
-    WATER = "水"
-
-
-class Stem(Enum):
-    JIA = "甲"
-    YI = "乙"
-    BING = "丙"
-    DING = "丁"
-    WU = "戊"
-    JI = "己"
-    GENG = "庚"
-    XIN = "辛"
-    REN = "壬"
-    GUI = "癸"
-
-
-class Branch(Enum):
-    ZI = "子"
-    CHOU = "丑"
-    YIN = "寅"
-    MAO = "卯"
-    CHEN = "辰"
-    SI = "巳"
-    WU = "午"
-    WEI = "未"
-    SHEN = "申"
-    YOU = "酉"
-    XU = "戌"
-    HAI = "亥"
 
 
 # ─────────────────────────────────────────────
 # Static lookup tables
 # ─────────────────────────────────────────────
-
-STEM_ELEMENT: Dict[Stem, Element] = {
-    Stem.JIA: Element.WOOD,
-    Stem.YI: Element.WOOD,
-    Stem.BING: Element.FIRE,
-    Stem.DING: Element.FIRE,
-    Stem.WU: Element.EARTH,
-    Stem.JI: Element.EARTH,
-    Stem.GENG: Element.METAL,
-    Stem.XIN: Element.METAL,
-    Stem.REN: Element.WATER,
-    Stem.GUI: Element.WATER,
-}
 
 BRANCH_ELEMENT: Dict[Branch, Element] = {
     Branch.ZI: Element.WATER,
@@ -235,150 +189,7 @@ SHENG_WANG_MULT: Dict[str, float] = {
     "养": 0.85,  # Nurture
 }
 
-# Full 十二长生 table: stem → branch → stage name
-# Built from classical texts (淵海子平, 三命通會)
-SHENG_WANG_TABLE: Dict[Stem, Dict[Branch, str]] = {
-    Stem.JIA: {
-        Branch.HAI: "长生",
-        Branch.ZI: "沐浴",
-        Branch.CHOU: "冠带",
-        Branch.YIN: "临官",
-        Branch.MAO: "帝旺",
-        Branch.CHEN: "衰",
-        Branch.SI: "病",
-        Branch.WU: "死",
-        Branch.WEI: "墓",
-        Branch.SHEN: "绝",
-        Branch.YOU: "胎",
-        Branch.XU: "养",
-    },
-    Stem.YI: {  # Yin Wood — counterclockwise from 午 (reverse of 甲)
-        Branch.WU: "长生",
-        Branch.SI: "沐浴",
-        Branch.CHEN: "冠带",
-        Branch.MAO: "临官",
-        Branch.YIN: "帝旺",
-        Branch.CHOU: "衰",
-        Branch.ZI: "病",
-        Branch.HAI: "死",
-        Branch.XU: "墓",
-        Branch.YOU: "绝",
-        Branch.SHEN: "胎",
-        Branch.WEI: "养",
-    },
-    Stem.BING: {
-        Branch.YIN: "长生",
-        Branch.MAO: "沐浴",
-        Branch.CHEN: "冠带",
-        Branch.SI: "临官",
-        Branch.WU: "帝旺",
-        Branch.WEI: "衰",
-        Branch.SHEN: "病",
-        Branch.YOU: "死",
-        Branch.XU: "墓",
-        Branch.HAI: "绝",
-        Branch.ZI: "胎",
-        Branch.CHOU: "养",
-    },
-    Stem.DING: {
-        Branch.YOU: "长生",
-        Branch.SHEN: "沐浴",
-        Branch.WEI: "冠带",
-        Branch.WU: "临官",
-        Branch.SI: "帝旺",
-        Branch.CHEN: "衰",
-        Branch.MAO: "病",
-        Branch.YIN: "死",
-        Branch.CHOU: "墓",
-        Branch.ZI: "绝",
-        Branch.HAI: "胎",
-        Branch.XU: "养",
-    },
-    Stem.WU: {  # Yang Earth — same 长生 positions as 丙 per 三命通会
-        Branch.YIN: "长生",
-        Branch.MAO: "沐浴",
-        Branch.CHEN: "冠带",
-        Branch.SI: "临官",
-        Branch.WU: "帝旺",
-        Branch.WEI: "衰",
-        Branch.SHEN: "病",
-        Branch.YOU: "死",
-        Branch.XU: "墓",
-        Branch.HAI: "绝",
-        Branch.ZI: "胎",
-        Branch.CHOU: "养",
-    },
-    Stem.JI: {  # Yin Earth — same 长生 positions as 丁 per 三命通会
-        Branch.YOU: "长生",
-        Branch.SHEN: "沐浴",
-        Branch.WEI: "冠带",
-        Branch.WU: "临官",
-        Branch.SI: "帝旺",
-        Branch.CHEN: "衰",
-        Branch.MAO: "病",
-        Branch.YIN: "死",
-        Branch.CHOU: "墓",
-        Branch.ZI: "绝",
-        Branch.HAI: "胎",
-        Branch.XU: "养",
-    },
-    Stem.GENG: {
-        Branch.SI: "长生",
-        Branch.WU: "沐浴",
-        Branch.WEI: "冠带",
-        Branch.SHEN: "临官",
-        Branch.YOU: "帝旺",
-        Branch.XU: "衰",
-        Branch.HAI: "病",
-        Branch.ZI: "死",
-        Branch.CHOU: "墓",
-        Branch.YIN: "绝",
-        Branch.MAO: "胎",
-        Branch.CHEN: "养",
-    },
-    Stem.XIN: {
-        Branch.ZI: "长生",
-        Branch.HAI: "沐浴",
-        Branch.XU: "冠带",
-        Branch.YOU: "临官",
-        Branch.SHEN: "帝旺",
-        Branch.WEI: "衰",
-        Branch.WU: "病",
-        Branch.SI: "死",
-        Branch.CHEN: "墓",
-        Branch.MAO: "绝",
-        Branch.YIN: "胎",
-        Branch.CHOU: "养",
-    },
-    Stem.REN: {
-        Branch.SHEN: "长生",
-        Branch.YOU: "沐浴",
-        Branch.XU: "冠带",
-        Branch.HAI: "临官",
-        Branch.ZI: "帝旺",
-        Branch.CHOU: "衰",
-        Branch.YIN: "病",
-        Branch.MAO: "死",
-        Branch.CHEN: "墓",
-        Branch.SI: "绝",
-        Branch.WU: "胎",
-        Branch.WEI: "养",
-    },
-    Stem.GUI: {
-        Branch.MAO: "长生",
-        Branch.YIN: "沐浴",
-        Branch.CHOU: "冠带",
-        Branch.ZI: "临官",
-        Branch.HAI: "帝旺",
-        Branch.XU: "衰",
-        Branch.YOU: "病",
-        Branch.SHEN: "死",
-        Branch.WEI: "墓",
-        Branch.WU: "绝",
-        Branch.SI: "胎",
-        Branch.CHEN: "养",
-    },
-}
+# SHENG_WANG_TABLE imported from day_master
 
 
 def get_shengwang_mult(stem: Stem, branch: Branch) -> float:
@@ -390,79 +201,8 @@ def get_shengwang_mult(stem: Stem, branch: Branch) -> float:
 
 
 # ─────────────────────────────────────────────
-# Seasonal factors
+# Seasonal factors — imported from day_master
 # ─────────────────────────────────────────────
-
-# ─────────────────────────────────────────────
-# Seasonal multiplier tables — module-level constants
-# Defined at module level for efficiency and consistency across calculations
-# ─────────────────────────────────────────────
-
-# Hidden stem multipliers: full suppression range for buried stems in branches
-STATE_MULT: Dict[str, float] = {
-    "旺": 1.00,
-    "相": 0.80,
-    "休": 0.60,
-    "囚": 0.40,
-    "死": 0.20,
-}
-
-# Visible (transparent) heavenly stem multipliers: raised floors for 囚 and 死.
-# 死 means "weakened", not "eliminated" — a transparent stem retains minimum
-# presence regardless of season. Hierarchy strictly preserved:
-#   旺 1.00 > 相 0.80 > 休 0.60 > 囚 0.50 > 死 0.40
-VISIBLE_STEM_MULT: Dict[str, float] = {
-    "旺": 1.00,
-    "相": 0.80,
-    "休": 0.60,
-    "囚": 0.50,
-    "死": 0.40,
-}
-
-
-@dataclass
-class SeasonalFactors:
-    season: str
-    states: Dict[Element, str]
-
-    def mult(self, element: Element) -> float:
-        """Seasonal multiplier for hidden stems — full range 0.20 to 1.00."""
-        return STATE_MULT.get(self.states.get(element, "囚"), 0.40)
-
-    def mult_visible(self, element: Element) -> float:
-        """
-        Seasonal multiplier for a *visible* (transparent) heavenly stem.
-        Uses raised floors for 死 (0.40) and 囚 (0.50) to prevent near-elimination
-        of a stem that is explicitly present in the heavenly position.
-        """
-        return VISIBLE_STEM_MULT.get(self.states.get(element, "囚"), 0.50)
-
-
-_SPRING_BRANCHES = frozenset({Branch.YIN, Branch.MAO, Branch.CHEN})
-_SUMMER_BRANCHES = frozenset({Branch.SI, Branch.WU, Branch.WEI})
-_AUTUMN_BRANCHES = frozenset({Branch.SHEN, Branch.YOU, Branch.XU})
-
-
-def get_seasonal_factors(month_branch: Branch) -> SeasonalFactors:
-    """
-    Map month branch → SeasonalFactors for all five elements.
-
-    Seasons are determined by frozenset membership:
-      春 (spring): 寅卯辰  夏 (summer): 巳午未
-      秋 (autumn): 申酉戌  冬 (winter): 亥子丑
-    Returns a SeasonalFactors with the season name and the element-state dict
-    drawn from _SEASONAL_TABLE, used by both hidden-stem (mult) and visible-stem
-    (mult_visible) scoring paths.
-    """
-    if month_branch in _SPRING_BRANCHES:
-        season = "spring"
-    elif month_branch in _SUMMER_BRANCHES:
-        season = "summer"
-    elif month_branch in _AUTUMN_BRANCHES:
-        season = "autumn"
-    else:
-        season = "winter"
-    return SeasonalFactors(season=season, states=_SEASONAL_TABLE[season])
 
 
 # ─────────────────────────────────────────────
@@ -773,16 +513,6 @@ class Pillar:
 STR_STEM = {s.value: s for s in Stem}
 STR_BRANCH = {b.value: b for b in Branch}
 
-_YANG_STEMS: frozenset = frozenset({"甲", "丙", "戊", "庚", "壬"})
-
-_STATE_DESCRIPTIONS: dict = {
-    "旺": "旺 (最强)",
-    "相": "相 (次强)",
-    "囚": "囚 (弱)",
-    "休": "休 (气弱)",
-    "死": "死 (极弱)",
-}
-
 _CLIMATE_DESCRIPTIONS: dict = {
     "very_cold": "极寒",
     "cold": "寒冷",
@@ -794,37 +524,6 @@ _CLIMATE_DESCRIPTIONS: dict = {
 _ROOT_LABELS: tuple = ("本气根", "中气根", "余气根")
 
 _STR_TO_ELEM: dict = {e.value: e for e in Element}
-
-_SEASONAL_TABLE: dict = {
-    "spring": {
-        Element.WOOD: "旺",
-        Element.FIRE: "相",
-        Element.EARTH: "死",
-        Element.METAL: "囚",
-        Element.WATER: "休",
-    },
-    "summer": {
-        Element.WOOD: "休",
-        Element.FIRE: "旺",
-        Element.EARTH: "相",
-        Element.METAL: "死",
-        Element.WATER: "囚",
-    },
-    "autumn": {
-        Element.WOOD: "死",
-        Element.FIRE: "囚",
-        Element.EARTH: "休",
-        Element.METAL: "旺",
-        Element.WATER: "相",
-    },
-    "winter": {
-        Element.WOOD: "相",
-        Element.FIRE: "死",
-        Element.EARTH: "囚",
-        Element.METAL: "休",
-        Element.WATER: "旺",
-    },
-}
 
 
 # ─────────────────────────────────────────────
@@ -1072,38 +771,6 @@ class WuXingDynamicsCalculator:
             for p in pillars if p.stem
         }
 
-        # Building 基本信息 (Basic Information)
-        day_pillar = next((p for p in pillars if p.position == "day"), None)
-        day_master = ""
-        if day_pillar and day_pillar.stem:
-            stem_val = day_pillar.stem.value
-            elem = STEM_ELEMENT[day_pillar.stem]
-            # Determine if stem is Yang (甲丙戊庚壬) or Yin (乙丁己辛癸)
-            yang_yin = "阳" if stem_val in _YANG_STEMS else "阴"
-
-            # Calculate 旺衰 (seasonal strength)
-            dm_state = _STATE_DESCRIPTIONS.get(seasonal.states.get(elem, "囚"), "未知")
-
-            # Calculate 十二长生 (12-stage life cycle)
-            dm_stage = (
-                SHENG_WANG_TABLE.get(day_pillar.stem, {}).get(day_pillar.branch)
-                if day_pillar.branch
-                else None
-            )
-
-            # Calculate 通根 (root connection) — element-level search across all branches
-            tong_gen = tong_gen_cache[elem]
-
-            day_master = {
-                "显示名称": f"{stem_val}{elem.value} ({yang_yin}{elem.value})",
-                "天干": stem_val,
-                "五行": elem.value,
-                "阴阳": yang_yin,
-                "旺衰": dm_state,
-                "十二长生": dm_stage,
-                "通根": tong_gen,
-            }
-
         # Map month branch to precise sub-season term (孟/仲/季)
         birth_season = (
             SUB_SEASON.get(month_pillar.branch, "")
@@ -1113,7 +780,6 @@ class WuXingDynamicsCalculator:
 
         # Assemble the final result structure. Commented out climate characteristics for now, can be re-enabled if needed.
         basic_info = {
-            "日主": day_master,
             "出生季节": birth_season,
             # "气候特征": _CLIMATE_DESCRIPTIONS.get(climate, climate),
         }

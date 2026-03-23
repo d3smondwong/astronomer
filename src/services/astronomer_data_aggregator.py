@@ -2,13 +2,13 @@ from datetime import datetime
 from lunar_python import Lunar
 from src.astronomer_calculations import (
     shen_sha,
-    interactions_gan_zhi_zuo_yong,
     yuan_tian_gang_bone_weight,
     bazi_pillars,
     wu_xing,
     ten_gods_shi_shen,
     na_yin,
     basic_info,
+    natal_interactions,
     life_stage_di_shi,
     void_xun_kong,
     three_palace_san_yuan,
@@ -17,6 +17,7 @@ from src.astronomer_calculations import (
     da_yun,
     xiao_yun,
     liu_nian_ye,
+    day_master,
 )
 
 
@@ -26,7 +27,7 @@ class AstroDataAggregator:
     def __init__(self):
 
         self.shen_sha = shen_sha
-        self.interactions = interactions_gan_zhi_zuo_yong
+        self.interactions = natal_interactions
         self.bone_weight = yuan_tian_gang_bone_weight
         self.bazi_pillars = bazi_pillars
         self.wu_xin = wu_xing
@@ -40,7 +41,8 @@ class AstroDataAggregator:
         self.birth_environment = birth_environment
         self.da_yun = da_yun
         self.xiao_yun = xiao_yun
-        self.liu_nian_ye = liu_nian_ye
+        self.day_master = day_master
+        # self.liu_nian_ye = liu_nian_ye
 
     def collect_data(
         self,
@@ -79,9 +81,10 @@ class AstroDataAggregator:
             "di_shi": self.di_shi.get_di_shi(lunar_birthday),
             "da_yun": self.da_yun.get_da_yun(lunar_birthday, gender),
             "xiao_yun": self.xiao_yun.get_xiao_yun(lunar_birthday, gender),
-            "liu_nian_ye": self.liu_nian_ye.get_liu_nian_ye_current_focus(
-                lunar_birthday, gender
-            ),
+            "day_master": self.day_master.get_day_master(lunar_birthday),
+            # "liu_nian_ye": self.liu_nian_ye.get_liu_nian_ye_current_focus(
+            #     lunar_birthday, gender
+            # ),
         }
 
         return result
