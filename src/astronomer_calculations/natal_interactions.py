@@ -103,7 +103,7 @@ KEY FEATURES:
        All three types share a consistent field schema:
          类型, 组合, 组合明细, 状态, 紧贴, 主动方, 根基
        天干合 additionally carries:
-         元素 (合化五行), 合化判断 ("合化成立" / "合而不化" — rooting-based)
+         元素 (合化五行)
        主动方: "相互" for 天干合/冲; controller pillar label for 天干克.
        根基: {pillar_label: tier} for each participating stem — 4-tier system
              (深根/中根/浅根/无根) computed via get_stem_root_tier().
@@ -237,7 +237,6 @@ Output Format:
     - 混杂: Clash turbidity flag (共拱 only)
     - 主动方: Controller pillar label for 天干克; "相互" for 天干合/冲
     - 根基: {pillar_label: tier} 4-tier rooting per participating stem (天干合/克/冲 only)
-    - 合化判断: "合化成立" or "合而不化" based on stem rooting (天干合 only)
     - 强度: Modulated strength (强势主流/显著影响/中等衰减/大幅衰减/消融吸收)
     - 备注: Causal note (if suppressed/absorbed)
 
@@ -256,6 +255,7 @@ from src.astronomer_calculations import void_xun_kong
 from src.utils.logging import get_logger
 from src.astronomer_calculations.day_master import (
     BRANCH_HIDDEN_ROOTING,
+    compute_de_di,
     get_stem_root_tier,
     get_shi_shen_for_stem_pair,
     stem_elements,
@@ -578,14 +578,6 @@ STRENGTH_ORDER = {
     "消融吸收": 4,
 }
 
-# Maps day master 强弱 classification to an equivalent rooting tier.
-# Used by _pass_stem_rooting to substitute the day master's branch-rooting
-# tier with its holistic constitutional strength when 日柱特殊=True.
-_QIANG_RUO_TO_ROOT_TIER: dict[str, str] = {
-    "身旺": "深根",
-    "中和": "中根",
-    "身弱": "无根",
-}
 
 INTERACTION_TIER_ORDER = {
     "三会": 0,
@@ -797,18 +789,19 @@ _XK_MISC_TYPES = frozenset({"暗合", "干支透合", "比和", "共拱"})
 _XK_STEM_ONLY = frozenset({"天干合", "天干克", "天干冲"})
 
 _XK_REMARKS = {
-    "合_single": "{pillars}旬空，合力虚浮，力场不实",
+    "合_single": "{pillars}支落旬空，合力虚浮，力场不实",
     "冲开旬空": "冲开旬空，虚局受激",
-    "双空相冲": "{pillars}双空相冲，冲力涣散",
-    "刑_single": "{pillars}旬空，刑力减弱",
-    "害破_single": "{pillars}旬空，害破力场减弱",
-    "misc_single": "{pillars}旬空，合力虚浮",
+    "双空相冲": "{pillars}支双空相冲，冲力涣散",
+    "刑_single": "{pillars}支落旬空，刑力减弱",
+    "害破_single": "{pillars}支落旬空，害破力场减弱",
+    "misc_single": "{pillars}支落旬空，合力虚浮",
 }
 
 # Pillar name constants
 _PILLAR_NAMES_CN = ["年柱", "月柱", "日柱", "时柱"]
 _PILLAR_IDX_MAP = {"年柱": 0, "月柱": 1, "日柱": 2, "时柱": 3}
 _PILLAR_ABBR_MAP = {"年": 0, "月": 1, "日": 2, "时": 3}
+_PILLAR_NAME_SET = frozenset(_PILLAR_NAMES_CN)  # fast membership test; avoids rebuilding per call
 _STEM_LOCK_PRIORITY = [2, 1, 3, 0]  # 日柱=2 absolute anchor
 
 # ── Xun Kong (旬空) Helpers ───────────────────────────────────────────────────
@@ -821,7 +814,7 @@ def _is_branch_in_xun_kong(branch: str, pillar_name: str, xun_kong_data: dict) -
 def _extract_branch_pairs(combo_detail: dict) -> list:
     pairs = []
     for pn, val in combo_detail.items():
-        if pn not in set(_PILLAR_NAMES_CN):
+        if pn not in _PILLAR_NAME_SET:
             continue
         if isinstance(val, str) and len(val) == 1 and val in branch_elements:
             pairs.append((pn, val))
@@ -1178,6 +1171,17 @@ def _pass1_structural(registry: InteractionRegistry, zhis: list) -> None:
       Tie-breaker C: lower proximity score wins
 
     Loser → 中等衰减 + synthetic half-structure injected for surviving pair.
+
+    NOTE — Synthetic injection is NEVER triggered for the natal 4-pillar chart.
+    A contest (len(candidates) > 1) requires the same branch to appear in two
+    competing triple-structures simultaneously, which needs 5+ distinct branch
+    positions. This function is only ever called from apply_bazi_master_priority,
+    which is only ever called from get_interactions (natal 4-pillar). Da Yun and
+    all cycle interactions use cycle_interactions.py, which has its own structural
+    detection and correctly dispatches 拱会 vs 残会 independently of this path.
+    The synthetic injection block below is therefore dead code for all current
+    call sites; it is retained for completeness but must not be extended to
+    cycle use cases without a full audit of 拱会/残会 type logic.
     """
     for idx, actor in registry.branch_actors.items():
         candidates = registry.get_by_type(["三会", "三合"], idx)
@@ -1607,6 +1611,7 @@ def _pass4_group(registry: InteractionRegistry) -> None:
                         if sub.get("拱向") == target and sub.get("类型") in {
                             "半合",
                             "拱会",
+                            "残会",
                         }:
                             sub_str = sub.get("强度")
                             if sub_str and STRENGTH_ORDER.get(sub_str, 0) >= STRENGTH_ORDER.get("大幅衰减", 0):
@@ -1648,16 +1653,16 @@ def _downgrade_if_stronger(current: str, cap: str) -> str:
     return cap if STRENGTH_ORDER.get(current, 99) < STRENGTH_ORDER.get(cap, 99) else current
 
 
-def _pass_stem_rooting(items: list, day_strength: str = "中和") -> None:
+def _pass_stem_rooting(items: list, tong_gen: str = "中根") -> None:
     """
     Stem Rooting Modulation Pass.
     Downgrades 天干合/克/冲 strength based on participating stems' 无根 status (multi-tier).
     Operates on a flat list (post-priority); does NOT use registry.
 
     When 日柱特殊=True on an item, the day master's branch-rooting tier is substituted
-    with a tier derived from its holistic 强弱 classification via _QIANG_RUO_TO_ROOT_TIER.
-    This prevents false downgrades for a 身旺 day master whose root falls outside the
-    local branch subset, and ensures a 身弱 day master is correctly treated as rootless.
+    with the 通根 tier from 得地 (深根/中根/浅根/无根). This prevents false downgrades for
+    a deeply-rooted day master whose root falls outside the local branch subset, and ensures
+    a rootless day master is correctly treated as 无根.
     All other stem pairs use actual branch-rooting tiers unchanged.
 
     Scenario table:
@@ -1666,11 +1671,9 @@ def _pass_stem_rooting(items: list, day_strength: str = "中和") -> None:
                 controller 无根 + target 无根   → "中等衰减"
         天干冲: one stem 无根 → "显著影响"; both 无根 → "中等衰减"
 
-    Scope note: the 强弱 substitution operates on a local effective_rooting copy and does
+    Scope note: the substitution operates on a local effective_rooting copy and does
     NOT write back to item["根基"]. Wu_xing's combo_factor and per_stem_retain (both read
     根基 directly) therefore still use the raw branch-rooting tier for the day master.
-    To extend the substitution to wu_xing scoring, write the derived tier back to
-    item["根基"]["日柱"] here instead of keeping it local.
     """
     for item in items:
         itype = item.get("类型")
@@ -1683,10 +1686,10 @@ def _pass_stem_rooting(items: list, day_strength: str = "中和") -> None:
             continue
         strength = item.get("强度", "")
 
-        # When the day master participates, substitute its tier with the 强弱-derived equivalent
+        # When the day master participates, substitute its tier with 通根 directly
         effective_rooting = dict(rooting)
         if item.get("日柱特殊") and "日柱" in effective_rooting:
-            effective_rooting["日柱"] = _QIANG_RUO_TO_ROOT_TIER.get(day_strength, "中根")
+            effective_rooting["日柱"] = tong_gen
 
         tiers = list(effective_rooting.values())
         wugen_count = tiers.count("无根")
@@ -1738,12 +1741,15 @@ def apply_bazi_master_priority(
     Pass 3 — Conflict Pass      (PRIORITY_RULE_TABLE lookup per actor lock)
     Pass 4 — Group/Environment  (半合/共拱/比和/暗合 with echo & VACANT susceptibility)
     Pass 5 — Default Assignment (DEFAULT_STRENGTH table)
-    Pass S — Stem Rooting Modulation (_pass_stem_rooting, orthogonal to priority logic)
+
+    Note: Pass S (Stem Rooting Modulation) is applied by the caller after this
+    function returns, so the caller can supply the correct 通根 tier.
     """
     _pass1_structural(registry, zhis)
-    # 共拱 detection runs here so synthetic 半合/残会 from Pass 1 tie-breaking
+    # 共拱 detection runs here so any synthetic 半合/残会 from Pass 1 tie-breaking
     # are visible. In 4-pillar natal charts Pass 1 never injects synthetics
-    # (requires 5+ branches), but this ordering is correct for Da Yun overlay.
+    # (requires 5+ branches — see _pass1_structural docstring). Da Yun and other
+    # cycle contexts use cycle_interactions.py, not this function.
     _detect_gong_gong(registry, zhis)
     _pass2_dual(registry)
     _pass3_conflict(registry)
@@ -1752,7 +1758,6 @@ def apply_bazi_master_priority(
 
     result = registry.all_items()
     result.sort(key=lambda x: INTERACTION_TIER_ORDER.get(x.get("类型", "无"), 999))
-    _pass_stem_rooting(result)
     return result
 
 
@@ -1967,11 +1972,10 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
     Stem interaction field schema (consistent across all three types):
         类型, 组合, 组合明细, 状态, 紧贴, 主动方, 根基
       天干合 additionally:
-        元素 (合化五行), 合化判断 ("合化成立" / "合而不化")
+        元素 (合化五行)
 
       主动方: controller pillar label for 天干克; "相互" for 天干合/冲.
       根基: {pillar_label: tier} — 4-tier (深根/中根/浅根/无根) via get_stem_root_tier().
-      合化判断: "合化成立" if both stems ≥浅根; "合而不化" if either is 无根.
 
     干支透合 is bidirectional per pair: checks both g_i→zhis[j] and g_j→zhis[i].
     Each item stores 干方索引 (source stem pillar) and 支方索引 (target branch pillar)
@@ -2194,7 +2198,6 @@ def _detect_pairwise(zhis: list, gans: list, registry: InteractionRegistry) -> N
                         "状态": get_status("天干合"),
                         "紧贴": is_adjacent,
                         "主动方": "相互",
-                        "合化判断": "合化成立" if tier_i != "无根" and tier_j != "无根" else "合而不化",
                         "根基": root_detail,
                     }
                 )
@@ -2427,6 +2430,10 @@ def _detect_gong_gong(registry: InteractionRegistry, zhis: list) -> None:
             else f"共拱{missing_branch}({frame_label}，{virtual_label})"
         )
 
+        # 紧贴: True if all participant pillars are consecutive (no gaps in index span)
+        sorted_indices = [_PILLAR_IDX_MAP[p] for p in all_names_sorted]
+        is_tight = (sorted_indices[-1] - sorted_indices[0]) == (len(sorted_indices) - 1)
+
         item = {
             "类型": "共拱",
             "元素": element,
@@ -2434,6 +2441,7 @@ def _detect_gong_gong(registry: InteractionRegistry, zhis: list) -> None:
             "组合": "-".join(all_names_sorted),
             "组合明细": combined_detail,
             "拱向": missing_branch,
+            "紧贴": is_tight,
             "状态": status,
             "混杂": clashed,
             "_layer": 2,
@@ -2473,14 +2481,14 @@ def _detect_gong_gong(registry: InteractionRegistry, zhis: list) -> None:
 _TIER1_TYPES = {"三会", "三合", "六冲", "六合"}
 _TIER2_TYPES = {"共拱", "拱会", "残会", "半合", "天干合", "天干克", "天干冲", "比和"}
 _TIER3_TYPES = {
-    "三刑",
-    "六害",
-    "六破",
-    "暗合",
     "无恩之刑",
     "恃势之刑",
     "无礼之刑",
     "自刑",
+    "六害",
+    "六破",
+    "暗合",
+    "干支透合",
 }
 
 
@@ -2509,7 +2517,10 @@ def _build_pillar_dynamics(filtered: list) -> dict:
             tier = "第一梯队_纲领层"
         elif itype in _TIER2_TYPES:
             tier = "第二梯队_气势层"
+        elif itype in _TIER3_TYPES:
+            tier = "第三梯队_琐碎层"
         else:
+            logger.warning("未知交互类型 %s 未分配梯队，默认归入第三梯队", itype)
             tier = "第三梯队_琐碎层"
         item_id = item["_iid"]
         # Strip internal keys once per item, reusing item_id before it's gone
@@ -2654,6 +2665,11 @@ def get_interactions(lunar_birthday) -> dict:
 
     # ── Five-pass priority filter (includes 共拱 detection after Pass 1) ──
     filtered = apply_bazi_master_priority(registry.all_items(), zhis, registry)
+
+    # ── Pass S: Stem Rooting Modulation ──────────────────────────────────
+    day_elem = stem_elements.get(gans[2], "")
+    tong_gen = compute_de_di(day_elem, zhis)["通根"] if day_elem else "中根"
+    _pass_stem_rooting(filtered, tong_gen=tong_gen)
 
     # ── Pass 6: Xun Kong (旬空) post-filter ──────────────────────────────
     xun_kong_result = void_xun_kong.get_xun_kong(lunar_birthday)

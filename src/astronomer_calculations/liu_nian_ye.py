@@ -1283,7 +1283,7 @@ def _detect_liu_nian_interactions(
     birth_chart: dict,
     cycle_xk_str: str | None = None,
     natal_xk: dict | None = None,
-    day_strength: str = "中和",
+    tong_gen: str = "中根",
 ) -> dict:
     """
     Detect Liu Nian interactions with birth chart using same 1x4 scan as Da Yun.
@@ -1309,7 +1309,7 @@ def _detect_liu_nian_interactions(
         cycle_label="流年",
         cycle_xk_str=cycle_xk_str,
         natal_xk=natal_xk,
-        day_strength=day_strength,
+        tong_gen=tong_gen,
     )
 
 
@@ -1319,7 +1319,7 @@ def _detect_liu_yue_interactions(
     birth_chart: dict,
     cycle_xk_str: str | None = None,
     natal_xk: dict | None = None,
-    day_strength: str = "中和",
+    tong_gen: str = "中根",
 ) -> dict:
     """
     Detect Liu Yue interactions with birth chart using same 1x4 scan as Da Yun.
@@ -1345,7 +1345,7 @@ def _detect_liu_yue_interactions(
         cycle_label="流月",
         cycle_xk_str=cycle_xk_str,
         natal_xk=natal_xk,
-        day_strength=day_strength,
+        tong_gen=tong_gen,
     )
 
 
@@ -1477,8 +1477,8 @@ def get_liu_nian(
     # Get the Day Stem (日干) - this is the reference for all Ten Gods calculations
     day_stem = bazi.getDayGan()
 
-    # Day master strength — used to contextualise 开库 墓库境况
-    day_strength = get_day_master(lunar_birthday).get("日主", {}).get("强弱", "中和")
+    # Day master 通根 tier — used to contextualise 开库 墓库境况
+    tong_gen = get_day_master(lunar_birthday).get("日主", {}).get("得地", {}).get("通根", "中根")
 
     # Extract birth chart pillars for interaction detection
     birth_chart = {
@@ -1569,7 +1569,7 @@ def get_liu_nian(
                 birth_chart,
                 cycle_xk_str=cycle_xk_str,
                 natal_xk=natal_xk,
-                day_strength=day_strength,
+                tong_gen=tong_gen,
             )
             interactions = interactions_result.get("作用", {})
 
@@ -1626,7 +1626,7 @@ def get_liu_nian(
                     day_stem,
                     cycle_a_xk_str=da_yun_xk_str,
                     cycle_b_xk_str=cycle_xk_str,
-                    day_strength=day_strength,
+                    tong_gen=tong_gen,
                 )
                 cross_result = get_cross_cycle_interactions(
                     da_yun_stem,
@@ -1638,7 +1638,7 @@ def get_liu_nian(
                     cycle_a_xk_str=da_yun_xk_str,
                     cycle_b_xk_str=cycle_xk_str,
                     natal_xk=natal_xk,
-                    day_strength=day_strength,
+                    tong_gen=tong_gen,
                 )
             else:
                 pairwise_result = {}
@@ -1726,8 +1726,8 @@ def get_liu_yue(
     # Get the Day Stem (日干) - this is the reference for all Ten Gods calculations
     day_stem = bazi.getDayGan()
 
-    # Day master strength — used to contextualise 开库 墓库境况
-    day_strength = get_day_master(lunar_birthday).get("日主", {}).get("强弱", "中和")
+    # Day master 通根 tier — used to contextualise 开库 墓库境况
+    tong_gen = get_day_master(lunar_birthday).get("日主", {}).get("得地", {}).get("通根", "中根")
 
     # Extract birth chart pillars for interaction detection
     birth_chart = {
@@ -1832,7 +1832,7 @@ def get_liu_yue(
                 cycle_b_label="流月",
                 cycle_a_xk_str=liu_nian_xk_str,
                 cycle_b_xk_str=cycle_xk_str,
-                day_strength=day_strength,
+                tong_gen=tong_gen,
             )
             cross_result = get_cross_cycle_interactions(
                 liu_nian_stem,
@@ -1846,7 +1846,7 @@ def get_liu_yue(
                 cycle_a_xk_str=liu_nian_xk_str,
                 cycle_b_xk_str=cycle_xk_str,
                 natal_xk=natal_xk,
-                day_strength=day_strength,
+                tong_gen=tong_gen,
             )
         else:
             pairwise_result = {}
@@ -1859,7 +1859,7 @@ def get_liu_yue(
             birth_chart,
             cycle_xk_str=cycle_xk_str,
             natal_xk=natal_xk,
-            day_strength=day_strength,
+            tong_gen=tong_gen,
         )
         interactions = interactions_result.get("作用", [])
 
