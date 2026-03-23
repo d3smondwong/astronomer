@@ -17,7 +17,7 @@ Key Exports (shared constants):
 
 Main Function:
     get_day_master(lunar_birthday) → dict:
-        Returns day master analysis with 得令/得地/得势 and qualitative 强弱.
+        Returns day master analysis with 得令/得地/得势 (no 强弱 verdict).
 
 Output structure:
     {
@@ -39,7 +39,7 @@ Output structure:
                 "中性天干": [{ "天干": "庚", "十神": "食神" }],
                 "反对天干": [{ "天干": "甲", "十神": "七杀" }],
             },
-            "强弱": "身旺"|"中和"|"身弱"
+            "得地": { "通根": "深根"|"中根"|"浅根"|"无根", ... }
         }
     }
 
@@ -543,36 +543,6 @@ def compute_de_shi(day_stem: str, all_stems: list[str]) -> dict:
     }
 
 
-def _compute_qiang_ruo(de_ling: bool, tong_gen: str, support_count: int) -> dict:
-    """
-    Qualitative strength label for the day master.
-    Classical principle: 得地胜过得令 (rooting outweighs seasonal advantage).
-
-    身旺:
-      - 深根 alone (regardless of season)
-      - 得令 AND 通根≥中根
-      - 得令 AND 支持天干≥2
-      - 中根 AND 支持天干≥2
-    身弱:
-      - 失令 AND 浅根/无根 AND 支持≤1
-      - 得令 AND 无根 AND 支持≤1  (虚浮 — in-season but has no substance)
-    中和: all other cases
-    """
-    if tong_gen == "深根":
-        return {"强弱": "身旺", "原因": "深根自立，无需得令"}
-    if de_ling and tong_gen == "中根":
-        return {"强弱": "身旺", "原因": "得令且中根，根基稳固"}
-    if de_ling and support_count >= 2:
-        return {"强弱": "身旺", "原因": "得令且得势，天干助力充足"}
-    if tong_gen == "中根" and support_count >= 2:
-        return {"强弱": "身旺", "原因": "中根有力，得势补令"}
-    if not de_ling and tong_gen in ("浅根", "无根") and support_count <= 1:
-        return {"强弱": "身弱", "原因": "失令失地，天干助力不足"}
-    if de_ling and tong_gen == "无根" and support_count <= 1:
-        return {"强弱": "身弱", "原因": "虚浮无根，得令而无实"}
-    return {"强弱": "中和", "原因": "得令失地或失令有根，强弱均衡"}
-
-
 def get_day_master(lunar_birthday: Lunar) -> dict:
     """
     Main entry point. Computes full day master analysis from a BaZi chart.
@@ -581,7 +551,13 @@ def get_day_master(lunar_birthday: Lunar) -> dict:
         lunar_birthday: Lunar object from lunar_python
 
     Returns:
-        { "日主": { "天干", "五行", "阴阳", "十二长生", "得令", "得地", "得势", "强弱" } }
+        { "日主": { "天干", "五行", "阴阳", "十二长生", "得令", "得地", "得势" } }
+
+    Note: No single 强弱 verdict is emitted. Downstream modules use 得地.通根
+    (深根/中根/浅根/无根) directly as the rooting-strength proxy. Presenting
+    the three raw factors (得令, 得地, 得势) avoids contested single-verdict
+    methodology — e.g. 深根 alone does not guarantee 身旺 across all schools
+    when 失令 and 失势 coincide with a dominant controlling element.
     """
     gans = [
         lunar_birthday.getYearGan(),
@@ -611,12 +587,6 @@ def get_day_master(lunar_birthday: Lunar) -> dict:
     de_di = compute_de_di(day_elem, zhis)
     de_shi = compute_de_shi(day_stem, gans)
 
-    qiang_ruo = _compute_qiang_ruo(
-        de_ling["得令"],
-        de_di["通根"],
-        len(de_shi["支持天干"]),
-    )
-
     return {
         "日主": {
             "天干": day_stem,
@@ -626,8 +596,6 @@ def get_day_master(lunar_birthday: Lunar) -> dict:
             "得令": de_ling,
             "得地": de_di,
             "得势": de_shi,
-            "强弱": qiang_ruo["强弱"],
-            "强弱原因": qiang_ruo["原因"],
         }
     }
 

@@ -92,8 +92,8 @@ def get_xiao_yun(lunar_birthday: Lunar, gender: int) -> dict:
     # Compute natal xun kong internally
     natal_xk = get_xun_kong(lunar_birthday).get("旬空", {})
 
-    # Day master strength — used to contextualise 开库 墓库境况
-    day_strength = get_day_master(lunar_birthday).get("日主", {}).get("强弱", "中和")
+    # Day master 通根 tier — used to contextualise 开库 墓库境况
+    tong_gen = get_day_master(lunar_birthday).get("日主", {}).get("得地", {}).get("通根", "中根")
 
     # Extract birth chart pillars for interaction detection
     birth_chart = {
@@ -156,7 +156,7 @@ def get_xiao_yun(lunar_birthday: Lunar, gender: int) -> dict:
             xiao_yun_stem, xiao_yun_branch, birth_chart, cycle_label="小运",
             cycle_xk_str=cycle_xk_str,
             natal_xk=natal_xk,
-            day_strength=day_strength,
+            tong_gen=tong_gen,
         )
         cycle_interactions = cycle_interactions_result.get("作用", [])
 
