@@ -21,7 +21,7 @@ Key Functions:
     get_liu_nian(lunar_birthday, gender, start_year=None, num_years=10):
         Calculates Annual Luck Cycles analysis.
 
-    get_liu_yue(lunar_birthday, gender, year_index=0):
+    get_liu_yue(lunar_birthday, gender, target_year=None):
         Calculates Monthly Luck Cycles for a specific annual period.
 
     get_liu_nian_ye(lunar_birthday, gender, start_year=None, num_years=10):
@@ -33,10 +33,10 @@ Output Format:
     Interactions are actionable event alerts for each period.
 """
 
-from lunar_python import Lunar, Solar
+from lunar_python import Lunar
 from lunar_python.util import LunarUtil
 from lunar_python.EightChar import EightChar
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 from src.astronomer_calculations.natal_interactions import (
@@ -750,6 +750,36 @@ def _get_san_sha_guidance(san_sha_branches: list, position: str) -> str:
     )
 
 
+def _get_five_yellow_guidance(direction: str) -> str:
+    """
+    Get direction-specific guidance for Five Yellow Sha (五黄煞).
+
+    五黄 is the most inauspicious flying star (土元素), associated with misfortune,
+    illness, and disaster. The afflicted sector must not be disturbed.
+
+    Args:
+        direction (str): Direction of Five Yellow this year (e.g., "正北", "西南")
+
+    Returns:
+        str: Direction-specific avoidance guidance
+    """
+    direction_desc = _DIRECTION_GUIDANCE.get(direction, direction)
+    detailed_guidance = {
+        "正北": "五黄入北方，坎位受凶星压制，该方位全年忌动土、装修、施工，易引发疾病与意外，宜安置化煞铜器镇压。",
+        "东北": "五黄入东北，艮位受克，该方位忌破土与改建，易招损财与身体损伤，建议减少使用此方空间。",
+        "正东": "五黄入东，震位受压，木被土克，该方位不宜频繁进出或安置床铺，易有健康与财务损失。",
+        "东南": "五黄入东南，巽位受困，不宜在此方向开工或签约，易生是非与拖累，事业易受阻。",
+        "正南": "五黄入南，离位遭殃，火生土反助凶，该方位尤须谨慎，忌装修与燃火，易有财损与官非。",
+        "西南": "五黄入西南，坤位重土叠煞，凶力最强，全年该方位忌一切动作，宜安置六帝铜钱或盐灯化解。",
+        "正西": "五黄入西，兑位受克，金被土泄，该方位不宜开展新计划或移动大件家具，易生口舌与财物损失。",
+        "西北": "五黄入西北，乾位受压，权贵受损，家长或领导易有健康问题，忌在此方位动土与长期停留。",
+    }
+    return detailed_guidance.get(
+        direction,
+        f"{direction_desc} - 五黄凶星所在，该方位全年忌动土、装修与施工，宜安置化煞之物",
+    )
+
+
 def _get_sui_po_position(year_zodiac: str) -> str:
     """
     Get Sui Po (Opposite direction of Tai Sui, 180 degrees).
@@ -1224,32 +1254,6 @@ def _get_current_date_range_liu_nian(reference_date: datetime = None) -> tuple:
     return (start_year, num_years)
 
 
-def _filter_liu_yue_by_date_range(
-    liu_yue_array: list, reference_date: datetime = None
-) -> list:
-    """
-    Filter Liu Yue to include past 12 months + next 24 months from reference date.
-
-    Args:
-        liu_yue_array (list): Array of Liu Yue cycle data dicts
-        reference_date (datetime): Reference date (default: today)
-
-    Returns:
-        list: Filtered Liu Yue array
-    """
-    if reference_date is None:
-        reference_date = datetime.now()
-
-    # Calculate date boundaries
-    past_12_months = reference_date - timedelta(days=365)
-    next_24_months = reference_date + timedelta(days=730)
-
-    # Filter cycles (this is a simple filter; if actual month dates are needed,
-    # they would need to be extracted from liu_yue_obj)
-    # For now, we'll include all cycles and let the caller handle date filtering
-    # if they have actual liu_yue dates available
-    return liu_yue_array
-
 
 def _get_xun_and_xun_kong_from_object(liu_yun_obj) -> tuple:
     """
@@ -1376,8 +1380,8 @@ def _get_jieqi_info_for_lunar_month(year: int, month: int, day: int = 15) -> dic
         curr_jie_solar = curr_jie.getSolar()
         next_jie_solar = next_jie.getSolar()
 
-        curr_jie_solar_date = curr_jie_solar.toYmdHms()
-        next_jie_solar_date = next_jie_solar.toYmdHms()
+        curr_jie_solar_date = curr_jie_solar.toYmdHms() + " (UTC+8)"
+        next_jie_solar_date = next_jie_solar.toYmdHms() + " (UTC+8)"
 
         return {
             "节气": curr_jie.getName(),
@@ -1567,7 +1571,7 @@ def get_liu_nian(
                 natal_xk=natal_xk,
                 day_strength=day_strength,
             )
-            interactions = interactions_result.get("作用", [])
+            interactions = interactions_result.get("作用", {})
 
             # Five Elements dynamics: enriched cycle pillar info + combined natal+cycle 五行力量
             cycle_wu_xing_info = CycleWuXingDynamics().calculate_cycle_interaction(
@@ -1641,7 +1645,8 @@ def get_liu_nian(
                 cross_result = {}
 
             liu_nian_info = {
-                "年龄": age,  # Age at start of year (from library)
+                "周岁年龄": lunar_calendar_year - lunar_birthday.getSolar().getYear(),  # Gregorian age
+                "虚岁年龄": age,  # Traditional Chinese age (from library)
                 "日历年份": lunar_calendar_year,  # Lunar calendar year
                 "当前大运": da_yun_obj.getGanZhi(),  # Current Da Yun stem-branch
                 "年生肖": year_zodiac,  # Zodiac animal for the year
@@ -1697,7 +1702,7 @@ def get_liu_nian(
 def get_liu_yue(
     lunar_birthday: Lunar,
     gender: int,
-    year_index: int = None,
+    target_year: int = None,
     reference_date: datetime = datetime.now(),
 ) -> dict:
     """
@@ -1709,7 +1714,7 @@ def get_liu_yue(
     Args:
         lunar_birthday (Lunar): Lunar calendar object
         gender (int): 0 for Female, 1 for Male
-        year_index (int): Which year within the Liu Nian cycles to get monthly for (0-based)
+        target_year (int): Calendar year to get monthly cycles for. Defaults to current year.
         reference_date (datetime): Reference date for month range filtering (default: today)
 
     Returns:
@@ -1750,15 +1755,14 @@ def get_liu_yue(
     # Calculate 起运 (start of luck cycle) based on gender
     yun = bazi.getYun(gender)
 
-    # Get all Da Yun cycles and find the Liu Nian at year_index
+    # Get all Da Yun cycles and find the Liu Nian matching target_year
     da_yun_array = yun.getDaYun()
 
-    # Use year_index=0 as default if not provided
-    if year_index is None:
-        year_index = 0
+    # Default to current year if not provided
+    if target_year is None:
+        target_year = reference_date.year
 
-    # Flatten all Liu Nian and find the one at year_index
-    total_liu_nian_count = 0
+    # Search for the liu nian whose calendar year matches target_year
     target_liu_nian_obj = None
     target_calendar_year = None
     target_age = None
@@ -1771,24 +1775,30 @@ def get_liu_yue(
             continue
 
         for liu_nian_obj in liu_nian_array:
-            if total_liu_nian_count == year_index:
+            if liu_nian_obj.getYear() == target_year:
                 target_liu_nian_obj = liu_nian_obj
-                target_calendar_year = liu_nian_obj.getYear()
+                target_calendar_year = target_year
                 target_age = liu_nian_obj.getAge()
                 target_da_yun_obj = da_yun_obj
                 break
 
-            total_liu_nian_count += 1
-
         if target_liu_nian_obj:
             break
 
-    # Get Liu Yue array for this Liu Nian
-    liu_yue_array = target_liu_nian_obj.getLiuYue() if target_liu_nian_obj else []
+    if target_liu_nian_obj is None or target_calendar_year is None:
+        return {"流月": {"元信息": {"流年": f"{target_year}年", "流月周期数": 0}, "流月周期": []}}
 
-    # Calculate date boundaries for month filtering (past 12 months + next 24 months)
-    past_12_months = reference_date - timedelta(days=365)
-    next_24_months = reference_date + timedelta(days=730)
+    # Get Liu Yue array for this Liu Nian
+    liu_yue_array = target_liu_nian_obj.getLiuYue()
+
+    # Extract Liu Nian stem/branch/xk for pairwise and cross-cycle interactions with Liu Yue
+    liu_nian_gz = target_liu_nian_obj.getGanZhi() if target_liu_nian_obj else ""
+    if liu_nian_gz and len(liu_nian_gz) >= 2:
+        liu_nian_stem = liu_nian_gz[0]
+        liu_nian_branch = liu_nian_gz[1]
+    else:
+        liu_nian_stem = liu_nian_branch = ""
+    liu_nian_xk_str = target_liu_nian_obj.getXunKong() if target_liu_nian_obj else None
 
     # Process each 流月 (month) within this year
     liu_yue_data = []
@@ -1799,21 +1809,7 @@ def get_liu_yue(
         if gan_zhi == "Unknown" or len(gan_zhi) < 2:
             continue
 
-        # Try to get the month number from the Liu Yue object
-        # The month is typically the index i (0-11 for Jan-Dec)
-        month_num = i + 1  # 1-based month number
-
-        # Create a date representation for filtering
-        # Use the target year and the month number
-        try:
-            month_date = datetime(target_calendar_year, month_num, 1)
-        except ValueError:
-            # If month_num is invalid, skip this entry
-            continue
-
-        # Filter: only include months within past 12 months + next 24 months
-        if month_date < past_12_months or month_date > next_24_months:
-            continue
+        month_num = i + 1  # 1-based month number (lunar month index)
 
         liu_yue_stem = gan_zhi[0]
         liu_yue_branch = gan_zhi[1]
@@ -1822,6 +1818,39 @@ def get_liu_yue(
         cycle_xk_str = (
             liu_yue_obj.getXunKong() if hasattr(liu_yue_obj, "getXunKong") else None
         )
+
+        # 月运作用: pairwise Liu Nian ↔ Liu Yue interactions
+        # 跨运作用: cross-cycle formations spanning natal + Liu Nian + Liu Yue
+        if liu_nian_stem and liu_nian_branch:
+            pairwise_result = get_pairwise_cycle_interactions(
+                liu_nian_stem,
+                liu_nian_branch,
+                liu_yue_stem,
+                liu_yue_branch,
+                day_stem,
+                cycle_a_label="流年",
+                cycle_b_label="流月",
+                cycle_a_xk_str=liu_nian_xk_str,
+                cycle_b_xk_str=cycle_xk_str,
+                day_strength=day_strength,
+            )
+            cross_result = get_cross_cycle_interactions(
+                liu_nian_stem,
+                liu_nian_branch,
+                liu_yue_stem,
+                liu_yue_branch,
+                birth_chart,
+                day_stem=day_stem,
+                cycle_a_label="流年",
+                cycle_b_label="流月",
+                cycle_a_xk_str=liu_nian_xk_str,
+                cycle_b_xk_str=cycle_xk_str,
+                natal_xk=natal_xk,
+                day_strength=day_strength,
+            )
+        else:
+            pairwise_result = {}
+            cross_result = {}
 
         # Detect interactions (作用) with birth chart using 1x4 scan
         interactions_result = _detect_liu_yue_interactions(
@@ -1867,8 +1896,8 @@ def get_liu_yue(
         fu = lunar_date_month.getFu()
         shujiu = lunar_date_month.getShuJiu()
         seasonal_cycles = {
-            "三伏": fu if fu else "非三伏天",
-            "数九": shujiu if shujiu else "非数九天",
+            "三伏": str(fu) if fu else "非三伏天",
+            "数九": str(shujiu) if shujiu else "非数九天",
         }
 
         # Get month info
@@ -1907,7 +1936,13 @@ def get_liu_yue(
             ),  # Strength of the month branch
             "九星能量与风水": nine_star_energy,  # Nine Star Energy for this month
             "方位分析": cai_xi_fu_gui_info,  # Auspicious positions and guidance for this month
-            "作用": interactions,  # Branch and Stem interactions with birth chart
+            "作用": interactions,  # Branch and Stem interactions with birth chart (1x4 scan)
+            "月运作用": pairwise_result.get(
+                "岁运作用", {}
+            ),  # Liu Nian ↔ Liu Yue pairwise interactions
+            "跨运作用": cross_result.get(
+                "跨运作用", {}
+            ),  # Cross-cycle structures (natal + Liu Nian + Liu Yue)
         }
         liu_yue_data.append(liu_yue_info)
 
@@ -1966,13 +2001,19 @@ def get_liu_nian_ye(
         lunar_birthday, gender, start_year, num_years, reference_date
     )
 
-    # Now add Liu Yue data for each Liu Nian
+    # Add Liu Yue data only for current year -1 to +2 (4-year window)
+    # All other Liu Nian years get an empty 流月周期 to keep payload manageable
     liu_nian_cycles = liu_nian_result["流年"]["流年周期"]
+    ref_year = reference_date.year
+    liu_yue_years = {ref_year - 1, ref_year, ref_year + 1, ref_year + 2}
 
-    for idx, liu_nian_cycle in enumerate(liu_nian_cycles):
-        # Get Liu Yue data for this year
-        liu_yue_result = get_liu_yue(lunar_birthday, gender, idx, reference_date)
-        liu_nian_cycle["流月周期"] = liu_yue_result["流月"]["流月周期"]
+    for liu_nian_cycle in liu_nian_cycles:
+        calendar_year = liu_nian_cycle["日历年份"]
+        if calendar_year in liu_yue_years:
+            liu_yue_result = get_liu_yue(lunar_birthday, gender, calendar_year, reference_date)
+            liu_nian_cycle["流月周期"] = liu_yue_result["流月"]["流月周期"]
+        else:
+            liu_nian_cycle["流月周期"] = []
 
     return liu_nian_result
 
@@ -1983,52 +2024,44 @@ def get_liu_nian_ye(
 
 if __name__ == "__main__":
     import json
-    import sys
     import logging
-    from io import StringIO
     from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
     from src.astronomer_calculations.bazi_pillars import get_bazi_pillars
     from src.utils.logging import configure_logging, get_logger
 
     # python -m src.astronomer_calculations.liu_nian_ye
 
-    # Set encoding to UTF-8 for proper Chinese character output
-    if sys.stdout.encoding != "utf-8":
-        sys.stdout = StringIO() if sys.platform == "win32" else sys.stdout
-
-    # Configure logging with timestamped directory
+    # Configure logging
     logger = configure_logging(log_level=logging.INFO, logs_base_dir="logs")
 
-    # Get current datetime
     now = datetime.now()
     logger.info(f"当前日期时间: {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Desmond's birthday example
-    solar_birthday = Solar.fromYmdHms(1985, 11, 25, 17, 7, 0)  # Create solar date
-    datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)  # Create datetime object
-    tst_birthday, _ = get_true_solar_time(datetime_birthday, 1.3253, 103.808053)
-
-    # Example: Lara's birthday
-    # solar_birthday = Solar.fromYmdHms(2025, 7, 31, 9, 10, 0)
-    # tst_birthday, inputs_report = get_true_solar_time(
-    #     datetime(2025, 7, 31, 9, 10, 0), 1.4759, 103.808053
-    # )
+    # --- Subject ---
+    # Desmond's birthday
+    tst_birthday, _ = get_true_solar_time(datetime(1985, 11, 25, 17, 7, 0), 1.3253, 103.808053)
     lunar_birthday = tst_birthday.getLunar()
+    gender = 1  # 0 = Female, 1 = Male
 
-    logger.info("八字")
+    # --- 八字 ---
     bazi_json = get_bazi_pillars(lunar_birthday)
-    logger.info(f"八字: {json.dumps(bazi_json, ensure_ascii=False)}")
+    logger.info("=== 八字 ===")
+    logger.info(json.dumps(bazi_json, ensure_ascii=False, indent=2))
 
-    logger.info(f"流年 5年过去 + 5年未来 (今日: {now.year}-{now.month}-{now.day})")
-    result = get_liu_nian(lunar_birthday, gender=0, reference_date=now)
-    logger.info(f"流年分析结果: {json.dumps(result, ensure_ascii=False, indent=2)}")
+    # # --- 流年 (5 years past + 5 years future) ---
+    # logger.info(f"=== 流年 (Gender={'男' if gender == 1 else '女'}) ===")
+    # liu_nian_result = get_liu_nian(lunar_birthday, gender=gender, reference_date=now)
+    # cycles = liu_nian_result["流年"]["流年周期"]
+    # third_cycle = cycles[2] if len(cycles) > 2 else None
+    # logger.info("=== 流年 第3个周期 ===")
+    # logger.info(json.dumps(third_cycle, ensure_ascii=False, indent=2))
 
-    # print(f"\n=== 流月 第1个年份 (女, Gender=0) ===", file=sys.stderr)
-    # result = get_liu_yue(lunar_birthday, gender=0, year_index=0, reference_date=now)
-    # print(json.dumps(result, ensure_ascii=False, indent=2), file=sys.stderr)
+    # --- 流年 & 流月 (5 years past + 5 years future, months only for -1/+2 window) ---
+    combined_result = get_liu_nian_ye(
+        lunar_birthday,
+        gender=gender,
+        reference_date=now,
+    )
 
-    # print(
-    #     f"\n=== 流年 & 流月 组合分析 (女, Gender=0) - 自动日期范围 ===", file=sys.stderr
-    # )
-    # result = get_liu_nian_ye(lunar_birthday, gender=0, reference_date=now)
-    # print(json.dumps(result, ensure_ascii=False, indent=2), file=sys.stderr)
+    logger.info("=== 流年 & 流月 ===")
+    logger.info(json.dumps(combined_result, ensure_ascii=False, indent=2))

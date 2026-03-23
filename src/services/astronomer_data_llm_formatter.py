@@ -34,7 +34,6 @@ class AstroDataLLMFormatter:
         """
         basic_info = self.raw_data.get("basic_info", {})
 
-        # Rename 调整阳历生日 to 阳历生日 for simplicity
         return {
             "阳历生日": basic_info.get("调整阳历生日"),
             "农历生日": basic_info.get("农历生日"),
@@ -335,15 +334,17 @@ class AstroDataLLMFormatter:
         xiao_yun_outer = self.raw_data.get("xiao_yun", {})
         return xiao_yun_outer.get("小运", {})
 
-    def _extract_liu_nian(self) -> dict:
+    def _extract_liu_nian_ye(self) -> dict:
         """
-        Extract 流年 (Liu Nian - Flowing Year) data for LLM consumption.
+        Extract 流年流月 (Liu Nian & Liu Yue) combined data for LLM consumption.
+
+        Returns the full output of get_liu_nian_ye() as stored by the aggregator.
+        Each 流年周期 entry embeds its own 流月周期 for years within the 4-year month window.
 
         Returns:
-            dict: 流年 metadata and annual cycle array, or empty dict if unavailable
+            dict: Combined 流年 + embedded 流月 structure, or empty dict if unavailable
         """
-        liu_nian_outer = self.raw_data.get("liu_nian_ye", {})
-        return liu_nian_outer.get("流年", {})
+        return self.raw_data.get("liu_nian_ye", {})
 
     def _organise_yun_cheng(self) -> dict:
         """
@@ -388,7 +389,7 @@ class AstroDataLLMFormatter:
             "日主": self._extract_day_master(),
             "五行力量": self._extract_wu_xing().get("五行力量", {}),
             "运程": self._organise_yun_cheng(),
-            # "流年": self._extract_liu_nian(),
+            "流年流月": self._extract_liu_nian_ye(),
             "分析逻辑参考": {
                 "干支作用优先级": self._extract_interactions(),
                 "五行相位动力": self._extract_wu_xing().get("五行相位动力", {}),

@@ -42,7 +42,7 @@ class AstroDataAggregator:
         self.da_yun = da_yun
         self.xiao_yun = xiao_yun
         self.day_master = day_master
-        # self.liu_nian_ye = liu_nian_ye
+        self.liu_nian_ye = liu_nian_ye
 
     def collect_data(
         self,
@@ -82,9 +82,7 @@ class AstroDataAggregator:
             "da_yun": self.da_yun.get_da_yun(lunar_birthday, gender),
             "xiao_yun": self.xiao_yun.get_xiao_yun(lunar_birthday, gender),
             "day_master": self.day_master.get_day_master(lunar_birthday),
-            # "liu_nian_ye": self.liu_nian_ye.get_liu_nian_ye_current_focus(
-            #     lunar_birthday, gender
-            # ),
+            "liu_nian_ye": self.liu_nian_ye.get_liu_nian_ye(lunar_birthday, gender),
         }
 
         return result
