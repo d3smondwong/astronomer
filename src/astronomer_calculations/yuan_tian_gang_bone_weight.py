@@ -492,7 +492,9 @@ def calculate_yuan_tian_gang_bone_weight(lunar_birthday):
     year_weight = YUAN_TIAN_GANG_BONE_WEIGHTS["years"][year_index]
 
     # 2. Extract Month (1-12)
-    month = lunar_birthday.getMonth()
+    # lunar-python returns negative month for leap months (e.g., -6 = 闰六月).
+    # Bone weight treats leap months the same as their base month.
+    month = abs(lunar_birthday.getMonth())
     if month not in YUAN_TIAN_GANG_BONE_WEIGHTS["months"]:
         raise ValueError(f"Month {month} not found in bone_weights['months']")
     month_weight = YUAN_TIAN_GANG_BONE_WEIGHTS["months"][month]
