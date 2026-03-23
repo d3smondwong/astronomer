@@ -1,0 +1,5 @@
+Code Review
+can you do a code review for cycle_to_cycle_interactions.py? Check thoroughly for bugs and that the logic flow follows bazi methodology. If there is a more elegant way for the code to be structured, propose it.
+
+Docstring
+Can you update the functions and module docstring?
