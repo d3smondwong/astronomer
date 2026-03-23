@@ -39,7 +39,7 @@ from lunar_python.EightChar import EightChar
 from datetime import datetime, timedelta
 from typing import Optional
 
-from src.astronomer_calculations.interactions_gan_zhi_zuo_yong import (
+from src.astronomer_calculations.natal_interactions import (
     clash_map,
     harm_map,
     six_he_map,
@@ -52,19 +52,18 @@ from src.astronomer_calculations.interactions_gan_zhi_zuo_yong import (
     stem_clashes,
 )
 
-from src.astronomer_calculations.cycle_wu_xing import (
-    get_stem_wu_xing,
-    get_branch_wu_xing,
-)
-
-from src.astronomer_calculations.cycle_na_yin import get_nayin
-from src.astronomer_calculations.cycle_di_shi import get_di_shi, DI_SHI_TABLE
-from src.astronomer_calculations.cycle_shi_shen import (
-    get_shi_shen_for_stem_pair,
-    get_hidden_stems_shi_shen,
-)
+from src.astronomer_calculations.cycle_wu_xing import CycleWuXingDynamics
 
 from src.astronomer_calculations.cycle_interactions import get_cycle_interactions
+from src.astronomer_calculations.day_master import get_day_master
+from src.astronomer_calculations.cycle_shen_sha import get_cycle_shen_sha
+from src.astronomer_calculations.void_xun_kong import get_xun_kong
+from src.astronomer_calculations.cycle_to_cycle_interactions import (
+    get_pairwise_cycle_interactions,
+)
+from src.astronomer_calculations.cycle2_natal_interactions import (
+    get_cross_cycle_interactions,
+)
 
 from src.astronomer_calculations.wu_xing import (
     Pillar,
@@ -458,6 +457,41 @@ _BRANCH_TO_ZODIAC = {
     "亥": "猪",
 }
 
+# Reverse mapping: Zodiac Animal -> Branch (生肖 -> 支)
+_ZODIAC_TO_BRANCH = {v: k for k, v in _BRANCH_TO_ZODIAC.items()}
+
+# San Sha three branches by zodiac group (三煞三支)
+# Fire (寅午戌) -> North (亥子丑), Water (申子辰) -> South (巳午未)
+# Wood (亥卯未) -> West (申酉戌), Metal (巳酉丑) -> East (寅卯辰)
+_SAN_SHA_BRANCHES_MAP = {
+    "虎": ["亥", "子", "丑"],
+    "马": ["亥", "子", "丑"],
+    "狗": ["亥", "子", "丑"],
+    "猴": ["巳", "午", "未"],
+    "鼠": ["巳", "午", "未"],
+    "龙": ["巳", "午", "未"],
+    "猪": ["申", "酉", "戌"],
+    "兔": ["申", "酉", "戌"],
+    "羊": ["申", "酉", "戌"],
+    "蛇": ["寅", "卯", "辰"],
+    "鸡": ["寅", "卯", "辰"],
+    "牛": ["寅", "卯", "辰"],
+}
+
+# Five Yellow palace by annual nine-star number (五黄宫位)
+# When annual star = N, 五黄 is located at the palace corresponding to N in Luo Shu
+_YEAR_STAR_TO_WU_HUANG_PALACE = {
+    1: ("离", "正南"),
+    2: ("艮", "东北"),
+    3: ("兑", "正西"),
+    4: ("乾", "西北"),
+    5: ("中", "中宫"),
+    6: ("巽", "东南"),
+    7: ("震", "正东"),
+    8: ("坤", "西南"),
+    9: ("坎", "正北"),
+}
+
 # Conflict relationship definitions
 _DIRECT_CLASH = {
     "鼠": "马",
@@ -655,32 +689,65 @@ def _check_punishment_clash(
     return (False, "无", 0, "")
 
 
-def _get_sui_po_guidance(position: str) -> str:
+def _get_sui_po_guidance(sui_po_branch: str, position: str) -> str:
     """
     Get position-specific guidance for Sui Po (岁破).
 
+    岁破 is the opposite of Tai Sui - a place of direct clash and unfavorable flow.
+
     Args:
+        sui_po_branch (str): Sui Po branch (e.g., "午")
         position (str): Direction (e.g., "正北", "正东")
 
     Returns:
         str: Position-specific guidance
     """
     direction_desc = _DIRECTION_GUIDANCE.get(position, position)
-    return f"{direction_desc} - 太岁180度对冲，该方位不宜进行重大活动和决策"
+    detailed_guidance = {
+        "正北": f"岁破{sui_po_branch}支入北方，该方位180度对冲太岁，形势最凶。此年北方不宜动土、装修、进行大型决策，易招灾厄。",
+        "东北": f"岁破{sui_po_branch}支入东北，与太岁正对，该方位忌破土与施工，容易引发争讼与伤害。",
+        "正东": f"岁破{sui_po_branch}支入东，该方位不宜进行重大投资与决策，易生变故与口舌。",
+        "东南": f"岁破{sui_po_branch}支入东南，此方易招小人与财损，不宜进行商业合作与签约。",
+        "正南": f"岁破{sui_po_branch}支入南，该方位不宜举办喜事与开业，易引发争执与官非。",
+        "西南": f"岁破{sui_po_branch}支入西南，不宜卧床或长期停留，易有人事不和与意外伤害。",
+        "正西": f"岁破{sui_po_branch}支入西，该方位不宜开新局面，容易财物损失与计划中止。",
+        "西北": f"岁破{sui_po_branch}支入西北，家长与权势受冲，不宜做大决策，易有权力争斗。",
+    }
+    return detailed_guidance.get(
+        position,
+        f"{direction_desc} - 岁破{sui_po_branch}支位置，太岁180度对冲，该方位不宜进行重大活动和决策",
+    )
 
 
-def _get_san_sha_guidance(position: str) -> str:
+def _get_san_sha_guidance(san_sha_branches: list, position: str) -> str:
     """
     Get position-specific guidance for San Sha (三煞).
 
+    三煞 indicates destructive sectors linked to killing energy, based on element grouping.
+
     Args:
+        san_sha_branches (list): The 3 san sha branches (e.g., ["亥", "子", "丑"])
         position (str): Direction (e.g., "正北", "正东")
 
     Returns:
         str: Position-specific guidance
     """
+    branches_str = "".join(san_sha_branches) if san_sha_branches else "未知"
     direction_desc = _DIRECTION_GUIDANCE.get(position, position)
-    return f"{direction_desc} - 该方位不宜动土、建筑、开工等重大工程活动"
+    detailed_guidance = {
+        "正北": f"三煞({branches_str})入北方，该方位为三杀所驻，全年不宜动土、开工、修造，易引发工伤与意外。",
+        "东北": f"三煞({branches_str})入东北，忌在此方进行施工与破土，容易招致灾祸与伤害。",
+        "正东": f"三煞({branches_str})入东，该方位不宜开门或频繁进出，易招惹意外与冲突。",
+        "东南": f"三煞({branches_str})入东南，此方位主财，若犯三煞易有财务纠纷与商业变故。",
+        "正南": f"三煞({branches_str})入南，该方位忌火与高温，不宜烹饪与工业生产，易发生事故。",
+        "西南": f"三煞({branches_str})入西南，不宜卧床或作为主卧，易有家庭纠纷与健康问题。",
+        "正西": f"三煞({branches_str})入西，收获季易生变，不宜进行收获、总结与签约事项。",
+        "西北": f"三煞({branches_str})入西北，乾位受冲，家长与领导力受损，易有权力纠纷。",
+    }
+    return detailed_guidance.get(
+        position,
+        f"{direction_desc} - 三煞({branches_str})位置，该方位不宜动土、建筑、开工等重大工程活动",
+    )
 
 
 def _get_sui_po_position(year_zodiac: str) -> str:
@@ -710,6 +777,240 @@ def _get_san_sha_position(year_zodiac: str) -> str:
         str: Direction of San Sha (e.g., "正北", "正南", etc.)
     """
     return _SAN_SHA_BY_ELEMENT.get(year_zodiac, "未知")
+
+
+def _get_tai_sui_position_guidance(year_branch: str, tai_sui_pos: str) -> str:
+    """
+    Generate context-aware guidance for Tai Sui position based on year branch and direction.
+
+    Args:
+        year_branch (str): Year's Earthly Branch (e.g., "子")
+        tai_sui_pos (str): Tai Sui position description (e.g., "北方位")
+
+    Returns:
+        str: Contextual guidance for the Tai Sui position this year
+    """
+    branch_to_zodiac = {
+        "子": "鼠",
+        "丑": "牛",
+        "寅": "虎",
+        "卯": "兔",
+        "辰": "龙",
+        "巳": "蛇",
+        "午": "马",
+        "未": "羊",
+        "申": "猴",
+        "酉": "鸡",
+        "戌": "狗",
+        "亥": "猪",
+    }
+    year_zodiac = branch_to_zodiac.get(year_branch, "未知")
+    direction = tai_sui_pos.split("(")[0].strip() if "(" in tai_sui_pos else tai_sui_pos
+
+    guidance_map = {
+        "正北": f"{year_zodiac}年太岁居北，该方位宜布局水相之物与黑色调，利事业发展与财运。",
+        "东北": f"{year_zodiac}年太岁居东北，该方位宜调理土气，适合安置靠山与贵人之位。",
+        "正东": f"{year_zodiac}年太岁居东，该方位宜布置木相生旺之物，利创新与突破。",
+        "东南": f"{year_zodiac}年太岁居东南，该方位宜布局风水旺气，利人脉与商业合作。",
+        "正南": f"{year_zodiac}年太岁居南，该方位宜布置火相吉祥之物，利名声与成就。",
+        "西南": f"{year_zodiac}年太岁居西南，该方位宜强化土气稳定，利家庭与人际。",
+        "正西": f"{year_zodiac}年太岁居西，该方位宜布置金相灵动之物，利收获与总结。",
+        "西北": f"{year_zodiac}年太岁居西北，该方位宜调理乾位，利权势与领导力。",
+    }
+    return guidance_map.get(
+        direction, f"{year_zodiac}年太岁位置在{tai_sui_pos}，该方位宜布局生旺之事。"
+    )
+
+
+def _get_sui_po_branch(year_zodiac: str) -> str:
+    """
+    Get 岁破 ZHI (Earthly Branch) using LunarUtil.CHONG (opposite branch).
+
+    岁破 is the opposite branch of the year's Tai Sui position.
+
+    Args:
+        year_zodiac (str): Year's zodiac animal (e.g., "鼠", "马")
+
+    Returns:
+        str: 岁破 branch (e.g., "午", "子")
+    """
+    year_branch = _ZODIAC_TO_BRANCH.get(year_zodiac, "")
+    if not year_branch:
+        return "未知"
+    zhi_order = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+    try:
+        zhi_index = zhi_order.index(year_branch)
+        return LunarUtil.CHONG[zhi_index]
+    except (ValueError, IndexError):
+        return "未知"
+
+
+def _get_san_sha_branches(year_zodiac: str) -> list:
+    """
+    Get the 3 ZHI (branches) forming Three Killings for the year zodiac.
+
+    Three Killings covers 3 consecutive branches based on element grouping.
+
+    Args:
+        year_zodiac (str): Year's zodiac animal (e.g., "马", "鼠")
+
+    Returns:
+        list: List of 3 branches (e.g., ["亥", "子", "丑"])
+    """
+    return _SAN_SHA_BRANCHES_MAP.get(year_zodiac, [])
+
+
+def _assess_wu_huang_severity(
+    five_yellow_direction: str,
+    bazi: EightChar,
+    person_zodiac: str,
+    year_zodiac: str,
+) -> list:
+    """
+    Assess Five Yellow Sha affliction based on natal chart factors.
+
+    Checks for qualitative factors that indicate heightened affliction:
+    - Day pillar direction matches 五黄 location
+    - Other pillars also in 五黄 direction
+    - Day stem element is earth (土), compounding with 五黄
+    - Person's zodiac clashes with year zodiac
+
+    Args:
+        five_yellow_direction (str): 五黄 location this year (e.g., "正西")
+        bazi (EightChar): Birth chart object
+        person_zodiac (str): Person's birth zodiac (from year pillar)
+        year_zodiac (str): Year's zodiac animal
+
+    Returns:
+        list: List of qualitative affliction factors (can be empty)
+    """
+    branch_to_dir = {
+        "子": "正北",
+        "丑": "东北",
+        "寅": "东北",
+        "卯": "正东",
+        "辰": "东南",
+        "巳": "东南",
+        "午": "正南",
+        "未": "西南",
+        "申": "西南",
+        "酉": "正西",
+        "戌": "西北",
+        "亥": "西北",
+    }
+
+    factors = []
+
+    # Factor 1: Day pillar direction match (most critical)
+    day_branch = bazi.getDayZhi()
+    day_dir = branch_to_dir.get(day_branch, "")
+    if day_dir == five_yellow_direction:
+        factors.append("日柱方位与五黄重叠（最危险）")
+
+    # Factor 2: Check other pillars in 五黄 direction
+    month_branch = bazi.getMonthZhi()
+    month_dir = branch_to_dir.get(month_branch, "")
+    year_branch = bazi.getYearZhi()
+    year_dir = branch_to_dir.get(year_branch, "")
+    time_branch = bazi.getTimeZhi()
+    time_dir = branch_to_dir.get(time_branch, "")
+
+    additional_pillars_count = sum(
+        1 for d in [month_dir, year_dir, time_dir] if d == five_yellow_direction
+    )
+    if additional_pillars_count > 0:
+        factors.append(f"还有{additional_pillars_count}个柱位在五黄方向")
+
+    # Factor 3: Day stem is earth (土) - compounds with 五黄
+    day_stem = bazi.getDayGan()
+    earth_stems = ["戊", "己"]
+    if day_stem in earth_stems:
+        factors.append("日干为土（与五黄同属土，易被加重）")
+
+    # Factor 4: Zodiac conflict with year
+    conflict_map = {
+        "鼠": "马",
+        "马": "鼠",
+        "牛": "羊",
+        "羊": "牛",
+        "虎": "猴",
+        "猴": "虎",
+        "兔": "鸡",
+        "鸡": "兔",
+        "龙": "狗",
+        "狗": "龙",
+        "蛇": "猪",
+        "猪": "蛇",
+    }
+    if conflict_map.get(person_zodiac) == year_zodiac:
+        factors.append("本命年与流年相冲（加重压力）")
+
+    return factors
+
+
+def _get_wu_huang_sha_analysis(
+    year_branch: str,
+    lunar_date: Lunar,
+    bazi: EightChar,
+    person_zodiac: str,
+    year_zodiac: str,
+) -> dict:
+    """
+    Get comprehensive Five Yellow Sha analysis.
+
+    五黄 is the most inauspicious star. This function provides:
+    - Location and direction
+    - Personal affliction check
+    - Severity assessment based on natal chart
+    - Remediation recommendations
+
+    Args:
+        year_branch (str): Year's Earthly Branch (e.g., "子")
+        lunar_date (Lunar): Lunar date object for the year
+        bazi (EightChar): Birth chart object
+        person_zodiac (str): Person's birth zodiac
+        year_zodiac (str): Year's zodiac animal
+
+    Returns:
+        dict: Comprehensive Five Yellow Sha analysis
+    """
+    year_star = lunar_date.getYearNineStar()
+    star_number = year_star.getIndex() + 1  # Convert 0-based to 1-based
+    _, five_yellow_direction = _YEAR_STAR_TO_WU_HUANG_PALACE.get(
+        star_number, ("未知", "未知")
+    )
+
+    # Check personal affliction: does day pillar's direction match 五黄 location?
+    day_branch = bazi.getDayZhi()
+    branch_to_dir = {
+        "子": "正北",
+        "丑": "东北",
+        "寅": "东北",
+        "卯": "正东",
+        "辰": "东南",
+        "巳": "东南",
+        "午": "正南",
+        "未": "西南",
+        "申": "西南",
+        "酉": "正西",
+        "戌": "西北",
+        "亥": "西北",
+    }
+    day_dir = branch_to_dir.get(day_branch, "")
+    is_person_affected = day_dir == five_yellow_direction
+
+    # Identify affliction factors based on natal chart
+    wu_huang_severity = _assess_wu_huang_severity(
+        five_yellow_direction, bazi, person_zodiac, year_zodiac
+    )
+
+    return {
+        "飞星数字": 5,
+        "方位": five_yellow_direction,
+        "五行": "土",
+        "是否犯煞": is_person_affected,
+        "五黄煞程度": wu_huang_severity,
+    }
 
 
 def _check_fan_tai_sui(
@@ -823,17 +1124,19 @@ def _check_all_pillars_tai_sui(pillars_dict: dict, year_zodiac: str) -> dict:
 
 def get_comprehensive_tai_sui_analysis(
     year_zodiac: str,
+    year_branch: str,
     person_zodiac: str,
     bazi: EightChar,
     lunar_date: Lunar,
 ) -> dict:
     """
     Get comprehensive Tai Sui analysis including:
-    - House afflictions (Tai Sui position, Sui Po, San Sha)
+    - House afflictions (Tai Sui position, Sui Po, San Sha, Five Yellow)
     - Personal clashes (check all 4 pillars against year zodiac)
 
     Args:
         year_zodiac (str): Year's zodiac animal
+        year_branch (str): Year's Earthly Branch (e.g., "子")
         person_zodiac (str): Person's birth zodiac animal
         bazi (EightChar): Birth chart (Eight Character) object
         lunar_date (Lunar): Lunar date object for the year (used to get Tai Sui position from library)
@@ -847,18 +1150,34 @@ def get_comprehensive_tai_sui_analysis(
     sui_po_pos = _get_sui_po_position(year_zodiac)
     san_sha_pos = _get_san_sha_position(year_zodiac)
 
+    # Compute Five Yellow Sha position
+    year_star = lunar_date.getYearNineStar()
+    star_number = year_star.getIndex() + 1  # Convert 0-based to 1-based
+    _, five_yellow_direction = _YEAR_STAR_TO_WU_HUANG_PALACE.get(
+        star_number, ("未知", "未知")
+    )
+
     house_afflictions = {
         "太岁位置": {
+            "地支": year_branch,
             "方位": tai_sui_pos,
-            "含义": "流年主亮点，该方位宜布局生旺之事",
+            "含义": _get_tai_sui_position_guidance(year_branch, tai_sui_pos),
         },
         "岁破位置": {
+            "地支": _get_sui_po_branch(year_zodiac),
             "方位": sui_po_pos,
-            "含义": _get_sui_po_guidance(sui_po_pos),
+            "含义": _get_sui_po_guidance(_get_sui_po_branch(year_zodiac), sui_po_pos),
         },
         "三煞位置": {
+            "地支列表": _get_san_sha_branches(year_zodiac),
             "方位": san_sha_pos,
-            "含义": _get_san_sha_guidance(san_sha_pos),
+            "含义": _get_san_sha_guidance(
+                _get_san_sha_branches(year_zodiac), san_sha_pos
+            ),
+        },
+        "五黄煞": {
+            "方位": five_yellow_direction,
+            "含义": _get_five_yellow_guidance(five_yellow_direction),
         },
     }
 
@@ -955,7 +1274,12 @@ def _get_xun_and_xun_kong_from_object(liu_yun_obj) -> tuple:
 
 
 def _detect_liu_nian_interactions(
-    liu_nian_stem: str, liu_nian_branch: str, birth_chart: dict
+    liu_nian_stem: str,
+    liu_nian_branch: str,
+    birth_chart: dict,
+    cycle_xk_str: str | None = None,
+    natal_xk: dict | None = None,
+    day_strength: str = "中和",
 ) -> dict:
     """
     Detect Liu Nian interactions with birth chart using same 1x4 scan as Da Yun.
@@ -967,18 +1291,31 @@ def _detect_liu_nian_interactions(
         liu_nian_stem (str): Liu Nian heavenly stem (year stem)
         liu_nian_branch (str): Liu Nian earthly branch (year branch)
         birth_chart (dict): Birth chart with keys "year", "month", "day", "hour"
+        cycle_xk_str (str | None): Liu Nian cycle's own xun kong string
+        natal_xk (dict | None): Natal chart xun kong data
 
     Returns:
         dict: Organized interactions by pillar and tier
     """
     # Use the shared cycle interaction detector and label this run as 流年
     return get_cycle_interactions(
-        liu_nian_stem, liu_nian_branch, birth_chart, cycle_label="流年"
+        liu_nian_stem,
+        liu_nian_branch,
+        birth_chart,
+        cycle_label="流年",
+        cycle_xk_str=cycle_xk_str,
+        natal_xk=natal_xk,
+        day_strength=day_strength,
     )
 
 
 def _detect_liu_yue_interactions(
-    liu_yue_stem: str, liu_yue_branch: str, birth_chart: dict
+    liu_yue_stem: str,
+    liu_yue_branch: str,
+    birth_chart: dict,
+    cycle_xk_str: str | None = None,
+    natal_xk: dict | None = None,
+    day_strength: str = "中和",
 ) -> dict:
     """
     Detect Liu Yue interactions with birth chart using same 1x4 scan as Da Yun.
@@ -990,13 +1327,21 @@ def _detect_liu_yue_interactions(
         liu_yue_stem (str): Liu Yue heavenly stem (month stem)
         liu_yue_branch (str): Liu Yue earthly branch (month branch)
         birth_chart (dict): Birth chart with keys "year", "month", "day", "hour"
+        cycle_xk_str (str | None): Liu Yue cycle's own xun kong string
+        natal_xk (dict | None): Natal chart xun kong data
 
     Returns:
         dict: Organized interactions by pillar and tier
     """
     # Use the shared cycle interaction detector and label this run as 流月
     return get_cycle_interactions(
-        liu_yue_stem, liu_yue_branch, birth_chart, cycle_label="流月"
+        liu_yue_stem,
+        liu_yue_branch,
+        birth_chart,
+        cycle_label="流月",
+        cycle_xk_str=cycle_xk_str,
+        natal_xk=natal_xk,
+        day_strength=day_strength,
     )
 
 
@@ -1097,7 +1442,7 @@ def get_liu_nian(
     gender: int,
     start_year: int = None,
     num_years: int = None,
-    reference_date: datetime = None,
+    reference_date: datetime = datetime.now(),
 ) -> dict:
     """
     Calculate Annual Luck Cycles (Liu Nian) from lunar birthday and gender.
@@ -1128,6 +1473,9 @@ def get_liu_nian(
     # Get the Day Stem (日干) - this is the reference for all Ten Gods calculations
     day_stem = bazi.getDayGan()
 
+    # Day master strength — used to contextualise 开库 墓库境况
+    day_strength = get_day_master(lunar_birthday).get("日主", {}).get("强弱", "中和")
+
     # Extract birth chart pillars for interaction detection
     birth_chart = {
         "year": {
@@ -1147,6 +1495,9 @@ def get_liu_nian(
             "branch": bazi.getTimeZhi(),
         },
     }
+
+    # Compute natal xun kong internally
+    natal_xk = get_xun_kong(lunar_birthday).get("旬空", {})
 
     # Calculate 起运 (start of luck cycle) based on gender
     yun = bazi.getYun(gender)
@@ -1171,6 +1522,17 @@ def get_liu_nian(
         if not liu_nian_array:
             continue
 
+        # Extract Da Yun stem/branch once per Da Yun period for 岁运/跨运 engines
+        da_yun_gz = da_yun_obj.getGanZhi()
+        if da_yun_gz and da_yun_gz != "Unknown" and len(da_yun_gz) >= 2:
+            da_yun_stem = da_yun_gz[0]
+            da_yun_branch = da_yun_gz[1]
+        else:
+            da_yun_stem = da_yun_branch = ""
+        da_yun_xk_str = (
+            da_yun_obj.getXunKong() if hasattr(da_yun_obj, "getXunKong") else None
+        )
+
         for i, liu_nian_obj in enumerate(liu_nian_array):
             gan_zhi = liu_nian_obj.getGanZhi()
             lunar_calendar_year = liu_nian_obj.getYear()
@@ -1189,28 +1551,40 @@ def get_liu_nian(
             liu_nian_stem = gan_zhi[0]
             liu_nian_branch = gan_zhi[1]
 
-            # Calculate Ten Gods for this 流年
-            stem_shi_shen = get_shi_shen_for_stem_pair(day_stem, liu_nian_stem)
-            branch_shi_shen = get_hidden_stems_shi_shen(day_stem, liu_nian_branch)
+            # Get Xun Kong for this cycle
+            cycle_xk_str = (
+                liu_nian_obj.getXunKong()
+                if hasattr(liu_nian_obj, "getXunKong")
+                else None
+            )
 
-            # Life Stage (地势) for the Liu Nian branch using birth day stem as reference
-            di_shi = get_di_shi(day_stem, liu_nian_branch)
-
-            # Five Elements (五行) for Stem and Branch
-            stem_wu_xing = get_stem_wu_xing(liu_nian_stem)
-            branch_wu_xing = get_branch_wu_xing(liu_nian_branch)
-
-            # Nayin (纳音) for the Liu Nian stem-branch pair
-            nayin = get_nayin(liu_nian_stem, liu_nian_branch)
-
-            # Get Xun (旬) and Xun Kong (旬空)
-            xun, xun_kong = _get_xun_and_xun_kong_from_object(liu_nian_obj)
-
-            # Detect interactions (作用) with birth chart
+            # Detect interactions (作用) with birth chart using 1x4 scan
             interactions_result = _detect_liu_nian_interactions(
-                liu_nian_stem, liu_nian_branch, birth_chart
+                liu_nian_stem,
+                liu_nian_branch,
+                birth_chart,
+                cycle_xk_str=cycle_xk_str,
+                natal_xk=natal_xk,
+                day_strength=day_strength,
             )
             interactions = interactions_result.get("作用", [])
+
+            # Five Elements dynamics: enriched cycle pillar info + combined natal+cycle 五行力量
+            cycle_wu_xing_info = CycleWuXingDynamics().calculate_cycle_interaction(
+                liu_nian_obj,
+                lunar_birthday,
+                priority_list=interactions_result.get("_raw_priority_list", []),
+                cycle_type="流年",
+                xun_kong_data=natal_xk,
+                cycle_xk_str=cycle_xk_str,
+            )
+            cycle_pillar_info = cycle_wu_xing_info.pop("流年柱", {})
+            cycle_wu_xing_result = cycle_wu_xing_info.get("五行力量分析", "无数据")
+
+            # Extract Shen Sha (神煞) for this cycle
+            cycle_shen_sha = get_cycle_shen_sha(
+                liu_nian_stem, liu_nian_branch, birth_chart, gender
+            )
 
             # Get person's birth zodiac and year zodiac for Tai Sui comparison
             person_zodiac = lunar_birthday.getYearShengXiao()
@@ -1222,7 +1596,7 @@ def get_liu_nian(
 
             # Get comprehensive Tai Sui analysis (house + pillar + personal layers)
             tai_sui_info = get_comprehensive_tai_sui_analysis(
-                year_zodiac, person_zodiac, bazi, lunar_date_random
+                year_zodiac, liu_nian_branch, person_zodiac, bazi, lunar_date_random
             )
 
             # Get Nine Star Energy (九星能量与风水) for this Liu Nian
@@ -1232,42 +1606,62 @@ def get_liu_nian(
             # Auspicious positions and guidance
             cai_xi_fu_gui_info = _get_cai_xi_fu_gui_analysis(liu_nian_stem)
 
+            # 五黄煞 five yellow sha analysis for this Liu Nian
+            five_yellow_sha_info = _get_wu_huang_sha_analysis(
+                liu_nian_branch, lunar_date_random, bazi, person_zodiac, year_zodiac
+            )
+
+            # 岁运作用: pairwise Da Yun ↔ Liu Nian interactions
+            # 跨运作用: cross-cycle formations spanning natal + Da Yun + Liu Nian
+            if da_yun_stem and da_yun_branch:
+                pairwise_result = get_pairwise_cycle_interactions(
+                    da_yun_stem,
+                    da_yun_branch,
+                    liu_nian_stem,
+                    liu_nian_branch,
+                    day_stem,
+                    cycle_a_xk_str=da_yun_xk_str,
+                    cycle_b_xk_str=cycle_xk_str,
+                    day_strength=day_strength,
+                )
+                cross_result = get_cross_cycle_interactions(
+                    da_yun_stem,
+                    da_yun_branch,
+                    liu_nian_stem,
+                    liu_nian_branch,
+                    birth_chart,
+                    day_stem=day_stem,
+                    cycle_a_xk_str=da_yun_xk_str,
+                    cycle_b_xk_str=cycle_xk_str,
+                    natal_xk=natal_xk,
+                    day_strength=day_strength,
+                )
+            else:
+                pairwise_result = {}
+                cross_result = {}
+
             liu_nian_info = {
-                # "序号": total_liu_nian_count + 1,  # 1-based sequence number
                 "年龄": age,  # Age at start of year (from library)
                 "日历年份": lunar_calendar_year,  # Lunar calendar year
                 "当前大运": da_yun_obj.getGanZhi(),  # Current Da Yun stem-branch
+                "年生肖": year_zodiac,  # Zodiac animal for the year
                 "传统节日": lunar_date_random.getFestivals(),
                 "其他节日": lunar_date_random.getOtherFestivals(),
-                # Intrinsic Properties - What this cycle IS (cycle's own nature)
-                "命理属性": {
-                    "年生肖": year_zodiac,  # Zodiac animal for the year. Use a temp date in the middle of the year to get the correct zodiac.
-                    "干支": gan_zhi,  # Gan-Zhi (stem-branch pair)
-                    "五行": {
-                        "干": stem_wu_xing,  # Stem Five Element and Polarity
-                        "支": branch_wu_xing,  # Branch Five Element and Polarity
-                    },
-                    "纳音": nayin,  # Nayin element (harmonic resonance)
-                    "旬": xun,  # Xun (10-day cycle)
-                    "旬空": xun_kong,  # Xun Kong (void periods)
-                },
-                # Relational Properties - How it affects the person (measured vs Day Stem)
-                "核心分析": {
-                    # Tai Sui conflict and recommendations
-                    "太岁分析": tai_sui_info,
-                    # Ten Gods
-                    "十神": {
-                        "天干十神": stem_shi_shen,  # Year Stem Ten God (for clarity)
-                        "地支十神": branch_shi_shen,  # Hidden themes (Main/Middle/Residual)
-                    },
-                    # Life Stage (地势)
-                    "地势": di_shi,  # Life Stage (长生十二神)
-                    # Nine Star Energy (九星能量与风水)
-                    "九星能量与风水": nine_star_energy_info,
-                    # Wealth, Joy, Blessing, Noble support positions based on the Liu Nian stem
-                    "方位分析": cai_xi_fu_gui_info,
-                    "作用": interactions,  # Branch and Stem interactions with birth chart
-                },
+                "运柱": cycle_pillar_info,  # Enriched cycle pillar: 五行, 十神, 通根, 藏干, 季节状态, 十二长生
+                "五行力量": cycle_wu_xing_result,  # Combined natal+cycle 五行力量分析
+                "神煞": cycle_shen_sha,  # Shen Sha stars for this cycle
+                "作用": interactions,  # Branch and Stem interactions with birth chart (1x4 scan)
+                "岁运作用": pairwise_result.get(
+                    "岁运作用", {}
+                ),  # Da Yun ↔ Liu Nian pairwise interactions
+                "跨运作用": cross_result.get(
+                    "跨运作用", {}
+                ),  # Cross-cycle structures (natal + Da Yun + Liu Nian)
+                # Liu Nian specific analysis
+                "太岁分析": tai_sui_info,  # Tai Sui conflict and recommendations
+                "五黄煞": five_yellow_sha_info,  # Five Yellow Sha analysis
+                "九星能量与风水": nine_star_energy_info,  # Nine Star Energy
+                "方位分析": cai_xi_fu_gui_info,  # Wealth, Joy, Blessing, Noble support positions
             }
             liu_nian_data.append(liu_nian_info)
             total_liu_nian_count += 1
@@ -1304,7 +1698,7 @@ def get_liu_yue(
     lunar_birthday: Lunar,
     gender: int,
     year_index: int = None,
-    reference_date: datetime = None,
+    reference_date: datetime = datetime.now(),
 ) -> dict:
     """
     Calculate Monthly Luck Cycles (Liu Yue) for a specific annual period.
@@ -1321,13 +1715,14 @@ def get_liu_yue(
     Returns:
         dict: Structured JSON with Liu Yue cycles for the specified range
     """
-    if reference_date is None:
-        reference_date = datetime.now()
     # Get the EightChar (八字) object
     bazi = lunar_birthday.getEightChar()
 
     # Get the Day Stem (日干) - this is the reference for all Ten Gods calculations
     day_stem = bazi.getDayGan()
+
+    # Day master strength — used to contextualise 开库 墓库境况
+    day_strength = get_day_master(lunar_birthday).get("日主", {}).get("强弱", "中和")
 
     # Extract birth chart pillars for interaction detection
     birth_chart = {
@@ -1348,6 +1743,9 @@ def get_liu_yue(
             "branch": bazi.getTimeZhi(),
         },
     }
+
+    # Compute natal xun kong internally
+    natal_xk = get_xun_kong(lunar_birthday).get("旬空", {})
 
     # Calculate 起运 (start of luck cycle) based on gender
     yun = bazi.getYun(gender)
@@ -1420,28 +1818,38 @@ def get_liu_yue(
         liu_yue_stem = gan_zhi[0]
         liu_yue_branch = gan_zhi[1]
 
-        # Calculate Ten Gods for this 流月
-        stem_shi_shen = _get_shi_shen_for_stem_pair(day_stem, liu_yue_stem)
-        branch_shi_shen = _get_hidden_stems_shi_shen(day_stem, liu_yue_branch)
+        # Get Xun Kong for this cycle
+        cycle_xk_str = (
+            liu_yue_obj.getXunKong() if hasattr(liu_yue_obj, "getXunKong") else None
+        )
 
-        # Life Stage (地势) for the Liu Yue branch using birth day stem as reference
-        di_shi = _get_di_shi(day_stem, liu_yue_branch)
-
-        # Five Elements (五行) for Stem and Branch
-        stem_wu_xing = _get_stem_wu_xing(liu_yue_stem)
-        branch_wu_xing = _get_branch_wu_xing(liu_yue_branch)
-
-        # Nayin (纳音) for the Liu Yue stem-branch pair
-        nayin = get_nayin(liu_yue_stem, liu_yue_branch)
-
-        # Get Xun (旬) and Xun Kong (旬空)
-        xun, xun_kong = _get_xun_and_xun_kong_from_object(liu_yue_obj)
-
-        # Detect interactions (作用) with birth chart
+        # Detect interactions (作用) with birth chart using 1x4 scan
         interactions_result = _detect_liu_yue_interactions(
-            liu_yue_stem, liu_yue_branch, birth_chart
+            liu_yue_stem,
+            liu_yue_branch,
+            birth_chart,
+            cycle_xk_str=cycle_xk_str,
+            natal_xk=natal_xk,
+            day_strength=day_strength,
         )
         interactions = interactions_result.get("作用", [])
+
+        # Five Elements dynamics: enriched cycle pillar info + combined natal+cycle 五行力量
+        cycle_wu_xing_info = CycleWuXingDynamics().calculate_cycle_interaction(
+            liu_yue_obj,
+            lunar_birthday,
+            priority_list=interactions_result.get("_raw_priority_list", []),
+            cycle_type="流月",
+            xun_kong_data=natal_xk,
+            cycle_xk_str=cycle_xk_str,
+        )
+        cycle_pillar_info = cycle_wu_xing_info.pop("流月柱", {})
+        cycle_wu_xing_result = cycle_wu_xing_info.get("五行力量分析", "无数据")
+
+        # Extract Shen Sha (神煞) for this cycle
+        cycle_shen_sha = get_cycle_shen_sha(
+            liu_yue_stem, liu_yue_branch, birth_chart, gender
+        )
 
         # Auspicious positions and guidance for this month
         cai_xi_fu_gui_info = _get_cai_xi_fu_gui_analysis(liu_yue_stem)
@@ -1475,6 +1883,9 @@ def get_liu_yue(
 
         liu_yue_info = {
             "月份索引": month_name,  # Month name in Chinese
+            "月生肖": _BRANCH_TO_ZODIAC.get(
+                liu_yue_branch, "未知"
+            ),  # Zodiac animal for the month
             "节气": jieqi_info.get("节气", "未知"),  # Solar term name (e.g., "清明")
             "公历起点": jieqi_info.get(
                 "公历起点", "未知"
@@ -1487,34 +1898,16 @@ def get_liu_yue(
             "月相": lunar_date_month.getYueXiang(),
             "季节": lunar_date_month.getSeason(),
             "时令": seasonal_cycles,
-            # Intrinsic Properties - What this cycle IS (cycle's own nature)
-            "命理属性": {
-                "月生肖": _BRANCH_TO_ZODIAC.get(
-                    liu_yue_branch, "未知"
-                ),  # Zodiac animal for the month
-                "干支": gan_zhi,  # Gan-Zhi (stem-branch pair)
-                "五行": {
-                    "干": stem_wu_xing,  # Stem Five Element and Polarity
-                    "支": branch_wu_xing,  # Branch Five Element and Polarity
-                },
-                "纳音": nayin,  # Nayin element (harmonic resonance)
-                "旬": xun,  # Xun (10-day cycle)
-                "旬空": xun_kong,  # Xun Kong (void periods)
-            },
-            # Relational Properties - How it affects the person (measured vs Day Stem)
-            "核心分析": {
-                "月令强度": _get_month_strength(
-                    liu_yue_branch, birth_chart
-                ),  # Strength of the month branch in the birth chart
-                "十神": {
-                    "天干十神": stem_shi_shen,  # Year Stem Ten God (for clarity)
-                    "地支十神": branch_shi_shen,  # Hidden themes (Main/Middle/Residual)
-                },
-                "地势": di_shi,  # Life Stage (长生十二神)
-                "九星能量与风水": nine_star_energy,  # Nine Star Energy for this month
-                "方位分析": cai_xi_fu_gui_info,  # Auspicious positions and guidance for this month
-                "作用": interactions,  # Branch and Stem interactions with birth chart
-            },
+            "运柱": cycle_pillar_info,  # Enriched cycle pillar: 五行, 十神, 通根, 藏干, 季节状态, 十二长生
+            "五行力量": cycle_wu_xing_result,  # Combined natal+cycle 五行力量分析
+            "神煞": cycle_shen_sha,  # Shen Sha stars for this cycle
+            # Liu Yue specific analysis
+            "月令强度": _get_month_strength(
+                liu_yue_branch, birth_chart
+            ),  # Strength of the month branch
+            "九星能量与风水": nine_star_energy,  # Nine Star Energy for this month
+            "方位分析": cai_xi_fu_gui_info,  # Auspicious positions and guidance for this month
+            "作用": interactions,  # Branch and Stem interactions with birth chart
         }
         liu_yue_data.append(liu_yue_info)
 
@@ -1548,7 +1941,7 @@ def get_liu_nian_ye(
     gender: int,
     start_year: int = None,
     num_years: int = None,
-    reference_date: datetime = None,
+    reference_date: datetime = datetime.now(),
 ) -> dict:
     """
     Calculate complete Liu Nian (Annual Luck) and Liu Yue (Monthly Luck) combined analysis.
@@ -1567,8 +1960,6 @@ def get_liu_nian_ye(
     Returns:
         dict: Structured JSON with Liu Nian cycles, each containing Liu Yue data
     """
-    if reference_date is None:
-        reference_date = datetime.now()
 
     # First get Liu Nian data with date awareness
     liu_nian_result = get_liu_nian(
@@ -1584,66 +1975,6 @@ def get_liu_nian_ye(
         liu_nian_cycle["流月周期"] = liu_yue_result["流月"]["流月周期"]
 
     return liu_nian_result
-
-
-# ============================================================================
-# CONVENIENCE FUNCTIONS - DATE-FOCUSED ANALYSIS
-# ============================================================================
-
-
-def get_liu_nian_current_focus(lunar_birthday: Lunar, gender: int) -> dict:
-    """
-    Get Liu Nian focused on current date: 5 years past + 5 years future.
-
-    Convenience wrapper around get_liu_nian() with automatic date range calculation.
-
-    Args:
-        lunar_birthday (Lunar): Lunar calendar object
-        gender (int): 0 for Female, 1 for Male
-
-    Returns:
-        dict: Liu Nian cycles for the current date-focused range
-    """
-    return get_liu_nian(lunar_birthday, gender, reference_date=datetime.now())
-
-
-def get_liu_yue_current_focus(
-    lunar_birthday: Lunar, gender: int, year_index: int = 0
-) -> dict:
-    """
-    Get Liu Yue for a specific year with current date context.
-
-    Convenience wrapper around get_liu_yue() with automatic date reference.
-
-    Args:
-        lunar_birthday (Lunar): Lunar calendar object
-        gender (int): 0 for Female, 1 for Male
-        year_index (int): Which year to analyze (0-based)
-
-    Returns:
-        dict: Liu Yue cycles for that year
-    """
-    return get_liu_yue(
-        lunar_birthday, gender, year_index, reference_date=datetime.now()
-    )
-
-
-def get_liu_nian_ye_current_focus(lunar_birthday: Lunar, gender: int) -> dict:
-    """
-    Get complete Liu Nian & Liu Yue analysis focused on current date.
-
-    Convenience wrapper for comprehensive analysis with automatic date range.
-    - Liu Nian: 5 years past + 5 years future from today
-    - Liu Yue: All months for those years
-
-    Args:
-        lunar_birthday (Lunar): Lunar calendar object
-        gender (int): 0 for Female, 1 for Male
-
-    Returns:
-        dict: Combined Liu Nian + Liu Yue cycles with current date focus
-    """
-    return get_liu_nian_ye(lunar_birthday, gender, reference_date=datetime.now())
 
 
 # ============================================================================
