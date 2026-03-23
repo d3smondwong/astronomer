@@ -255,7 +255,7 @@ class AstroDataLLMFormatter:
         _EXCLUDE = {"基本信息", "四柱"}
         wu_xing_distribution = {k: v for k, v in wu_xing_force.items() if k not in _EXCLUDE}
 
-        wu_xing_scoring_explanation = wu_xing_force.get("五行相位动力", {})
+        wu_xing_scoring_explanation = wu_xing_data.get("五行相位动力", {})
 
         return {"五行力量": wu_xing_distribution, "五行相位动力": wu_xing_scoring_explanation}
 
@@ -389,7 +389,7 @@ class AstroDataLLMFormatter:
             "日主": self._extract_day_master(),
             "五行力量": self._extract_wu_xing().get("五行力量", {}),
             "运程": self._organise_yun_cheng(),
-            "流年流月": self._extract_liu_nian_ye(),
+            # "流年流月": self._extract_liu_nian_ye(),
             "分析逻辑参考": {
                 "干支作用优先级": self._extract_interactions(),
                 "五行相位动力": self._extract_wu_xing().get("五行相位动力", {}),
