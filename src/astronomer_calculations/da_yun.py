@@ -120,6 +120,7 @@ from lunar_python.util import LunarUtil
 from lunar_python.EightChar import EightChar
 from src.astronomer_calculations.cycle_na_yin import get_nayin
 from src.astronomer_calculations.cycle_interactions import get_cycle_interactions
+from src.astronomer_calculations.day_master import get_day_master
 from src.astronomer_calculations.cycle_di_shi import get_di_shi
 from src.astronomer_calculations.cycle_wu_xing import CycleWuXingDynamics
 from src.astronomer_calculations.cycle_shen_sha import get_cycle_shen_sha
@@ -144,6 +145,9 @@ def get_da_yun(lunar_birthday: Lunar, gender: int) -> dict:
 
     # Compute natal xun kong internally
     natal_xk = get_xun_kong(lunar_birthday).get("旬空", {})
+
+    # Day master strength — used to contextualise 开库 墓库境况
+    day_strength = get_day_master(lunar_birthday).get("日主", {}).get("强弱", "中和")
 
     # Extract natal chart pillars for interaction detection
     natal_chart = {
@@ -192,6 +196,7 @@ def get_da_yun(lunar_birthday: Lunar, gender: int) -> dict:
                 da_yun_stem, da_yun_branch, natal_chart,
                 cycle_xk_str=cycle_xk_str,
                 natal_xk=natal_xk,
+                day_strength=day_strength,
             )
             interactions = interactions_result.get("作用", [])
 
