@@ -202,12 +202,14 @@ if analyze_button:
             tab13,
             tab14,
             tab15,
+            tab16,
         ) = st.tabs(
             [
                 "基本信息",
                 "八字",
                 "出生环境",
                 "五行",
+                "日主",
                 "神煞",
                 "旬空",
                 "三垣",
@@ -255,83 +257,90 @@ if analyze_button:
                 st.info("No Five Elements data available")
 
         with tab4:
+            st.subheader("☀️ 日主 (Day Master)")
+            if "day_master" in analysis_result and analysis_result["day_master"]:
+                st.json(analysis_result["day_master"])
+            else:
+                st.info("No Day Master data available")
+
+        with tab5:
             st.subheader("🌙 神煞 (Shen Sha - Gods & Evils)")
             if "shen_sha" in analysis_result and analysis_result["shen_sha"]:
                 st.json(analysis_result["shen_sha"])
             else:
                 st.info("No Shen Sha data available")
 
-        with tab5:
+        with tab6:
             st.subheader("✨ 旬空 (Xun Kong - Void Branches)")
             if "xun_kong" in analysis_result and analysis_result["xun_kong"]:
                 st.json(analysis_result["xun_kong"])
             else:
                 st.info("No Xun Kong data available")
 
-        with tab6:
+        with tab7:
             st.subheader("👑 三垣 (San Yuan - Three Palaces)")
             if "san_yuan" in analysis_result and analysis_result["san_yuan"]:
                 st.json(analysis_result["san_yuan"])
             else:
                 st.info("No Three Palaces data available")
 
-        with tab7:
+        with tab8:
             st.subheader("🐟 胦息 (Tai Xi - Embryonic Breath)")
             if "tai_xi" in analysis_result and analysis_result["tai_xi"]:
                 st.json(analysis_result["tai_xi"])
             else:
                 st.info("No Embryonic Breath data available")
 
-        with tab8:
+        with tab9:
             st.subheader("⚡ 作用 (Gan Zhi Interactions)")
             if "interactions" in analysis_result and analysis_result["interactions"]:
                 st.json(analysis_result["interactions"])
             else:
                 st.info("No Interaction data available")
 
-        with tab9:
+        with tab10:
             st.subheader("⚖️ 袁天罡称骨歌 (Yuan Tian Gang Bone Weight)")
             if "bone_weight" in analysis_result and analysis_result["bone_weight"]:
                 st.json(analysis_result["bone_weight"])
             else:
                 st.info("No Bone Weight data available")
 
-        with tab10:
+        with tab11:
             st.subheader("🔯 十神 (Ten Gods)")
             if "shi_shen" in analysis_result and analysis_result["shi_shen"]:
                 st.json(analysis_result["shi_shen"])
             else:
                 st.info("No Ten Gods data available")
 
-        with tab11:
+        with tab12:
             st.subheader("🎵 纳音 (Na Yin - Five Elements)")
             if "na_yin" in analysis_result and analysis_result["na_yin"]:
                 st.json(analysis_result["na_yin"])
             else:
                 st.info("No Na Yin data available")
 
-        with tab12:
+        with tab13:
             st.subheader("🌍 地势 (Di Shi - Earthly Position)")
             if "di_shi" in analysis_result and analysis_result["di_shi"]:
                 st.json(analysis_result["di_shi"])
             else:
                 st.info("No Di Shi data available")
 
-        with tab13:
+        with tab14:
             st.subheader("🌙 大运 (Da Yun - Big Luck Cycles)")
             if "da_yun" in analysis_result and analysis_result["da_yun"]:
                 st.json(analysis_result["da_yun"])
             else:
                 st.info("No Da Yun data available")
 
-        with tab14:
+        with tab15:
             st.subheader("✨ 小运 (Xiao Yun - Small Luck Cycles)")
             if "xiao_yun" in analysis_result and analysis_result["xiao_yun"]:
                 st.json(analysis_result["xiao_yun"])
             else:
                 st.info("No Xiao Yun data available")
 
-        with tab15:
+        with tab16:
             st.subheader(
                 "📅 流年 & 流月 (Liu Nian & Liu Yue - Annual & Monthly Luck Cycles)"
             )
