@@ -254,6 +254,12 @@ from datetime import datetime
 from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
 from src.astronomer_calculations import void_xun_kong
 from src.utils.logging import get_logger
+from src.astronomer_calculations.day_master import (
+    BRANCH_HIDDEN_ROOTING,
+    get_stem_root_tier,
+    get_shi_shen_for_stem_pair,
+    stem_elements,
+)
 
 logger = get_logger(__name__)
 
@@ -452,37 +458,7 @@ stem_controls = frozenset({
     ("丁", "辛"),
 })
 
-stem_elements = {
-    "甲": "木",
-    "乙": "木",
-    "丙": "火",
-    "丁": "火",
-    "戊": "土",
-    "己": "土",
-    "庚": "金",
-    "辛": "金",
-    "壬": "水",
-    "癸": "水",
-}
-
-# ── Branch rooting: canonical plain-string hidden stem table ─────────────────
-# This is the single source of truth. wu_xing.py derives its Enum-keyed BRANCH_HIDDEN
-# from this table via import, eliminating duplication.
-BRANCH_HIDDEN_ROOTING: dict[str, list[tuple[str, float]]] = {
-    "子": [("癸", 1.0)],
-    "丑": [("己", 0.6), ("癸", 0.3), ("辛", 0.1)],
-    "寅": [("甲", 0.6), ("丙", 0.3), ("戊", 0.1)],
-    "卯": [("乙", 1.0)],
-    "辰": [("戊", 0.6), ("乙", 0.3), ("癸", 0.1)],
-    "巳": [("丙", 0.6), ("庚", 0.3), ("戊", 0.1)],
-    "午": [("丁", 0.7), ("己", 0.3)],
-    "未": [("己", 0.6), ("丁", 0.3), ("乙", 0.1)],
-    "申": [("庚", 0.6), ("壬", 0.3), ("戊", 0.1)],
-    "酉": [("辛", 1.0)],
-    "戌": [("戊", 0.6), ("辛", 0.3), ("丁", 0.1)],
-    "亥": [("壬", 0.7), ("甲", 0.3)],
-}
-
+# stem_elements, BRANCH_HIDDEN_ROOTING, _ROOT_DEPTH_LABELS imported from day_master
 _ROOT_DEPTH_LABELS: list[str] = ["本气根", "中气根", "余气根"]
 
 # ── 合化五行 lookup — element produced by each 天干合 pair ───────────────────
@@ -600,6 +576,15 @@ STRENGTH_ORDER = {
     "中等衰减": 2,
     "大幅衰减": 3,
     "消融吸收": 4,
+}
+
+# Maps day master 强弱 classification to an equivalent rooting tier.
+# Used by _pass_stem_rooting to substitute the day master's branch-rooting
+# tier with its holistic constitutional strength when 日柱特殊=True.
+_QIANG_RUO_TO_ROOT_TIER: dict[str, str] = {
+    "身旺": "深根",
+    "中和": "中根",
+    "身弱": "无根",
 }
 
 INTERACTION_TIER_ORDER = {
@@ -1663,17 +1648,29 @@ def _downgrade_if_stronger(current: str, cap: str) -> str:
     return cap if STRENGTH_ORDER.get(current, 99) < STRENGTH_ORDER.get(cap, 99) else current
 
 
-def _pass_stem_rooting(items: list) -> None:
+def _pass_stem_rooting(items: list, day_strength: str = "中和") -> None:
     """
     Stem Rooting Modulation Pass.
     Downgrades 天干合/克/冲 strength based on participating stems' 无根 status (multi-tier).
     Operates on a flat list (post-priority); does NOT use registry.
+
+    When 日柱特殊=True on an item, the day master's branch-rooting tier is substituted
+    with a tier derived from its holistic 强弱 classification via _QIANG_RUO_TO_ROOT_TIER.
+    This prevents false downgrades for a 身旺 day master whose root falls outside the
+    local branch subset, and ensures a 身弱 day master is correctly treated as rootless.
+    All other stem pairs use actual branch-rooting tiers unchanged.
 
     Scenario table:
         天干合: one stem 无根 → "显著影响"; both 无根 → "中等衰减"
         天干克: controller 无根 + target rooted → "大幅衰减";
                 controller 无根 + target 无根   → "中等衰减"
         天干冲: one stem 无根 → "显著影响"; both 无根 → "中等衰减"
+
+    Scope note: the 强弱 substitution operates on a local effective_rooting copy and does
+    NOT write back to item["根基"]. Wu_xing's combo_factor and per_stem_retain (both read
+    根基 directly) therefore still use the raw branch-rooting tier for the day master.
+    To extend the substitution to wu_xing scoring, write the derived tier back to
+    item["根基"]["日柱"] here instead of keeping it local.
     """
     for item in items:
         itype = item.get("类型")
@@ -1685,7 +1682,13 @@ def _pass_stem_rooting(items: list) -> None:
         if not rooting:
             continue
         strength = item.get("强度", "")
-        tiers = list(rooting.values())
+
+        # When the day master participates, substitute its tier with the 强弱-derived equivalent
+        effective_rooting = dict(rooting)
+        if item.get("日柱特殊") and "日柱" in effective_rooting:
+            effective_rooting["日柱"] = _QIANG_RUO_TO_ROOT_TIER.get(day_strength, "中根")
+
+        tiers = list(effective_rooting.values())
         wugen_count = tiers.count("无根")
 
         if itype == "天干合":
@@ -1701,9 +1704,9 @@ def _pass_stem_rooting(items: list) -> None:
 
         elif itype == "天干克":
             controller = item.get("主动方")
-            if not controller or rooting.get(controller) != "无根":
+            if not controller or effective_rooting.get(controller) != "无根":
                 continue
-            target_tier = next((v for k, v in rooting.items() if k != controller), "无根")
+            target_tier = next((v for k, v in effective_rooting.items() if k != controller), "无根")
             if target_tier != "无根":
                 cap, note = "大幅衰减", "克者无根，被克者有根，克力瓦解"
             else:
@@ -1827,33 +1830,8 @@ def _pass6_xun_kong(filtered: list, xun_kong_data: dict, zhis: list) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _get_shi_shen_for_stem_pair(day_stem: str, hidden_stem: str) -> str:
-    """
-    Compute the ten-god relationship of hidden_stem relative to day_stem.
-    Returns a Chinese ten-god label.
-    All ten-god relationships in BaZi are always computed relative to the day master.
-    """
-    day_elem = stem_elements.get(day_stem, "无")
-    hidden_elem = stem_elements.get(hidden_stem, "无")
-
-    day_yin = day_stem in "乙丁己辛癸"
-    hidden_yin = hidden_stem in "乙丁己辛癸"
-    same_polarity = day_yin == hidden_yin
-
-    _generates = {"木": "火", "火": "土", "土": "金", "金": "水", "水": "木"}
-    _controls = {"木": "土", "火": "金", "土": "水", "金": "木", "水": "火"}
-
-    if hidden_elem == day_elem:
-        return "比肩" if same_polarity else "劫财"
-    if _generates.get(day_elem) == hidden_elem:
-        return "食神" if same_polarity else "伤官"
-    if _generates.get(hidden_elem) == day_elem:
-        return "正印" if same_polarity else "偏印"
-    if _controls.get(day_elem) == hidden_elem:
-        return "偏财" if same_polarity else "正财"
-    if _controls.get(hidden_elem) == day_elem:
-        return "七杀" if same_polarity else "正官"
-    return "未知"
+# _get_shi_shen_for_stem_pair → now get_shi_shen_for_stem_pair (public) imported from day_master
+_get_shi_shen_for_stem_pair = get_shi_shen_for_stem_pair
 
 
 def _detect_san_hui(zhis: list, registry: InteractionRegistry) -> None:
@@ -2565,30 +2543,7 @@ def _build_vacant_flags(registry: InteractionRegistry) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def get_stem_root_tier(elem: str, zhis: list[str]) -> str:
-    """
-    Returns rooting tier for an element string across given branch strings.
-    Exported for use by wu_xing.py to avoid duplicating BRANCH_HIDDEN_ROOTING.
-
-    Args:
-        elem: element string e.g. "木", "火"
-              From natal_interactions: stem_elements.get(gan) → "木"
-              From wu_xing: STEM_ELEMENT[p.stem].value → Element.WOOD.value → "木"
-              Both produce the same plain string — types are consistent.
-        zhis: list of branch strings e.g. ["寅", "午", "子", "亥"]
-              From wu_xing: [q.branch.value for q in pillars if q.branch]
-
-    Returns:
-        "深根" | "中根" | "浅根" | "无根"
-    """
-    best_idx = len(_ROOT_DEPTH_LABELS)
-    for zhi in zhis:
-        for idx, (hidden_stem, _) in enumerate(BRANCH_HIDDEN_ROOTING.get(zhi, [])):
-            if stem_elements.get(hidden_stem) == elem:
-                if idx < best_idx:
-                    best_idx = idx
-                break
-    return ["深根", "中根", "浅根", "无根"][min(best_idx, 3)]
+# get_stem_root_tier imported from day_master
 
 
 def compute_pillar_rooting(

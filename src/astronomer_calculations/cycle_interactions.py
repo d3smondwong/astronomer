@@ -413,6 +413,62 @@ TOMB_HIDDEN_STEMS: dict[str, list[tuple[str, str]]] = {
 }
 _TOMB_BRANCHES = frozenset(TOMB_HIDDEN_STEMS.keys())
 
+# ── 墓库境况 helpers ──────────────────────────────────────────────────────────
+_KAIKU_SUPPORT_GODS = frozenset({"比肩", "劫财", "正印", "偏印"})
+_KAIKU_OPPOSE_GODS = frozenset({"七杀", "正官"})
+
+
+def _determine_lib_type(tomb_branch: str, day_elem: str) -> str:
+    """
+    Return "墓" if the day master's element is stored in this tomb branch (i.e. the
+    day master's own qi is being entombed), or "库" if a different element is stored.
+    """
+    hidden_elems = {
+        stem_elements.get(s, "") for s, _ in TOMB_HIDDEN_STEMS.get(tomb_branch, [])
+    }
+    return "墓" if day_elem in hidden_elems else "库"
+
+
+def _determine_kai_ku_influence(
+    day_strength: str, lib_type: str, released_gods: list[str]
+) -> str:
+    """Derive 影响 label from day master strength, lib type, and released ten-gods."""
+    has_support = any(g in _KAIKU_SUPPORT_GODS for g in released_gods)
+    has_oppose = any(g in _KAIKU_OPPOSE_GODS for g in released_gods)
+    if lib_type == "库":
+        if day_strength == "身旺":
+            return "有利"
+        elif day_strength == "身弱":
+            return "有利" if has_support else ("不利" if has_oppose else "中性")
+        else:  # 中和
+            return "有利" if not has_oppose else "中性"
+    else:  # 墓 — day master's own element is entombed here
+        return "中性" if day_strength in ("身旺", "中和") else "不利"
+
+
+def _generate_kai_ku_remark(
+    day_strength: str, lib_type: str, released_gods: list[str]
+) -> str:
+    """Generate a Chinese explanation for a 开库 item."""
+    if not released_gods:
+        return "库藏未显，作用不彰"
+    release_desc = "、".join(released_gods)
+    if lib_type == "库":
+        if day_strength == "身旺":
+            return f"日主身旺，开库得用，释放{release_desc}"
+        elif day_strength == "中和":
+            return f"日主中和，开库启用，释放{release_desc}"
+        else:
+            return f"日主身弱，开库泄力，释放{release_desc}"
+    else:  # 墓
+        if day_strength == "身旺":
+            return f"开墓引动{release_desc}，日主身旺可承"
+        elif day_strength == "中和":
+            return f"开墓引动{release_desc}，强弱均衡，变化不定"
+        else:
+            return f"开墓引动{release_desc}，日主身弱，恐有阻滞"
+
+
 # Hidden stems for non-tomb branches — used by _check_branch_rooting.
 # Module-level constant to avoid re-creating the dict on every call.
 _NON_TOMB_HIDDEN: dict[str, list[str]] = {
@@ -949,6 +1005,7 @@ def _detect_cycle_pairwise(
     registry: CycleRegistry,
     cycle_label: str,
     day_stem: str,
+    day_strength: str = "中和",
 ) -> None:
     """
     1×4 scan: cycle pillar vs each natal pillar.
@@ -1062,6 +1119,9 @@ def _detect_cycle_pairwise(
                     }
                     for stem, ceng in hidden_data
                 ]
+                _released_gods = [e["十神"] for e in ku_cang]
+                _day_elem = stem_elements.get(day_stem, "")
+                _lib_type = _determine_lib_type(target_zhi, _day_elem)
                 registry.register(
                     {
                         "类型": "开库",
@@ -1078,6 +1138,15 @@ def _detect_cycle_pairwise(
                         "库藏释放": ku_cang,
                         "根基强度": cycle_self_rooting["strength"],
                         "根基说明": cycle_self_rooting["interpretation"],
+                        "墓库境况": {
+                            "类型": _lib_type,
+                            "影响": _determine_kai_ku_influence(
+                                day_strength, _lib_type, _released_gods
+                            ),
+                            "说明": _generate_kai_ku_remark(
+                                day_strength, _lib_type, _released_gods
+                            ),
+                        },
                     }
                 )
             else:
@@ -1214,7 +1283,10 @@ def _detect_cycle_pairwise(
                     "状态": get_status("天干合"),
                     "紧贴": True,
                     "主动方": "相互",
-                    "合化判断": "合化成立" if cycle_tier != "无根" and natal_tier != "无根" else "合而不化",
+                    "合化判断": "合化成立" if cycle_tier != "无根" and (
+                        {"身旺": "深根", "中和": "中根", "身弱": "无根"}.get(day_strength, "中根")
+                        if is_ri_zhu else natal_tier
+                    ) != "无根" else "合而不化",
                     "根基": root_detail,
                 }
             )
@@ -2136,6 +2208,7 @@ def get_cycle_interactions(
     cycle_label: str = "大运",
     cycle_xk_str: str | None = None,
     natal_xk: dict | None = None,
+    day_strength: str = "中和",
 ) -> dict:
     """
     Detect all interactions between one external cycle pillar and the natal chart.
@@ -2207,6 +2280,7 @@ def get_cycle_interactions(
         registry,
         cycle_label,
         day_stem,
+        day_strength,
     )
 
     # 共拱 detection — after structural, so structural registrations are visible
@@ -2218,7 +2292,7 @@ def get_cycle_interactions(
     )
 
     # ── Stem rooting modulation ────────────────────────────────────────────
-    _pass_stem_rooting(filtered)
+    _pass_stem_rooting(filtered, day_strength=day_strength)
 
     # ── Pass 6: Xun Kong (旬空) post-filter ──────────────────────────────
     if cycle_xk_str is not None or natal_xk is not None:

@@ -110,6 +110,10 @@ from src.astronomer_calculations.cycle_interactions import (
     KAIKU_STRENGTH,
     KAIKU_RELEASE_STRENGTH,
     KAIKU_RELEASE_NATURE,
+    # 墓库境况 helpers
+    _determine_lib_type,
+    _determine_kai_ku_influence,
+    _generate_kai_ku_remark,
     # XK constants — all defined in cycle_interactions (single source of truth)
     _XK_HE_TYPES,
     _XK_CHONG_TYPES,
@@ -251,6 +255,7 @@ def _detect_pairwise_branch(
     a_lbl: str,
     b_lbl: str,
     day_stem: str,
+    day_strength: str = "中和",
 ) -> list[dict]:
     """
     Detect all branch interactions between two cycle pillars.
@@ -326,6 +331,9 @@ def _detect_pairwise_branch(
                         "合化五行": _STEM_COMBINE_ELEMENT.get(stem, ""),
                     }
                 ku_cang.append(entry)
+            _released_gods_b = [e["十神"] for e in ku_cang]
+            _day_elem_b = stem_elements.get(day_stem, "")
+            _lib_type_b = _determine_lib_type(b_branch, _day_elem_b)
             results.append(
                 {
                     "类型": "开库",
@@ -340,6 +348,15 @@ def _detect_pairwise_branch(
                     "库藏释放": ku_cang,
                     "根基强度": rooting["strength"],
                     "根基说明": rooting["interpretation"],
+                    "墓库境况": {
+                        "类型": _lib_type_b,
+                        "影响": _determine_kai_ku_influence(
+                            day_strength, _lib_type_b, _released_gods_b
+                        ),
+                        "说明": _generate_kai_ku_remark(
+                            day_strength, _lib_type_b, _released_gods_b
+                        ),
+                    },
                 }
             )
 
@@ -371,6 +388,9 @@ def _detect_pairwise_branch(
                         "合化五行": _STEM_COMBINE_ELEMENT.get(stem, ""),
                     }
                 ku_cang.append(entry)
+            _released_gods_a = [e["十神"] for e in ku_cang]
+            _day_elem_a = stem_elements.get(day_stem, "")
+            _lib_type_a = _determine_lib_type(a_branch, _day_elem_a)
             results.append(
                 {
                     "类型": "开库",
@@ -385,6 +405,15 @@ def _detect_pairwise_branch(
                     "库藏释放": ku_cang,
                     "根基强度": rooting["strength"],
                     "根基说明": rooting["interpretation"],
+                    "墓库境况": {
+                        "类型": _lib_type_a,
+                        "影响": _determine_kai_ku_influence(
+                            day_strength, _lib_type_a, _released_gods_a
+                        ),
+                        "说明": _generate_kai_ku_remark(
+                            day_strength, _lib_type_a, _released_gods_a
+                        ),
+                    },
                 }
             )
 
@@ -1093,6 +1122,7 @@ def get_pairwise_cycle_interactions(
     cycle_b_label: str = "流年",
     cycle_a_xk_str: str | None = None,
     cycle_b_xk_str: str | None = None,
+    day_strength: str = "中和",
 ) -> dict:
     """
     Detect and priority-resolve all interactions between two cycle pillars.
@@ -1134,7 +1164,7 @@ def get_pairwise_cycle_interactions(
     all_items: list[dict] = []
     all_items.extend(_detect_pairwise_fanyin_fuyin(a_s, a_b, b_s, b_b, a_lbl, b_lbl))
     all_items.extend(
-        _detect_pairwise_branch(a_s, a_b, b_s, b_b, a_lbl, b_lbl, day_stem)
+        _detect_pairwise_branch(a_s, a_b, b_s, b_b, a_lbl, b_lbl, day_stem, day_strength)
     )
     all_items.extend(_detect_pairwise_stem(a_s, a_b, b_s, b_b, a_lbl, b_lbl))
     all_items.extend(

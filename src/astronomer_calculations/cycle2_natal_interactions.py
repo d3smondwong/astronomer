@@ -74,6 +74,11 @@ Section Map
 # SECTION 1 — Imports & Constants
 # ══════════════════════════════════════════════════════════════════════════════
 
+import re
+
+# Strips {placeholder} tokens from remark templates when format kwargs are missing
+_RE_PLACEHOLDER = re.compile(r"\{[^}]+\}")
+
 from src.astronomer_calculations.natal_interactions import (
     branch_elements,
     triple_he,
@@ -86,11 +91,21 @@ from src.astronomer_calculations.natal_interactions import (
     compute_pillar_rooting,
     get_status,
     _PT_KEY_MAP,
+    clash_map,
+    stem_elements,
+    _get_shi_shen_for_stem_pair,
 )
 
 from src.astronomer_calculations.cycle_interactions import (
     CYCLE_PRIORITY_RULE_TABLE,
     CYCLE_REMARKS,
+    # 开库 constants & helpers
+    TOMB_HIDDEN_STEMS,
+    _TOMB_BRANCHES,
+    _check_branch_rooting,
+    _determine_lib_type,
+    _determine_kai_ku_influence,
+    _generate_kai_ku_remark,
     # XK constants & helpers — single source of truth from cycle_interactions
     _XK_HE_TYPES,
     _XK_XING_TYPES,
@@ -108,17 +123,19 @@ _NATAL_KEYS = ["year", "month", "day", "hour"]
 CROSS_CYCLE_TIER_ORDER: dict[str, int] = {
     "三会": 0,
     "三合": 1,
-    "拱会": 2,
-    "残会": 3,
-    "半合": 4,
-    "无恩之刑": 5,
-    "恃势之刑": 5,
+    "开库": 2,
+    "拱会": 3,
+    "残会": 4,
+    "半合": 5,
+    "无恩之刑": 6,
+    "恃势之刑": 6,
 }
 
 # ── Base strength for cross-cycle formations ──
 CROSS_CYCLE_BASE_STRENGTH: dict[str, str] = {
     "三合": "强势主流",
     "三会": "强势主流",
+    "开库": "强势主流",
     "无恩之刑": "强势主流",
     "恃势之刑": "强势主流",
     "半合": "显著影响",  # dual-cycle only — arching toward missing branch
@@ -331,6 +348,90 @@ def _detect_cross_san_xing(
     return results
 
 
+def _detect_cross_kai_ku(
+    a_branch: str,
+    b_branch: str,
+    a_stem: str,
+    b_stem: str,
+    a_lbl: str,
+    b_lbl: str,
+    natal_chart: dict,
+    day_stem: str,
+    day_strength: str = "中和",
+) -> list[dict]:
+    """
+    Detect 开库 when a cycle branch (A or B) acts as the key to a natal tomb branch.
+
+    Each cycle branch is checked independently against all 4 natal pillars.
+    The natal branch must be a tomb (辰/戌/丑/未) clashed by the cycle branch.
+
+    Can produce up to 2 entries — one per cycle pillar at most one natal tomb per cycle.
+    Dual opening (both A and B open different natal tombs simultaneously) is significant.
+
+    Output fields: 类型, 分类, 组合, 组合明细, 组合来源, 主动方,
+                   库体, 库藏释放, 根基强度, 根基说明, 墓库境况
+    """
+    results = []
+    day_elem = stem_elements.get(day_stem, "")
+
+    for cycle_branch, cycle_stem, cycle_lbl in [
+        (a_branch, a_stem, a_lbl),
+        (b_branch, b_stem, b_lbl),
+    ]:
+        for pillar_name, natal_branch in _natal_pillar_branches(natal_chart):
+            if clash_map.get(cycle_branch) != natal_branch:
+                continue
+            if natal_branch not in _TOMB_BRANCHES:
+                continue
+
+            rooting = _check_branch_rooting(cycle_stem, cycle_branch)
+            hidden_data = TOMB_HIDDEN_STEMS[natal_branch]
+            ku_cang = [
+                {
+                    "天干": stem,
+                    "十神": _get_shi_shen_for_stem_pair(day_stem, stem),
+                    "层次": ceng,
+                }
+                for stem, ceng in hidden_data
+            ]
+            released_gods = [e["十神"] for e in ku_cang]
+            lib_type = _determine_lib_type(natal_branch, day_elem)
+
+            results.append(
+                {
+                    "类型": "开库",
+                    "分类": "跨运开库",
+                    "组合": f"{cycle_lbl}-{pillar_name}",
+                    "组合明细": {
+                        f"{cycle_lbl}支": cycle_branch,
+                        f"{pillar_name}支": natal_branch,
+                    },
+                    "组合来源": {
+                        cycle_lbl: cycle_branch,
+                        f"命盘{pillar_name}": natal_branch,
+                    },
+                    "主动方": cycle_lbl,
+                    "库体": {
+                        "库支": natal_branch,
+                        "钥匙": cycle_branch,
+                    },
+                    "库藏释放": ku_cang,
+                    "根基强度": rooting["strength"],
+                    "根基说明": rooting["interpretation"],
+                    "墓库境况": {
+                        "类型": lib_type,
+                        "影响": _determine_kai_ku_influence(
+                            day_strength, lib_type, released_gods
+                        ),
+                        "说明": _generate_kai_ku_remark(
+                            day_strength, lib_type, released_gods
+                        ),
+                    },
+                }
+            )
+    return results
+
+
 def _detect_cross_ban_he(
     a_branch: str,
     b_branch: str,
@@ -420,15 +521,19 @@ def _lookup_rule(lock_type: str, itype: str) -> str | None:
 
 def _lookup_remark(lock_type: str, itype: str, **fmt_kw) -> str:
     """Check CYCLE_REMARKS first, fall back to STRENGTH_REMARKS.
-    Formats with provided kwargs; returns empty string if no remark."""
+    Formats with provided kwargs; returns raw template if formatting fails or
+    no kwargs provided; returns empty string if no remark found."""
     template = CYCLE_REMARKS.get((lock_type, itype)) or STRENGTH_REMARKS.get(
         (lock_type, itype), ""
     )
-    if template and fmt_kw:
+    if not template:
+        return ""
+    if fmt_kw:
         try:
             return template.format(**fmt_kw)
         except (KeyError, IndexError):
-            pass
+            # Return template with placeholders stripped rather than raw brace syntax
+            return _RE_PLACEHOLDER.sub("", template).strip("，。 ")
     return template
 
 
@@ -466,17 +571,20 @@ def _get_structural_winner_lock(full_structures: list[dict]) -> str | None:
 
 def _cross_pass_structural(items: list[dict]) -> None:
     """
-    Pass 1: Structural competition — full structures suppress partials.
+    Pass 1: Structural competition — full structures suppress partials and 开库.
 
     三会 vs 三合: for each 三会 item, downgrades all 三合 items via STRUCTURAL_三会
-    rule (→ 消融吸收). The full structural winner then suppresses dual-cycle partials
-    (半合/拱会/残会) via the same rule table.
+    rule (→ 消融吸收). The full structural winner then suppresses:
+      - dual-cycle partials (半合/拱会/残会) via the same rule table
+      - 开库 items (→ 大幅衰减 for 三会, 中等衰减 for 三合) because the structural
+        field absorbs or dampens the clash energy that would otherwise open the tomb
 
     Winner priority: 三会 > 三合. Uses _get_structural_winner_lock() for the
-    partial-suppression lock key to avoid duplicating that logic.
+    suppression lock key to avoid duplicating that logic.
     """
     full_structures = [it for it in items if it.get("类型") in ("三合", "三会")]
     partial_items = [it for it in items if it.get("类型") in ("半合", "拱会", "残会")]
+    kaiku_items = [it for it in items if it.get("类型") == "开库"]
 
     # 三会 vs 三合 competition
     for san_hui in [it for it in full_structures if it.get("类型") == "三会"]:
@@ -488,6 +596,9 @@ def _cross_pass_structural(items: list[dict]) -> None:
     if winner_lock is not None:
         for item in partial_items:
             _apply_downgrade(item, winner_lock)
+        # Structural field suppresses 开库 — pass 主动方 as {cycle} for remark template
+        for item in kaiku_items:
+            _apply_downgrade(item, winner_lock, cycle=item.get("主动方", ""))
 
 
 def _cross_pass_xing(items: list[dict]) -> None:
@@ -593,6 +704,9 @@ def _cross_xun_kong_pass(
         elif itype in _XK_XING_TYPES:
             _downgrade_by_one_tier_xk(item, _build_xk_remark(void_parts, "刑_single"))
             item["旬空涉及"] = void_parts
+        elif itype == "开库":
+            _downgrade_by_one_tier_xk(item, _build_xk_remark(void_parts, "冲开旬空"))
+            item["旬空涉及"] = void_parts
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -649,6 +763,7 @@ def get_cross_cycle_interactions(
     cycle_a_xk_str: str | None = None,
     cycle_b_xk_str: str | None = None,
     natal_xk: dict | None = None,
+    day_strength: str = "中和",
 ) -> dict:
     """
     Detect cross-cycle structural formations spanning natal chart + two cycle pillars.
@@ -657,10 +772,11 @@ def get_cross_cycle_interactions(
     the two cycle pillars — prevents duplication with individual 1×4 scans.
 
     Processing pipeline:
-        Step 1 — Detection (四 helpers, in order):
+        Step 1 — Detection (五 helpers, in order):
                    _detect_cross_san_hui  (三会 first — higher priority)
                    _detect_cross_san_he   (三合)
                    _detect_cross_san_xing (三刑)
+                   _detect_cross_kai_ku   (开库 — cycle branch as key to natal tomb)
                    _detect_cross_ban_he   (半合 / 拱会 / 残会 — cycle-only partials)
         Step 2 — Priority filter:
                    Pass 1: structural competition (三会 > 三合 > partials)
@@ -675,7 +791,7 @@ def get_cross_cycle_interactions(
         cycle_a_stem / cycle_a_branch: First cycle pillar stem and branch characters.
         cycle_b_stem / cycle_b_branch: Second cycle pillar stem and branch characters.
         natal_chart: {"year": {"stem": str, "branch": str}, "month":…, "day":…, "hour":…}
-        day_stem: Birth Day Stem — reserved for future 十神 annotation; unused currently.
+        day_stem: Birth Day Stem — used for 十神 resolution in 开库 库藏释放 and 墓库境况.
         cycle_a_label: Display label for the first cycle (default "大运").
         cycle_b_label: Display label for the second cycle (default "流年").
         cycle_a_xk_str: Xun Kong string for cycle A from getXunKong() (e.g. "午未").
@@ -689,9 +805,9 @@ def get_cross_cycle_interactions(
         dict: {"跨运作用": {"关系总览": [...], "跨运结构": [...], "根基": {...}}}
               根基 covers all 6 pillars (4 natal + 2 cycle) via compute_pillar_rooting.
     """
-    _ = (cycle_a_stem, cycle_b_stem, day_stem)  # reserved for future 十神 use
     a_b, b_b = cycle_a_branch, cycle_b_branch
     a_lbl, b_lbl = cycle_a_label, cycle_b_label
+    _day_stem = day_stem or ""
 
     # ── Step 1: Detection ────────────────────────────────────────────────────
     all_items: list[dict] = []
@@ -700,6 +816,14 @@ def get_cross_cycle_interactions(
     all_items.extend(_detect_cross_san_hui(a_b, b_b, a_lbl, b_lbl, natal_chart))
     all_items.extend(_detect_cross_san_he(a_b, b_b, a_lbl, b_lbl, natal_chart))
     all_items.extend(_detect_cross_san_xing(a_b, b_b, a_lbl, b_lbl, natal_chart))
+
+    # Cross-cycle 开库: either cycle branch acting as key to a natal tomb
+    all_items.extend(
+        _detect_cross_kai_ku(
+            a_b, b_b, cycle_a_stem, cycle_b_stem,
+            a_lbl, b_lbl, natal_chart, _day_stem, day_strength,
+        )
+    )
 
     # Dual-cycle partials (no natal completion required)
     all_items.extend(_detect_cross_ban_he(a_b, b_b, a_lbl, b_lbl))
