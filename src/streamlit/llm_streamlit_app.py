@@ -10,10 +10,14 @@ from pathlib import Path
 # Add project root to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from src.services.astronomer_data_aggregator import AstroDataAggregator
 from src.services.astronomer_data_llm_formatter import AstroDataLLMFormatter
 from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
 from src.utils.logging import configure_logging, get_logger
+from src.llm.llm_service import analyse_bazi, LLMError
 from lunar_python import Solar
 
 # To run it
@@ -165,6 +169,14 @@ if analyze_button:
 
         logger.info("✅ BaZi analysis completed successfully")
 
+        try:
+            with st.spinner("🤖 Consulting the LLM..."):
+                llm_response = analyse_bazi(llm_friendly_data)
+        except LLMError as e:
+            logger.error("LLM analysis failed: %s", e)
+            st.error(f"LLM error: {e}")
+            st.stop()
+
         # Display results
         st.success("✅ Analysis Complete!")
         st.markdown("---")
@@ -200,27 +212,24 @@ if analyze_button:
 
         with tab1:
             st.subheader("👤 Life Overview")
-            st.info(
-                "🚀 LLM response will be displayed here once the integration logic is implemented."
-            )
-            # TODO: Add LLM response logic for life overview
-            pass
+            if llm_response.life_overview:
+                st.markdown(llm_response.life_overview)
+            else:
+                st.warning("No Life Overview returned from the LLM.")
 
         with tab2:
             st.subheader("💕 Romance")
-            st.info(
-                "🚀 LLM response will be displayed here once the integration logic is implemented."
-            )
-            # TODO: Add LLM response logic for romance
-            pass
+            if llm_response.romance:
+                st.markdown(llm_response.romance)
+            else:
+                st.warning("No Romance section returned from the LLM.")
 
         with tab3:
             st.subheader("💼 Career")
-            st.info(
-                "🚀 LLM response will be displayed here once the integration logic is implemented."
-            )
-            # TODO: Add LLM response logic for career
-            pass
+            if llm_response.career:
+                st.markdown(llm_response.career)
+            else:
+                st.warning("No Career section returned from the LLM.")
 
         st.markdown("---")
 
