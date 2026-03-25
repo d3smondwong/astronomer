@@ -59,9 +59,8 @@ def _load_config() -> tuple[LLMConfig, str, str]:
         stream=provider_cfg.get("stream", False),
     )
 
-    templates = cfg.get("templates", {})
     system_template = OmegaConf.select(cfg, "templates.system", default="prompts/system_prompt.jinja")
-    user_template = OmegaConf.select(cfg, "templates.user", default="prompts/bazi_analysis.jinja")
+    user_template = OmegaConf.select(cfg, "templates.user", default="prompts/generations_prompt.jinja")
 
     return config, system_template, user_template
 
@@ -122,3 +121,54 @@ def analyse_bazi(llm_data: dict) -> LLMResponse:
     )
 
     return ResponseParser().parse(raw_text)
+
+# --- EXECUTION ---
+# python -m src.llm.llm_service
+if __name__ == "__main__":
+    from datetime import datetime
+
+    from dotenv import load_dotenv
+    load_dotenv()
+
+    from src.utils.logging import configure_logging
+    configure_logging()
+
+    from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
+    from src.services.astronomer_data_aggregator import AstroDataAggregator
+    from src.services.astronomer_data_llm_formatter import AstroDataLLMFormatter
+
+    # python -m src.llm.llm_service
+
+    # --- Choose subject ---
+    # Desmond
+    datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)
+    latitude, longitude, gender = 1.3253, 103.808053, 1
+
+    # Corinne
+    # datetime_birthday = datetime(1987, 6, 3, 12, 6, 0)
+    # latitude, longitude, gender = 1.4759, 103.808053, 0
+
+    # Lara
+    # datetime_birthday = datetime(2025, 7, 31, 9, 10, 0)
+    # latitude, longitude, gender = 1.3253, 103.808053, 0
+
+    tst_birthday, _ = get_true_solar_time(datetime_birthday, latitude, longitude)
+    lunar_birthday = tst_birthday.getLunar()
+
+    # Collect & format
+    raw_data = AstroDataAggregator().collect_data(
+        lunar_birthday,
+        birth_datetime=datetime_birthday,
+        latitude=latitude,
+        longitude=longitude,
+        gender=gender,
+    )
+    llm_friendly_data = AstroDataLLMFormatter(raw_data).format_for_llm()
+
+    logger.info("=== Running LLM Analysis ===")
+    result = analyse_bazi(llm_friendly_data)
+
+    logger.info("--- Life Overview ---\n%s", result.life_overview)
+    logger.info("--- Romance ---\n%s", result.romance)
+    logger.info("--- Career ---\n%s", result.career)
+    logger.info("--- Raw Text ---\n%s", result.raw_text)
