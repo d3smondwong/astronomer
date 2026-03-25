@@ -13,18 +13,15 @@ logger = get_logger(__name__)
 class GeminiProvider(BaseProvider):
     def __init__(self, config: LLMConfig):
         super().__init__(config)
-        import google.generativeai as genai
+        from google import genai
+        from google.genai import types
 
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             raise KeyError("GEMINI_API_KEY not set in .env")
 
-        genai.configure(api_key=api_key)
-        self._genai = genai
-        self._model_client = genai.GenerativeModel(
-            model_name=config.model,
-            system_instruction=None,  # system prompt passed per-call via contents
-        )
+        self._client = genai.Client(api_key=api_key)
+        self._types = types
 
     def call(self, system_prompt: str, user_prompt: str) -> str:
         logger.debug(
@@ -34,14 +31,11 @@ class GeminiProvider(BaseProvider):
             self.config.max_tokens,
         )
         try:
-            # Gemini supports a system instruction at model level; rebuild with it
-            model = self._genai.GenerativeModel(
-                model_name=self.config.model,
-                system_instruction=system_prompt,
-            )
-            response = model.generate_content(
-                user_prompt,
-                generation_config=self._genai.GenerationConfig(
+            response = self._client.models.generate_content(
+                model=self.config.model,
+                contents=user_prompt,
+                config=self._types.GenerateContentConfig(
+                    system_instruction=system_prompt,
                     temperature=self.config.temperature,
                     max_output_tokens=self.config.max_tokens,
                 ),
