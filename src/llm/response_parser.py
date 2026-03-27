@@ -2,36 +2,121 @@
 Parses the raw LLM response into structured Life Overview, Romance, and Career sections.
 """
 
+import json
 import re
 
-from src.llm.base_provider import LLMResponse
+from json_repair import repair_json
+
+from src.llm.base_provider import LifeOverview, LLMResponse
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-_SECTION_PATTERN = re.compile(
-    r"##\s*Life Overview\s*|##\s*Romance\s*|##\s*Career\s*",
-    re.IGNORECASE,
-)
+
+def _normalize_newlines(text) -> str:
+    """Ensure single newlines become markdown hard-breaks so st.markdown renders them."""
+    if text is None:
+        return ""
+    if not isinstance(text, str):
+        # LLM returned a non-string (e.g. nested dict) — serialize so content isn't lost
+        try:
+            text = json.dumps(text, ensure_ascii=False)
+        except Exception:
+            return ""
+    if not text:
+        return text
+    # Replace literal \n escape sequences the LLM sometimes emits inside JSON strings
+    text = text.replace("\\n", "\n")
+    # Collapse 3+ newlines to 2 (paragraph break), then expand single newlines to hard breaks
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"\n(?!\n)", "  \n", text)
+    return text
+
+
+# Strip markdown code fences the model sometimes wraps around JSON
+_CODE_FENCE = re.compile(r"```(?:json)?\s*([\s\S]*?)```", re.IGNORECASE)
+
+
+def _repair_json_strings(text: str) -> str:
+    """Escape literal control characters inside JSON string values.
+
+    LLMs sometimes emit literal newlines/tabs inside JSON string values, which
+    makes json.loads() fail. This walks the text character-by-character and
+    escapes those characters only when inside a string value.
+    """
+    result = []
+    in_string = False
+    escaped = False
+    for char in text:
+        if escaped:
+            result.append(char)
+            escaped = False
+        elif char == "\\":
+            result.append(char)
+            escaped = True
+        elif char == '"':
+            in_string = not in_string
+            result.append(char)
+        elif in_string and char == "\n":
+            result.append("\\n")
+        elif in_string and char == "\r":
+            result.append("\\r")
+        elif in_string and char == "\t":
+            result.append("\\t")
+        else:
+            result.append(char)
+    return "".join(result)
 
 
 class ResponseParser:
     def parse(self, raw_text: str) -> LLMResponse:
-        """Split raw LLM text into the three BaZi analysis sections."""
-        parts = _SECTION_PATTERN.split(raw_text)
-        # parts[0] is any preamble before the first header (usually empty)
-        # parts[1], [2], [3] are the section bodies
-        sections = [p.strip() for p in parts[1:4]]
+        """Extract life_overview (nested), romance, and career from a JSON LLM response."""
+        text = raw_text.strip()
 
-        # Pad to 3 if model returned fewer sections
-        while len(sections) < 3:
-            sections.append("")
+        # Unwrap ```json ... ``` if present
+        fence_match = _CODE_FENCE.search(text)
+        if fence_match:
+            text = fence_match.group(1).strip()
 
-        life_overview, romance, career = sections[0], sections[1], sections[2]
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            # Try manual control-character escaping first (fast path)
+            try:
+                data = json.loads(_repair_json_strings(text))
+            except json.JSONDecodeError:
+                # Fall back to json-repair which handles unescaped quotes, missing commas, etc.
+                try:
+                    data = json.loads(repair_json(text))
+                    logger.debug("ResponseParser: json-repair recovered malformed JSON")
+                except (json.JSONDecodeError, Exception) as e:
+                    logger.warning("ResponseParser: JSON decode failed (%s) — returning raw text", e)
+                    return LLMResponse(life_overview=LifeOverview(), romance="", career="", raw_text=raw_text)
 
+        raw_overview = data.get("life_overview", {})
+        # Support both the new nested-object format and the legacy flat-string format
+        if isinstance(raw_overview, str):
+            life_overview = LifeOverview(poem=_normalize_newlines(raw_overview))
+        else:
+            life_overview = LifeOverview(
+                poem=_normalize_newlines(raw_overview.get("poem", "")),
+                self_verification=_normalize_newlines(raw_overview.get("self_verification", "")),
+                core_identity=_normalize_newlines(raw_overview.get("core_identity", "")),
+                life_so_far=_normalize_newlines(raw_overview.get("life_so_far", "")),
+                defining_moments=_normalize_newlines(raw_overview.get("defining_moments", "")),
+                the_future=_normalize_newlines(raw_overview.get("the_future", "")),
+                destiny_balance_sheet=_normalize_newlines(raw_overview.get("destiny_balance_sheet", "")),
+                living_in_alignment=_normalize_newlines(raw_overview.get("living_in_alignment", "")),
+            )
+
+        romance = _normalize_newlines(data.get("romance", ""))
+        career = _normalize_newlines(data.get("career", ""))
+
+        total_chars = sum(len(v) for v in vars(life_overview).values())
         logger.debug(
-            "Parsed sections — Life Overview: %d chars, Romance: %d chars, Career: %d chars",
-            len(life_overview),
+            "Parsed sections — Life Overview: %d chars total (%d sub-sections filled), Romance: %d chars, Career: %d chars",
+            total_chars,
+            sum(1 for v in vars(life_overview).values() if v),
             len(romance),
             len(career),
         )
