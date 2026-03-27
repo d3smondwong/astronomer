@@ -115,7 +115,9 @@ Output Format:
     - 紧贴: adjacency flag for distance semantics
 """
 
-from lunar_python import Lunar
+from datetime import datetime
+
+from lunar_python import Lunar, Solar
 from lunar_python.util import LunarUtil
 from lunar_python.EightChar import EightChar
 from src.astronomer_calculations.cycle_na_yin import get_nayin
@@ -140,6 +142,8 @@ def get_da_yun(lunar_birthday: Lunar, gender: int) -> dict:
     Returns:
         dict: Structured JSON with Da Yun cycles and timing information
     """
+    current_year = Solar.fromDate(datetime.now()).getYear()
+
     # Get the EightChar (八字) object
     bazi = lunar_birthday.getEightChar()
 
@@ -229,6 +233,7 @@ def get_da_yun(lunar_birthday: Lunar, gender: int) -> dict:
             "开始年龄": da_yun.getStartAge(),  # Start age (from birth)
             "结束年龄": da_yun.getEndAge(),  # End age (from birth)
             "周期": f"{da_yun.getStartAge()}-{da_yun.getEndAge()}岁",  # Age range display
+            "当运": da_yun.getStartYear() <= current_year <= da_yun.getEndYear(),  # Is this the active decade
             "运柱": cycle_pillar_info,  # Enriched cycle pillar: 五行, 十神, 通根, 藏干, 季节状态, 十二长生
             "五行力量": cycle_wu_xing_result,  # Combined natal+cycle 五行力量分析
             "神煞": cycle_shen_sha if i > 0 else "未行大运",  # Shen Sha stars for this cycle
