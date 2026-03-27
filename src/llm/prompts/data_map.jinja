@@ -1,0 +1,181 @@
+### DATA MAPPING GUIDE (JSON GPS)
+Reference these specific JSON keys to build your narrative. Do not guess; the data is located here:
+
+{# ====================== Section 0. DESTINY ARC (袁天罡称骨歌) ====================== #}
+## 0. GRAND ARC (袁天罡称骨歌)
+* **Poem (称骨歌):** "{{ data['袁天罡称骨歌']['称骨歌'] | replace('[传统文学意象 (非写实预测)] ', '') }}"
+* **Weight (骨重):** {{ data['袁天罡称骨歌']['总骨重'] }} taels
+
+{# ====================== Section 1. BASIC IDENTITY & CLIMATE (基本信息 & 调候) ====================== #}
+## 1. BASIC IDENTITY & CLIMATE (基本信息 & 调候)
+{% set basic = data['基本信息'] %}
+* **Birth (出生):** {{ basic['阳历生日'] }} ({{ basic['农历生日'] }})
+* **Gender (性别):** {{ basic['性别'] }}
+* **Season (时令):** {{ basic['时令']['时令'] }} ({{ basic['时令']['月令地支'] }})
+  * **Elemental dominance (五行旺度):** {{ basic['时令']['五行状态'] | tojson }}
+* **Climate (气候状态):** {{ basic['时令']['调候分析']['气候状态'] }}
+  * **Essential element (调节药方):** {{ basic['时令']['调候分析']['调节药方'] }} (Urgency: {{ basic['时令']['调候分析']['调节紧迫性'] }})
+* **Natural Directions (方位运气):**
+  {% for key, dir in data['出生环境']['地理与神性开运']['方位运气'].items() %}
+  * **{{ key }}:** {{ dir['方向'] }} ({{ dir['方位'] }})
+  {% endfor %}
+* **Birth Constellation (星宿):** {{ data['出生环境']['地理与神性开运']['神性护佑']['星宿']['星宿'] }}
+  * **Poem (诗诀):** "{{ data['出生环境']['地理与神性开运']['神性护佑']['星宿']['星宿诗诀'] }}"
+* **Guardians (天神):**
+  * Day (日值): {{ data['出生环境']['地理与神性开运']['神性护佑']['天神']['日值天神']['天神'] }} ({{ data['出生环境']['地理与神性开运']['神性护佑']['天神']['日值天神']['运势'] }})
+  * Hour (时值): {{ data['出生环境']['地理与神性开运']['神性护佑']['天神']['时值天神']['天神'] }} ({{ data['出生环境']['地理与神性开运']['神性护佑']['天神']['时值天神']['运势'] }})
+* **Recommended Activities (日宜):** {{ data['出生环境']['行动策略与禁忌']['宜忌指引']['日宜'] | join(', ') }}
+* **Avoid (日忌):** {{ data['出生环境']['行动策略与禁忌']['宜忌指引']['日忌'] | join(', ') }}
+* **Lucky Deities (日吉神宜趋):** {{ data['出生环境']['行动策略与禁忌']['宜忌指引']['日吉神宜趋'] | join(', ') }}
+* **Hour Activities (时宜):** {{ data['出生环境']['行动策略与禁忌']['宜忌指引']['时宜'] | join(', ') }}
+* **Hour Avoidances (时忌):** {{ data['出生环境']['行动策略与禁忌']['宜忌指引']['时忌'] | join(', ') }}
+* **Sensitivities (冲煞风险):**
+  * **彭祖百忌 (Stem):** {{ data['出生环境']['行动策略与禁忌']['冲煞风险']['彭祖百忌']['干'] }}
+  * **彭祖百忌 (Branch):** {{ data['出生环境']['行动策略与禁忌']['冲煞风险']['彭祖百忌']['支'] }}
+  * **Clash with (日冲):** {{ data['出生环境']['行动策略与禁忌']['冲煞风险']['日冲'] }}
+  * **Day Pillar Clash Detail (日柱冲克):** {{ data['出生环境']['行动策略与禁忌']['冲煞风险']['日柱冲克'] }}
+  * **Day Harmful Energy (日煞):** {{ data['出生环境']['行动策略与禁忌']['冲煞风险']['日煞'] }}
+  * **Day Directional Harm (日柱方位煞):** {{ data['出生环境']['行动策略与禁忌']['冲煞风险']['日柱方位煞'] }}
+  * **Hour Clash (时冲):** {{ data['出生环境']['行动策略与禁忌']['冲煞风险']['时冲'] }}
+  * **Hour Harmful Energy (时煞):** {{ data['出生环境']['行动策略与禁忌']['冲煞风险']['时煞'] }}
+* **Inauspicious Influences (日凶煞宜忌):** {{ data['出生环境']['行动策略与禁忌']['宜忌指引']['日凶煞宜忌'] | join(', ') }}
+* **Grand Duke Directions (太岁方位):**
+  * Year Grand Duke (年太岁): {{ data['出生环境']['行动策略与禁忌']['太岁方位']['年太岁']['位置'] }} — {{ data['出生环境']['行动策略与禁忌']['太岁方位']['年太岁']['描述'] }}
+  * Month Grand Duke (月太岁): {{ data['出生环境']['行动策略与禁忌']['太岁方位']['月太岁']['位置'] }} — {{ data['出生环境']['行动策略与禁忌']['太岁方位']['月太岁']['描述'] }}
+  * Day Grand Duke (日太岁): {{ data['出生环境']['行动策略与禁忌']['太岁方位']['日太岁']['位置'] }} — {{ data['出生环境']['行动策略与禁忌']['太岁方位']['日太岁']['描述'] }}
+* **Moon Phase (月相):** {{ data['出生环境']['时令能量状态']['季节背景']['月相'] }}
+* **Natural Sign (物候):** {{ data['出生环境']['时令能量状态']['物候天文']['物候'] }}
+* **Sub-period (候):** {{ data['出生环境']['时令能量状态']['物候天文']['候'] }}
+* **Day Prosperity Star (日禄):** {{ data['出生环境']['时令能量状态']['物候天文']['日禄'] }}
+* **Six Fortune (六曜):** {{ data['出生环境']['时令能量状态']['能量周期']['六曜'] }}
+* **Nine-Star Energies (九星):**
+  * Year: {{ data['出生环境']['时令能量状态']['九星能量']['年九星'] }}
+  * Month: {{ data['出生环境']['时令能量状态']['九星能量']['月九星'] }}
+  * Day: {{ data['出生环境']['时令能量状态']['九星能量']['日九星'] }}
+  * Hour: {{ data['出生环境']['时令能量状态']['九星能量']['时九星'] }}
+* **Solar Term Progress (气令进度):** {{ data['出生环境']['历法与节气进程']['气令进度']['前气令']['名称'] }} → {{ data['出生环境']['历法与节气进程']['气令进度']['下个气令']['名称'] }} ({{ data['出生环境']['历法与节气进程']['气令进度']['进度百分比'] }} through)
+* **Multi-calendar (多维历法):**
+  * Buddhist: {{ data['出生环境']['历法与节气进程']['多维历法']['佛历'] }}
+  * Taoist: {{ data['出生环境']['历法与节气进程']['多维历法']['道历'] }}
+
+{# ====================== Section 2. DAY MASTER (日主) ====================== #}
+## 2. DAY MASTER (日主)
+{% set dm = data['日主'] %}
+* **天干:** {{ dm['天干'] }} ({{ dm['五行'] }}, {{ dm['阴阳'] }})
+* **十二长生:** {{ dm['十二长生'] }}
+* **得令:** {{ dm['得令']['状态'] }}
+* **通根:** {{ dm['得地']['通根'] }} (Details: {{ dm['得地']['详情'] | tojson }})
+* **十神支持 (得势):**
+  * **生扶 (支持天干):** {% for s in dm['得势']['支持天干'] %}{{ s['天干'] }} ({{ s['十神'] }}) {% endfor %}
+  * **中性 (中性天干):** {% for s in dm['得势']['中性天干'] %}{{ s['天干'] }} ({{ s['十神'] }}) {% endfor %}
+  * **克泄 (反对天干):** {% for s in dm['得势']['反对天干'] %}{{ s['天干'] }} ({{ s['十神'] }}) {% endfor %}
+
+{# ====================== Section 3. FOUR PILLARS (四柱) ====================== #}
+## 3. FOUR PILLARS (四柱)
+{% for pillar_name, pillar in data['核心命盘']['四柱实体'].items() %}
+### {{ pillar_name.upper() }} ({{ pillar['天干'] }}{{ pillar['地支'] }})
+* **天干地支:** {{ pillar['天干'] }}{{ pillar['地支'] }}
+* **藏干:**
+  {% for h in pillar['藏干'] %}
+  * {{ h['干'] }} ({{ h['强度'] }}) → {{ h['十神'] if '十神' in h else 'N/A' }}
+  {% endfor %}
+* **十神:**
+  * **天干:** {{ pillar['十神']['天干十神'] }}
+  * **地支:** {% for key, val in pillar['十神']['地支十神'].items() %}{{ key }}: {{ val }}{% if not loop.last %}, {% endif %}{% endfor %}
+* **纳音:** {{ pillar['纳音'] }}
+* **神煞:** {{ pillar['神煞'] | join(', ') }}
+* **干支五行关系:** {{ pillar['干支五行']['主导气势'] }}
+* **季节状态:** {{ pillar['季节状态'] }}
+* **地势:** {{ pillar['地势'] }}
+* **十二长生:** {{ pillar['十二长生'] }}
+* **旬空:** 旬: {{ pillar['旬空']['旬'] }}, 空: {{ pillar['旬空']['旬空'] }}
+* **自坐通根:** {% if pillar['通根'] is string %}{{ pillar['通根'] }}{% else %}{% for k, v in pillar['通根'].items() %}{{ k }}: {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}
+* **通根 (根基):**
+  {% for key, val in pillar['根基'].items() %}
+  * **{{ key }}:** {{ val['根基强度'] }} ({{ val['根基说明'] }})
+  {% endfor %}
+* **干支作用 (作用) — all tiers:**
+  {% set interactions = pillar['作用'] %}
+  {% for tier_name in ['第一梯队_纲领层', '第二梯队_气势层', '第三梯队_琐碎层'] %}
+    {% if interactions[tier_name] %}
+      {% for i in interactions[tier_name] %}
+    * [{{ tier_name }}] {{ i['类型'] }} ({{ i['组合'] }}): {{ i['状态'] }} — Intensity: {{ i.get('强度', 'N/A') }}{% if i.get('紧贴') %} [紧贴]{% endif %}{% if i.get('混杂') %} [混杂]{% endif %}{% if i.get('主动方') %} Active: {{ i['主动方'] }}{% endif %}
+
+        {% if i.get('根基') %}
+        Root: {% for party, r in i['根基'].items() %}{{ party }}: {{ r }}{% if not loop.last %}, {% endif %}{% endfor %}
+        {% endif %}
+        {% if i.get('墓库境况') %}
+        Vault: type={{ i['墓库境况'].get('类型', '?') }}, key={{ i['墓库境况'].get('钥匙受困', '?') }}
+        {% endif %}
+        {% if i.get('库藏释放') %}
+        Released: {% for rel in i['库藏释放'] %}{{ rel['天干'] }}({{ rel['十神'] }}, {{ rel['释放性质'] }}){% if not loop.last %} / {% endif %}{% endfor %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  {% endfor %}
+  {% if not interactions['第一梯队_纲领层'] and not interactions['第二梯队_气势层'] and not interactions['第三梯队_琐碎层'] %}
+    * None
+  {% endif %}
+{% endfor %}
+
+* **总体干支关系 (干支关系总览):** {{ data['核心命盘']['干支关系总览'] | join(', ') }}
+
+{# ====================== Section 4. SYSTEM STARS (神煞) ====================== #}
+## 4. SYSTEM STARS (神煞)
+### Chart-Wide Stars (系统神煞)
+{% for star_name, star_info in data['系统神煞'].items() %}
+* **{{ star_name }}:**
+  {% if star_info is mapping %}
+    * **激活:** {{ star_info.get('激活', 'N/A') }}
+    {% if star_info.get('触发日干') %} * **触发日干:** {{ star_info['触发日干'] }}{% endif %}
+    {% if star_info.get('分布明细') %} * **所在柱位:** {{ star_info['分布明细'] | join(', ') }}{% endif %}
+  {% else %}
+    * {{ star_info }}
+  {% endif %}
+{% endfor %}
+
+### Pillar Stars (柱位神煞)
+{% for pillar_name, pillar in data['核心命盘']['四柱实体'].items() %}
+* **{{ pillar_name }}:** {{ pillar['神煞'] | join(', ') if pillar['神煞'] else '(none)' }}
+{% endfor %}
+
+{# ====================== 5. INNATE DESTINY NUMBERS (先天命数) ====================== #}
+## 5. INNATE DESTINY NUMBERS (先天命数)
+* **三垣:**
+  {% for palace_name, palace in data['先天命数']['三垣'].items() %}
+  * **{{ palace_name }}:** {{ palace['干支'] }} ({{ palace['纳音'] }})
+  {% endfor %}
+* **胎息:** {{ data['先天命数']['胎息']['干支'] }} ({{ data['先天命数']['胎息']['纳音'] }})
+
+{# ====================== 6. FIVE ELEMENTS STRENGTHS (五行力量) ====================== #}
+## 6. ELEMENTAL STRENGTHS (五行力量)
+{% for element, stats in data['五行力量']['五行力量分析'].items() %}
+* **{{ element }}** ({{ stats['旺衰'] }}): {{ stats['百分比'] }}% — {{ stats['能级']['名称'] }}
+  * **建议:** {{ stats['能级']['核心建议'] }}
+{% endfor %}
+
+* **组合加成:**
+  {% for combo in data['五行力量']['组合加成'] %}
+  * {{ combo['类型'] }} ({{ combo['组合'] }}): {{ combo['强度'] }}
+  {% endfor %}
+* **害减损:**
+  {% for harm in data['五行力量']['害减损'] %}
+  * {{ harm['类型'] }} ({{ harm['组合'] }}): {{ harm['强度'] }}
+  {% endfor %}
+* **破减损:**
+  {% for break in data['五行力量']['破减损'] %}
+  * {{ break['类型'] }} ({{ break['组合'] }}): {{ break['强度'] }}
+  {% endfor %}
+
+{# ====================== 7. LIFE TIMELINE (运程) ====================== #}
+## 7. LIFE TIMELINE (运程)
+* **起运信息:**
+  * **起运时间:** {{ data['运程']['起运信息']['起运时间'] }} (Age {{ data['运程']['起运信息']['起运年份'] }})
+  * **顺逆:** {{ data['运程']['起运信息']['顺逆'] }}
+
+### Early Years (小运)
+{{ data['运程']['小运阶段'] | tojson(indent=2) }}
+
+### Major Decades (大运)
+{{ data['运程']['大运阶段'] | tojson(indent=2) }}
+

@@ -16,8 +16,20 @@ class LLMConfig:
 
 
 @dataclass
+class LifeOverview:
+    poem: str = ""
+    self_verification: str = ""
+    core_identity: str = ""
+    life_so_far: str = ""
+    defining_moments: str = ""
+    the_future: str = ""
+    destiny_balance_sheet: str = ""
+    living_in_alignment: str = ""
+
+
+@dataclass
 class LLMResponse:
-    life_overview: str
+    life_overview: LifeOverview
     romance: str
     career: str
     raw_text: str

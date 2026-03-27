@@ -3,9 +3,11 @@ Builds system and user prompts by rendering Jinja2 templates.
 """
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
+from lunar_python import Solar
 
 from src.utils.logging import get_logger
 
@@ -25,6 +27,7 @@ class PromptBuilder:
             loader=FileSystemLoader(str(_PROMPTS_DIR)),
             keep_trailing_newline=True,
         )
+        self._env.policies["json.dumps_kwargs"] = {"ensure_ascii": False}
         self._system_template = Path(system_template).name
         self._user_template = Path(user_template).name
 
@@ -33,7 +36,9 @@ class PromptBuilder:
         system_prompt = self._env.get_template(self._system_template).render()
         bazi_json = json.dumps(llm_data, ensure_ascii=False, indent=2)
         user_prompt = self._env.get_template(self._user_template).render(
-            bazi_json=bazi_json
+            data=llm_data,
+            bazi_json=bazi_json,
+            current_year=Solar.fromDate(datetime.now()).getLunar().getYear(),
         )
         logger.debug(
             "Prompts built — system: %d chars, user: %d chars",
