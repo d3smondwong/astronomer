@@ -84,10 +84,20 @@ def _make_provider(config: LLMConfig):
             from src.llm.providers.huggingface import HuggingFaceProvider
 
             return HuggingFaceProvider(config)
+        elif config.provider == "deepseek":
+            from src.llm.providers.deepseek import DeepSeekProvider
+
+            return DeepSeekProvider(config)
         else:
             raise LLMError(f"Unknown provider: '{config.provider}'")
     except KeyError as e:
         raise LLMError(str(e)) from e
+
+
+def get_active_model() -> str:
+    """Return '<provider>/<model>' for the currently configured provider."""
+    config, _, _ = _load_config()
+    return f"{config.provider}/{config.model}"
 
 
 def analyse_bazi(llm_data: dict) -> LLMResponse:
@@ -146,6 +156,7 @@ if __name__ == "__main__":
     from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
     from src.services.astronomer_data_aggregator import AstroDataAggregator
     from src.services.astronomer_data_llm_formatter import AstroDataLLMFormatter
+    from astronomer_calculations.wealth_interpretive_insights import extract_wealth_insights
 
     # python -m src.llm.llm_service
 
@@ -173,19 +184,20 @@ if __name__ == "__main__":
         longitude=longitude,
         gender=gender,
     )
-    llm_friendly_data = AstroDataLLMFormatter(raw_data).format_for_llm()
+    wealth_insights = extract_wealth_insights(raw_data)
+    llm_friendly_data = AstroDataLLMFormatter(raw_data, wealth_insights=wealth_insights).format_for_llm()
 
     logger.info("=== Running LLM Analysis ===")
     result = analyse_bazi(llm_friendly_data)
 
     ov = result.life_overview
     logger.info(
-        "--- Life Overview ---\npoem: %d chars | self_verification: %d | core_identity: %d | life_so_far: %d | defining_moments: %d | the_future: %d | destiny_balance_sheet: %d | living_in_alignment: %d",
+        "--- Life Overview ---\npoem: %d chars | self_verification: %d | core_identity: %d | life_so_far: %d | defining_events: %d | the_future: %d | destiny_balance_sheet: %d | living_in_alignment: %d",
         len(ov.poem),
         len(ov.self_verification),
         len(ov.core_identity),
         len(ov.life_so_far),
-        len(ov.defining_moments),
+        len(ov.defining_events),
         len(ov.the_future),
         len(ov.destiny_balance_sheet),
         len(ov.living_in_alignment),
