@@ -17,14 +17,19 @@ from src.services.astronomer_data_aggregator import AstroDataAggregator
 from src.services.astronomer_data_llm_formatter import AstroDataLLMFormatter
 from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
 from src.utils.logging import configure_logging, get_logger
-from src.llm.llm_service import analyse_bazi, LLMError
+from src.llm.llm_service import analyse_bazi, get_active_model, LLMError
 from lunar_python import Solar
 
 # To run it
 # streamlit run src/streamlit/llm_streamlit_app.py
 
-# Initialize logging
-configure_logging()
+# Initialize logging — wrapped in cache_resource so it only runs once per session,
+# not on every Streamlit re-run triggered by widget interactions.
+@st.cache_resource
+def _init_logging():
+    configure_logging()
+
+_init_logging()
 logger = get_logger(__name__)
 
 # Page configuration
@@ -45,12 +50,17 @@ def _save_report(
     gender: int,
     longitude: float,
     latitude: float,
+    model: str = "",
 ) -> Path:
     """Save markdown report and LLM input JSON to reports/YYYY-MM-DD/HH-MM-SS/."""
     import json as _json
     now = datetime.now()
     gender_label = "Male" if gender == 1 else "Female"
-    stem = f"{birth_date.strftime('%Y-%m-%d')}_{gender_label}_{longitude}_{latitude}"
+    model_slug = model.replace("/", "_") if model else ""
+    md_stem = f"{birth_date.strftime('%Y-%m-%d')}_{gender_label}_{longitude}_{latitude}"
+    if model_slug:
+        md_stem = f"{md_stem}_{model_slug}"
+    base_stem = f"{birth_date.strftime('%Y-%m-%d')}_{gender_label}_{longitude}_{latitude}"
     report_dir = (
         Path(__file__).parent.parent.parent
         / "reports"
@@ -63,13 +73,13 @@ def _save_report(
     for header, content in sections:
         if content:
             md_lines.append(f"## {header}\n\n{content}\n")
-    (report_dir / f"{stem}.md").write_text("\n---\n\n".join(md_lines), encoding="utf-8")
+    (report_dir / f"{md_stem}.md").write_text("\n---\n\n".join(md_lines), encoding="utf-8")
 
-    (report_dir / f"{stem}.json").write_text(
+    (report_dir / f"{base_stem}.json").write_text(
         _json.dumps(llm_input_data, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
-    return report_dir / f"{stem}.md"
+    return report_dir / f"{md_stem}.md"
 
 
 # Styling
@@ -205,14 +215,19 @@ if analyze_button:
                 gender=gender,
             )
 
+            # Pre-compute interpretive insights
+            from astronomer_calculations.wealth_interpretive_insights import extract_wealth_insights
+            wealth_insights = extract_wealth_insights(raw_data)
+
             # Format data for LLM
-            formatter = AstroDataLLMFormatter(raw_data)
+            formatter = AstroDataLLMFormatter(raw_data, wealth_insights=wealth_insights)
             llm_friendly_data = formatter.format_for_llm()
 
         logger.info("✅ BaZi analysis completed successfully")
 
         try:
             with st.spinner("🤖 Consulting the LLM..."):
+                active_model = get_active_model()
                 llm_response = analyse_bazi(llm_friendly_data)
         except LLMError as e:
             logger.error("LLM analysis failed: %s", e)
@@ -233,6 +248,7 @@ if analyze_button:
             "gender": gender,
             "latitude": latitude,
             "longitude": longitude,
+            "model": active_model,
         }
         st.rerun()
 
@@ -274,8 +290,9 @@ if "_result" in st.session_state:
         ("👤 Life Overview — ✨ A Poem About You", ov.poem),
         ("👤 Life Overview — 🔍 Do We Understand You?", ov.self_verification),
         ("👤 Life Overview — 🧬 Core Identity", ov.core_identity),
+        ("👤 Life Overview — 🏛️ The Core Areas of Your Life", ov.core_areas),
         ("👤 Life Overview — 📖 Your Life So Far", ov.life_so_far),
-        ("👤 Life Overview — ⚡ 3 Defining Moments", ov.defining_moments),
+        ("👤 Life Overview — ⚡ 3 Defining Moments", ov.defining_events),
         ("👤 Life Overview — 🔭 The Future", ov.the_future),
         ("👤 Life Overview — ⚖️ The Destiny Balance Sheet", ov.destiny_balance_sheet),
         ("👤 Life Overview — 🌿 Living in Alignment", ov.living_in_alignment),
@@ -286,6 +303,7 @@ if "_result" in st.session_state:
         saved_path = _save_report(
             all_sections, llm_friendly_data,
             r["birth_date"], r["gender"], r["longitude"], r["latitude"],
+            model=r.get("model", ""),
         )
         project_root = Path(__file__).parent.parent.parent
         st.success(f"Report saved to `{saved_path.relative_to(project_root)}`")
@@ -293,7 +311,7 @@ if "_result" in st.session_state:
     # LLM Analysis Tabs
     tab1, tab2, tab3 = st.tabs(
         [
-            "👤 Life Overview",
+            "📖 Your Life So Far",
             "💕 Romance",
             "💼 Career",
         ]
@@ -305,8 +323,9 @@ if "_result" in st.session_state:
             ("✨ A Poem About You", ov.poem),
             ("🔍 Do We Understand You?", ov.self_verification),
             ("🧬 Core Identity", ov.core_identity),
+            ("🏛️ The Core Areas of Your Life", ov.core_areas),
+            ("⚡ 3 Defining Events", ov.defining_events),
             ("📖 Your Life So Far", ov.life_so_far),
-            ("⚡ 3 Defining Moments", ov.defining_moments),
             ("🔭 The Future", ov.the_future),
             ("⚖️ The Destiny Balance Sheet", ov.destiny_balance_sheet),
             ("🌿 Living in Alignment", ov.living_in_alignment),
@@ -369,7 +388,7 @@ else:
         Your birth information will be converted from solar to lunar calendar and analyzed using traditional BaZi principles with AI-powered insights.
 
         **Tabs Available:**
-        - **👤 Life Overview** — General life path and destiny insights
+        - **📖 Your Life So Far** — General life path and destiny insights
         - **💕 Romance** — Relationship and romantic prospects
         - **💼 Career** — Professional development and opportunities
         """

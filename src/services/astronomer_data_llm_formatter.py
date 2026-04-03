@@ -9,14 +9,17 @@ Organizes complex astrological data into semantic groups for better LLM understa
 class AstroDataLLMFormatter:
     """Formats aggregated astronomer data for LLM consumption"""
 
-    def __init__(self, raw_data: dict):
+    def __init__(self, raw_data: dict, wealth_insights: dict | None = None):
         """
         Initialize formatter with raw data from AstroDataAggregator.collect_data()
 
         Args:
             raw_data (dict): Output from AstroDataAggregator.collect_data()
+            wealth_insights (dict | None): Pre-computed wealth patterns from
+                extract_wealth_insights(). Pass None to omit Section 6b.
         """
         self.raw_data = raw_data
+        self._wealth_insights = wealth_insights
 
     def _extract_basic_info(self) -> dict:
         """
@@ -394,6 +397,7 @@ class AstroDataLLMFormatter:
                 "干支作用优先级": self._extract_interactions(),
                 "五行相位动力": self._extract_wu_xing().get("五行相位动力", {}),
             },
+            "wealth_insights": self._wealth_insights,
         }
 
         return formatted_data
