@@ -210,8 +210,8 @@ def get_birth_environment(lunar_birthday: Lunar) -> dict:
     fu = lunar_birthday.getFu()
     shujiu = lunar_birthday.getShuJiu()
     seasonal_cycles = {
-        "三伏": fu if fu else "非三伏天",
-        "数九": shujiu if shujiu else "非数九天",
+        "三伏": fu.toFullString() if fu else "非三伏天",
+        "数九": shujiu.toFullString() if shujiu else "非数九天",
         "六曜": lunar_birthday.getLiuYao(),
     }
 
