@@ -18,11 +18,29 @@ def _normalize_newlines(text) -> str:
     if text is None:
         return ""
     if not isinstance(text, str):
-        # LLM returned a non-string (e.g. nested dict) — serialize so content isn't lost
-        try:
-            text = json.dumps(text, ensure_ascii=False)
-        except Exception:
-            return ""
+        # LLM returned a list — convert to bullet points
+        if isinstance(text, list):
+            lines = []
+            closing = ""
+            for item in text:
+                if not isinstance(item, str):
+                    continue
+                item = item.strip()
+                if item.startswith("*If") or item.startswith("If"):
+                    closing = item
+                else:
+                    if not item.startswith("- "):
+                        item = f"- {item}"
+                    lines.append(item)
+            if closing:
+                lines.append(f"\n{closing}")
+            text = "\n".join(lines)
+        else:
+            # Other non-string (e.g. nested dict) — serialize so content isn't lost
+            try:
+                text = json.dumps(text, ensure_ascii=False)
+            except Exception:
+                return ""
     if not text:
         return text
     # Replace literal \n escape sequences the LLM sometimes emits inside JSON strings
@@ -31,6 +49,26 @@ def _normalize_newlines(text) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"\n(?!\n)", "  \n", text)
     return text
+
+
+def _flatten_core_areas(value) -> str:
+    """Convert core_areas dict (wealth/relationships/career) to a headed markdown string."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        section_headers = {
+            "wealth": "#### 💰 Wealth",
+            "relationships": "#### 💕 Relationships",
+            "career": "#### 💼 Career",
+            "health": "#### 🌿 Health",
+        }
+        parts = []
+        for key, header in section_headers.items():
+            text = value.get(key, "")
+            if text:
+                parts.append(f"{header}\n{text}")
+        return "\n\n".join(parts)
+    return ""
 
 
 # Strip markdown code fences the model sometimes wraps around JSON
@@ -93,7 +131,7 @@ class ResponseParser:
                     logger.warning("ResponseParser: JSON decode failed (%s) — returning raw text", e)
                     return LLMResponse(life_overview=LifeOverview(), romance="", career="", raw_text=raw_text)
 
-        raw_overview = data.get("life_overview", {})
+        raw_overview = data.get("retrospective")
         # Support both the new nested-object format and the legacy flat-string format
         if isinstance(raw_overview, str):
             life_overview = LifeOverview(poem=_normalize_newlines(raw_overview))
@@ -102,11 +140,12 @@ class ResponseParser:
                 poem=_normalize_newlines(raw_overview.get("poem", "")),
                 self_verification=_normalize_newlines(raw_overview.get("self_verification", "")),
                 core_identity=_normalize_newlines(raw_overview.get("core_identity", "")),
+                core_areas=_normalize_newlines(_flatten_core_areas(raw_overview.get("core_areas", ""))),
+                defining_events=_normalize_newlines(raw_overview.get("defining_events", "")),
                 life_so_far=_normalize_newlines(raw_overview.get("life_so_far", "")),
-                defining_moments=_normalize_newlines(raw_overview.get("defining_moments", "")),
-                the_future=_normalize_newlines(raw_overview.get("the_future", "")),
-                destiny_balance_sheet=_normalize_newlines(raw_overview.get("destiny_balance_sheet", "")),
-                living_in_alignment=_normalize_newlines(raw_overview.get("living_in_alignment", "")),
+                # the_future=_normalize_newlines(raw_overview.get("the_future", "")),
+                # destiny_balance_sheet=_normalize_newlines(raw_overview.get("destiny_balance_sheet", "")),
+                # living_in_alignment=_normalize_newlines(raw_overview.get("living_in_alignment", "")),
             )
 
         romance = _normalize_newlines(data.get("romance", ""))
