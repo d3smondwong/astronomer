@@ -1,0 +1,452 @@
+You are analyzing the destiny chart for a {{ data['基本信息']['性别'] }} born on {{ data['基本信息']['阳历生日'] }}.
+
+{% include 'data_map.jinja' %}
+
+### REPORT STRUCTURE
+Use the JSON data provided above to fill in all placeholders and generate a premium destiny report in English following this exact structure:
+
+### 1. A Poem About You
+Reference Section 0 (GRAND ARC / 袁天罡称骨歌). Format the output exactly as follows — no "Part" labels, no headers:
+
+First, quote the poem verbatim from Section 0 as a blockquote (each line on its own line, prefixed with `>`):
+> [line 1]
+> [line 2]
+> [line 3]
+> [line 4]
+
+Then, the English translation — each line on its own line in italics, matching the Chinese line by line:
+*[translation of line 1]*
+*[translation of line 2]*
+*[translation of line 3]*
+*[translation of line 4]*
+
+Then a markdown divider:
+---
+
+Then 4–6 sentences of interpretation flowing as natural prose — what the poem reveals about this specific person's life arc, the central tension or triumph it points to, and how it sets the tone for everything that follows. Begin with an evocative opener (not "This poem means..." or "Part 3"). Use warm, personal language ("you"). No Chinese metaphysical terms. **Bold the single most important sentence in this interpretation.**
+
+### 2. "Do we understand you?"
+Generate **seven self‑verification statements** derived from the user’s unique chart.
+Use their core personality element, the season they were born in, key life patterns, and any notable tensions or gifts.
+
+These statements must feel *eerily specific* — not generic psychology. Each should make the reader pause and think "how could they know that?"
+
+Format your output for this section exactly as shown below including the ending statement (do not include the code fences in your output):
+```
+- [statement 1]
+- [statement 2]
+- [statement 3]
+- [statement 4]
+- [statement 5]
+- [statement 6]
+- [statement 7]
+
+*If 3 or more sound like you, this report was written for you.*
+```
+
+### 3. Your Core Identity
+**Your natural element:** {{ data['日主']['天干'] }} {{ data['日主']['阴阳'] }} {{ data['日主']['五行'] }}
+(Use the standard translation: e.g., Yang Wood, Yin Fire, etc.)
+
+Write a rich, personal paragraph (8–10 sentences) describing who you are at your core.
+Use metaphors drawn from your element and the season of your birth.
+
+Weave in the following insights from the JSON, translating each into human experience:
+
+- **Your elemental nature:** Use the value from `data['日主']['天干']` and `data['日主']['阴阳']`.
+  If Yang, describe a forceful, outward‑facing quality. If Yin, a receptive, inward‑gathering quality.
+  Use the classic metaphor for the element (Wood: growing, reaching; Fire: warming, illuminating; Earth: steady, nurturing; Metal: structured, refining; Water: deep, adaptable).
+
+- **The season you were born into:** From `data['基本信息']['时令']['时令']` and `data['基本信息']['时令']['五行状态']`.
+  Describe how your natural element interacts with the season—whether it feels at home, challenged, or heightened.
+
+- **Your elemental balance:** Look at `data['五行力量']['五行力量分析']`.
+  For each element, you’ll see a `百分比` (percentage), a `旺衰` label, and a `能级` object containing `状态描述` and `核心建议`.
+  Identify which element has the highest percentage (your dominant energy) and which has the lowest (your scarce energy).
+  Use the `能级` descriptions to bring texture to your explanation.
+
+- **The major forces shaping your life:** Look inside each pillar’s `作用` (e.g., `data['核心命盘']['四柱实体']['日柱']['作用']['第一梯队_纲领层']`).
+  Pay special attention to interactions involving the **Day Pillar** (yourself), as they reveal the most about your core relationships, career, and internal conflicts.
+
+- **Your inner layers (what lives beneath the surface):**
+  Look at the `藏干` array inside the Day Pillar (`data['核心命盘']['四柱实体']['日柱']['藏干']`).
+  Each hidden element represents a quality that isn’t always visible but influences you from the inside.
+  Describe these as: “Beneath your [visible trait], there is also [hidden trait] that quietly shapes your choices.”
+  Also consider the `十神` mapping inside the Day Pillar’s `地支十神`—these show how you relate to others, to money, and to your own growth.
+
+- **Your inherent life phase:** Look at `data['核心命盘']['四柱实体']['日柱']['地势']` (e.g., 冠带, 临官, 帝旺) and `十二长生` (if present).
+  These describe your natural rhythm.
+
+- **Your poetic signature:** Look at `data['核心命盘']['四柱实体']['日柱']['纳音']`. Create a short, evocative image that matches the `纳音` and ties it to your core nature.
+
+- **Your climate “medicine” (the element your chart most needs):** From `data['基本信息']['时令']['调候分析']`.
+  If the “调节紧迫性” is high and the “调节药方” is, say, Fire, describe that as a deep need: “What you’ve needed most since birth is warmth—emotional warmth, clear direction, or simply permission to shine.”
+
+- **Hidden strengths or quiet gifts:**
+  Look at the `神煞` array for the **Day Pillar** (`data['核心命盘']['四柱实体']['日柱']['神煞']`) and any activated keys in `data['系统神煞']` (where `激活` is `true`).
+  Choose **1–2** that feel most central to your personality.
+  Describe them in plain English—never use the Chinese names.
+  For example, if you see “文昌,” you might write: “You have a natural gift for language and learning; ideas flow easily when you put pen to paper.”
+
+- **Your foundation:** From `data['日主']['得地']` (whether you have deep roots) and `data['日主']['得势']` (whether others around you naturally support you).
+  Describe: “Your core is deeply anchored—you don’t uproot easily”
+
+- **Inner tension or hidden fuel:** Look at `data['核心命盘']['干支关系总览']` or any `透合(藏干隐合)` interactions in `data['核心命盘']['四柱实体']`.
+  Do **not** use the term “透合” or “藏干”. Instead, describe it as: “Beneath your calm surface, there’s a hidden current of ambition that only emerges when the moment is right” or “A quiet drive that you may not even recognize in yourself, yet it subtly shapes your choices.”
+
+End the paragraph with a concluding line that ties back to your core essence and hints at how this nature plays out in the rest of your life. **Bold the single most important sentence in this section.**
+
+### 4. The Core Areas of Your Life
+
+For each of the four areas below, follow the two-step process. Never use Chinese terms. Begin each area with its heading exactly as shown.
+
+#### 💰 Wealth
+**DATA SOURCES:**
+- **WEALTH INSIGHTS** (Section 6b above) — pre-computed pattern verdicts. Use each active pattern's `verdict` directly in your writing. Do not re-derive from raw pillars. The `evidence` field shows supporting data.
+
+Read all four pillars together — wealth is shaped by inheritance, earning, control, and legacy working in combination:
+- **Family Foundation** (`data['核心命盘']['四柱实体']['年柱']['十神']`) — does the Year Pillar show inherited wealth (正财/偏财) or a lean start (官/杀)? This sets the baseline you begin from.
+- **Earning Capacity** (`data['核心命盘']['四柱实体']['月柱']['十神']`) — does the Month Pillar carry wealth energy (财星) or another focus? This governs your earning potential across the prime working years (ages ~20–50).
+- **Personal Financial Control** (`data['核心命盘']['四柱实体']['日柱']['十神']`) — does the Day Pillar show wealth mastery (财) or leakage (伤官/劫财)? This reveals whether you naturally hold money or let it flow out.
+- **Legacy & Late Life** (`data['核心命盘']['四柱实体']['时柱']['十神']`) — does the Hour Pillar point toward accumulation or depletion? This determines whether what you built is preserved or spent.
+- Season and climate (`data['基本信息']['时令']`) — whether your elemental makeup is supported for resource-building in your birth season.
+- Any `神煞` across all four pillars (`data['核心命盘']['四柱实体'][pillar]['神煞']`) — interpret as wealth-related traits (e.g. a star that sharpens financial instinct, or one that invites overextension).
+- **CRITICAL: Life Timeline (`data['运程']['大运阶段']`)** — for each decade, use the actual `开始年龄` and `结束年龄` from the data (do not use fixed age cutoffs). For each decade, read `运程['大运阶段'][i]['运柱']['季节状态']` and its pillar interactions. Use the four pillars as thematic lenses to interpret the decade:
+  - **Year Pillar lens** — governs inherited wealth baseline, family financial environment; most relevant in the earliest decades
+  - **Month Pillar lens** — governs earning capacity through career and effort; most relevant in the formative and prime working decades
+  - **Day Pillar lens** — governs personal financial control, whether money is held or lost; most relevant across the prime adult decades
+  - **Hour Pillar lens** — governs legacy, late-life accumulation or depletion, what is passed on; most relevant in later decades
+  - For each decade: note `运程['大运阶段'][i]['运柱']['旬空']` for void branches that hollow a wealth domain, and whether the decade shows building energy (旺/生/帝旺) or contraction (衰/死/墓/绝)
+
+**STEP 1 — DATA SCAN (do this silently before writing)**
+Read each value and form a specific verdict — do not leave any point unanswered:
+- **Year Pillar `十神`** → what wealth baseline did family provide? (正财 = stable household income; 偏财 = speculative/entrepreneurial family wealth; 正官/七杀 = financially conservative or lean family; 正印/偏印 = knowledge/status but not material wealth; 比肩 = family wealth divided among many; 劫财 = family wealth lost or taken — lean inheritance)
+- **Month Pillar `十神`** → how does earning happen? (正财 = steady salary/methodical accumulation; 偏财 = deals/windfalls/variable income; 正官 = income through structured employment; 七杀 = hard-won income under pressure; 食神 = skills/craft-based earning; 伤官 = unconventional income, may conflict with authority; 正印/偏印 = credentialled income, stable but not wealth-generating; 比肩/劫财 = earnings shared or drained by peers). Then go one level deeper: cross-reference the Day Master's element and any 神煞 related to skill or talent to derive a *specific domain label* for this person's earning — not a generic archetype but something concrete (e.g. "sustained analytical work across complex systems," "high-stakes negotiation and deal-making," "creative or advisory work with discerning clients," "building and managing teams or processes"). This label must appear in the written output.
+- **Day Pillar `十神`** → does money stay or leave? (正财 = disciplined holder, accumulates steadily; 偏财 = money flows in waves — spends freely; 比肩/劫财 = money leaks to others; 食神/伤官 = spends on lifestyle or expression)
+- **Hour Pillar `十神`** → what is the late-life wealth trajectory? (正财/偏财 = late accumulation, wealth preserved; 正官/七杀 = modest stability, not abundance; 比肩/劫财/伤官 = wealth distributed or drained in later years)
+- **For each `大运阶段`**: record actual `开始年龄`, `结束年龄`. First, glance at `大运阶段[i]['作用']['关系总览']` — the headline list of dominant interaction types (合局 = harmonious; 正克 = direct control/pressure; 透合/暗 = hidden/subtle; 同气共鸣 = amplification). This orients what to look for in the detail below. Then read all signals and combine into a verdict:
+  1. `运柱['季节状态']` + `运柱['运干十二长生']` → overall energy level (旺/帝旺 = peak; 长生/冠带 = growing; 衰/病 = declining; 死/墓/绝 = contraction)
+  2. `运柱['地势']` → branch life stage
+  3. `运柱['十神']` (天干 + 本气/中气/余气) → role the decade plays for wealth (正财/偏财 = wealth-generating decade; 正官 = stable income but capped; 七杀 = financial pressure, hard-won gains; 正印/偏印 = spending on learning/development, not accumulation; 比肩 = competitive decade, financial position contested; 劫财 = financially draining decade, money lost or competed away; 食神 = income through craft/output; 伤官 = unconventional earnings, high outgoings)
+  4. `运柱['五行']['主导气势']` → internal dynamic (天生地/地克天/天克地/截脚)
+  5. `运柱['通根']` → rooting of luck pillar stem (本气根/中气根/余气根)
+  6. `大运阶段[i]['五行力量']` → elemental balance this decade — check each element's `百分比` and `旺衰`; identify the dominant (highest %) and depleted (lowest %). Is the wealth element (财星 element for this Day Master) 旺/相 = supported, or 休/囚/死 = weakened? The `能级['核心建议']` for the depleted element signals where pressure will be felt
+  7. `大运阶段[i]['作用']['柱位动态']` → which natal pillars activated and how? Prioritise 月柱 (earning) and 时柱 (legacy): harmonious (六合/三合/生) = resource activation; clashing (六冲/刑/害) = financial pressure; absent = domain not activated
+  8. `大运阶段[i]['作用']['根基']` → rooting of each natal pillar this decade (深根 = backed; 无根/浅根 = weakened)
+  9. `运柱['旬空']` → void branch — note which domain is hollowed
+  10. `大运阶段[i]['神煞']` → stars active this decade (日系/年系/月系/杂项) — interpret as wealth-related traits or patterns
+  - **Combine into a verdict**: e.g. "strong energy decade, 偏财 ten god, but 六冲 on Month Pillar with 无根 = earnings engaged but unstable — gains possible but hard to hold"
+
+**STEP 2 — WRITE**
+
+**WRITING RULES — apply to every block below without exception:**
+- **No hedging.** Do not use "likely," "may," "perhaps," "possibly," or similar qualifiers. The chart is read with conviction — state what the data shows directly.
+- **Every sentence must be falsifiable.** If a sentence could appear unchanged in a report for a different chart, rewrite it. Each sentence must be earnable only from this chart's specific data.
+- **The question context must deepen, not widen.** The 2–3 sentences after the question must narrow and make the question more personal — not introduce new concepts. If a sentence could stand alone without the question above it, remove it.
+
+Output exactly in this format (do not include the code fences in your output):
+```
+**Your relationship with wealth:**
+[2 sentences. Synthesise the four-pillar picture — where you started (Year), how you earn (Month), whether you hold it (Day), what remains (Hour). Use the specific domain label derived in STEP 1 to name the type of work through which earning capacity is strongest — not 'hard work' or 'effort' but the concrete domain specific to this chart. Weave into natural prose; do NOT list traits.]
+
+**How wealth has evolved through your life:**
+[Walk each life phase using natural language — 'in your twenties', 'in your thirties', 'in midlife', 'in later years' — mapped to the actual decade ages from the data. Do NOT write about childhood or teenage years; wealth narration begins at the first decade where real financial activity is plausible (typically the first 大运 that falls in the twenties or later). Formative decades (Month lens): earning capacity through career or education. Prime decades (Day lens): personal accumulation and control. Later decades (Hour lens): preservation or depletion. Close with one sentence: self-made or inherited — steady flow or peaks and troughs?]
+
+**Your wealth, recently:**
+[Read the decade that covers the person's current age. From the wealth element's strength, the pillar interactions active this decade, and whether any void branch falls on an earning or accumulation domain — write 3–4 sentences describing what financial themes have been running in the background. Derive the language from this chart's specific data. Do not name chart mechanics. Do not use generic archetypes.]
+
+**What opens the door to abundance:**
+[1–2 sentences. What circumstances, mindsets, or seasons unlock flow? What blocks it?]
+
+**[Single bold sentence — a defining truth about this person's wealth destiny that ties past, present, and future together.]**
+```
+
+
+#### 💕 Relationships
+
+**DATA SOURCES:**
+Each relational domain maps to specific pillars — do not blend them:
+- **Family** (`data['核心命盘']['四柱实体']['年柱']['十神']`, `data['核心命盘']['四柱实体']['年柱']['作用']`, `data['核心命盘']['四柱实体']['时柱']['十神']`, `data['核心命盘']['四柱实体']['时柱']['作用']`) — Year Pillar: what emotional patterns were inherited from family of origin? Hour Pillar: what is being repeated or consciously broken — what do you pass on to children or create in your own household?
+  - **Mother figure** — represented by 印星 (正印/偏印) across the chart. Their strength and rooting reveals the quality of the maternal relationship: strong and rooted 印星 = nurturing, present, formative; weak, absent, or clashing 印星 = emotional distance, conditionality, or over-dependence. Their interactions (`作用`) show whether the maternal bond was a source of stability or tension.
+  - **Father figure** — for male Day Masters, represented by 财星 (正财/偏财); for female Day Masters, by 官星 (正官/七杀). Strength and rooting reveals the quality of the paternal relationship: strong = structured presence, authority, or provision; weak or clashing = absence, pressure, or emotional unavailability. Their interactions show whether the paternal influence was grounding or destabilising.
+  - **Siblings** — represented by 比肩 (same-polarity companion) and 劫财 (opposing-polarity companion). Their strength and presence shows whether siblings were allies or rivals, a source of support or competition. Strong 比肩/劫财 with harmonious interactions = bonded sibling unit; strong with clashing interactions = rivalry or resource competition; weak or absent = siblings played a minor role or were emotionally distant.
+- **Romance** (`data['核心命盘']['四柱实体']['日柱']['地支']`, `data['核心命盘']['四柱实体']['日柱']['十神']`, `data['核心命盘']['四柱实体']['日柱']['藏干']`, `data['核心命盘']['四柱实体']['日柱']['作用']`) — the Day Pillar is the seat of romantic identity: what does the chart attract? How does intimacy show up? What is hidden beneath the surface that shapes closeness?
+- **Friendship** (`data['核心命盘']['四柱实体']['月柱']['十神']` and `data['核心命盘']['四柱实体']['月柱']['作用']`) — Month Pillar governs social bonds, peer dynamics, and community confidence. How do you move in friendships? What role do you naturally take? Where does reciprocity break down?
+- Any `神煞` across all four pillars (`data['核心命盘']['四柱实体'][pillar]['神煞']`) — interpret as emotional patterns, relational gifts, or recurring wounds relevant to the domain they appear in.
+- **CRITICAL: Life Timeline for Romance (`data['运程']['大运阶段']`)** — the timeline lives inside the Romance section only. For each decade, use the actual `开始年龄` and `结束年龄`. Focus primarily on the **Day Pillar lens** — how romantic identity deepens, is tested, or transforms across the life arc. Reference Month Pillar only where a social decade opens or closes romantic opportunity. Reference Hour Pillar only where later decades shift intimacy toward family legacy. For each decade: check `运程['大运阶段'][i]['运柱']['旬空']` for void branches hollowing out the romantic domain, and `运程['大运阶段'][i]['运柱']['藏干']` for hidden stems surfacing unspoken needs; note whether decade energy (六合/六冲/刑/害/破) supports deepening or brings rupture.
+
+**STEP 1 — DATA SCAN (do this silently before writing)**
+Read each value and form a specific verdict — do not leave any point unanswered:
+- **Year Pillar `十神` and `作用`** → what emotional blueprint did family of origin instil? (正印/偏印 = nurturing/secure; 正官/七杀 = authority/pressure; 比肩/劫财 = competitive/self-reliant; 正财/偏财 = transactional/conditional). Harmonious `作用` (六合/三合) = bonds that held; clashing `作用` (六冲/刑) = early disruption or conditional love.
+- **Mother dynamic** → locate 印星 (正印/偏印) across all four pillars. Note their combined strength (`旺衰`), rooting (`通根`), and any interactions (`作用`) involving them. Form two verdicts: (1) the emotional quality of the relationship — was the mother nurturing and present, conditional, smothering, or largely absent? (2) the role she played in shaping the reader's values, emotional baseline, or sense of worthiness.
+- **Father dynamic** → for male Day Masters, locate 财星 (正财/偏财); for female Day Masters, locate 官星 (正官/七杀). Note their strength, rooting, and interactions. Form two verdicts: (1) the emotional quality of the paternal relationship — structured authority, warm provision, emotional absence, or pressure? (2) the role the father played in shaping the reader's ambition, sense of security, or relationship with achievement.
+- **Sibling dynamic** → locate 比肩 and 劫财 across all four pillars. Note their combined strength and any interactions. If their combined presence is strong or they have notable interactions (六合/六冲/刑/害): form a verdict — were siblings allies, rivals, or a source of competition for resources and attention? Flag as **meaningful signal**. If weak, absent, or with no notable interactions: flag as **negligible signal** — do not write about siblings in STEP 2.
+- **Hour Pillar `十神` and `作用`** → what is being passed forward — repeated or broken? (正印/偏印 = deeply nurturing to own family; 正官/七杀 = high expectations, disciplined; 食神/伤官 = creative, expressive legacy; 比肩/劫财 = peer-like, may struggle with authority role; 正财/偏财 = providing). Note whether `作用` shows the pattern softening or intensifying across generations.
+- **Day Pillar `地支`, `十神`, `藏干`, `作用`** → who is the romantic self? Branch elemental nature sets the emotional texture; `十神` of the branch shows what is attracted (正官/七杀 = authority/driven partners; 正财/偏财 = grounding/abundance; 正印/偏印 = nurturing; 食神/伤官 = creative/expressive; 比肩/劫财 = peer-like/independent); `藏干` hidden stems = what lies beneath the surface in intimacy; `作用` harmony or clash = relational ease or recurring friction.
+- **Month Pillar `十神` and `作用`** → social style and friendship role? (比肩/劫财 = peer-oriented, collaborative or competitive; 正官/七杀 = authority-adjacent, may lead or resist; 食神/伤官 = expressive, generous in friendship; 正印/偏印 = reserved, mentor-oriented, selective). Note reciprocity patterns — where does giving outpace receiving?
+- **For each `大运阶段`** (Romance timeline only): record actual `开始年龄`, `结束年龄`. First glance at `大运阶段[i]['作用']['关系总览']` for dominant interaction types. Then:
+  1. `运柱['季节状态']` + `运柱['运干十二长生']` → romantic energy arc (旺/帝旺 = expansive, connection possible; 长生/冠带 = opening up; 衰/病 = withdrawing; 死/墓/绝 = contraction or transformation)
+  2. `运柱['十神']` (天干 + 本气/中气/余气) → relational role activated (正印/偏印 = nurturing dynamic; 正官/七杀 = authority or obligation in love; 比肩/劫财 = independence; 食神/伤官 = expressive intimacy; 正财/偏财 = grounding or transactional)
+  3. `大运阶段[i]['五行力量']` → is the romance element (官 for female Day Masters; 财 for male Day Masters) 旺/相 = supported, or 休/囚/死 = weakened?
+  4. `大运阶段[i]['作用']['柱位动态']` → is the Day Pillar activated? (六合/生 = deepening; 六冲/刑/害/破 = rupture or test; absent = romantic life quiet)
+  5. `运柱['旬空']` → void branch — which domain is hollowed this decade?
+  6. `运柱['藏干']` → hidden stems surfacing = unspoken needs rising in intimacy
+  7. `大运阶段[i]['神煞']` → stars active this decade — interpret as relational archetypes or emotional patterns
+  - **Combine into a verdict per decade**: e.g. "contracting energy, 七杀 ten god, 六冲 on Day Pillar with 无根 = intimacy under pressure from obligation or authority, connection strained and hard to recover"
+  - **Significant romantic event flag** — after forming the verdict, check for the following signals and flag the decade if any 2 of 3 are present:
+    - **Positive flag** (`SIGNIFICANT ROMANTIC EVENT — POSITIVE`): (1) Day Pillar has 六合 or 三合 interaction; (2) romance element (官星 for female Day Masters, 财星 for male Day Masters) is 旺 or 相; (3) 桃花, 红鸾, or 天喜 is active in `大运阶段[i]['神煞']`.
+    - **Negative flag** (`SIGNIFICANT ROMANTIC EVENT — NEGATIVE`): (1) Day Pillar has 六冲, 刑, 害, or 破 interaction; (2) decade ten god is 七杀 or 劫财; (3) romance element is 休, 囚, or 死.
+    - If neither flag applies, leave the decade unflagged.
+
+**STEP 2 — WRITE**
+
+**WRITING RULES — apply to every block below without exception:**
+- **No hedging.** Do not use "likely," "may," "perhaps," "possibly," "sometimes," or similar qualifiers. State what the chart shows directly.
+- **Every sentence must be falsifiable.** If a sentence could appear unchanged in a report for a different chart, rewrite it. Each sentence must be earnable only from this chart's specific data.
+- **No advice or warnings.** Do not use "you must," "be wary of," "you should." State observations only.
+- **No archetype labels as standalone descriptions.** If the chart points toward a pattern like "the strong one" or "the caretaker," describe the specific texture of how it manifests for this person — not the label alone.
+- **The closing bold sentence must be a derived truth.** It must be specific to this chart — not life advice, not a universal observation. If it could appear in a different report unchanged, rewrite it.
+
+Output exactly in this format (do not include the code fences in your output):
+```
+**Family:**
+[3–5 sentences in natural prose. Do NOT open with a summary statement about the reader's values, role, or character — begin directly with the mother dynamic. Cover these threads in order, woven together without sub-headers:
+1. **Mother** — the emotional quality of the relationship and the role she played in shaping the reader's emotional baseline, sense of self-worth, or inner life. Derived from 印星 strength and interactions. State it directly.
+2. **Father** — the emotional quality of the relationship and the role he played in shaping the reader's ambition, sense of security, or relationship with achievement. Derived from 财星 (male) or 官星 (female) strength and interactions. State it directly.
+3. **Siblings** — include ONLY if STEP 1 flagged a meaningful sibling signal. If so: describe the sibling environment (alliance, rivalry, competition) and how it shaped the reader's instinct around loyalty or self-sufficiency. If STEP 1 flagged negligible signal, omit entirely — do not mention siblings.
+4. **What carried forward** — from Hour Pillar: what pattern from family of origin is being repeated or consciously interrupted in the reader's own household. State it as what the chart shows, not as a possibility.
+Write 4–5 sentences if siblings are included; 3–4 sentences if omitted.]
+
+**Romance:**
+[3–4 sentences. Synthesise the Day Pillar into a character snapshot: who this person is as a partner, what they attract, what they find hard to give or receive, what lies beneath the surface in intimacy. Do not describe evolution here — that belongs in the timeline below. Weave into natural prose; do NOT list traits.]
+
+[Walk the romantic arc using natural language — 'as a young adult', 'in your twenties', 'in your thirties', 'in midlife', 'in later years' — mapped to the actual decade ages from the data. CRITICAL: each phase must open with a concrete signal from the chart — what the decade's energy was doing to the Day Pillar — before any emotional observation follows. If you cannot point to a specific signal in the data for a phase, do not write that phase. For any decade flagged `SIGNIFICANT ROMANTIC EVENT — POSITIVE` in STEP 1: after the standard phase observation, add 2–3 sentences on the likely commitment or deepening — what the chart shows about that period, the emotional quality of it, and what it established. For any decade flagged `SIGNIFICANT ROMANTIC EVENT — NEGATIVE`: after the standard phase observation, add 2–3 sentences on the rupture or strain — what put the relationship under pressure, what the emotional weight of that period was, and what it left behind. Only write these extra sentences for flagged decades. Close with one sentence: has love asked more of you than you expected — or less?]
+
+**Friendship:**
+[2–3 sentences. Synthesise the Month Pillar into social style: the role naturally taken in friendships, how social confidence has moved across life, and where reciprocity tends to break down. State observations only — no advice or warnings. Weave into natural prose; do NOT list traits.]
+
+**The pattern that keeps returning:**
+[1–2 sentences. Name the single dynamic that recurs across family, romance, and friendship with enough specificity that it could not describe a different chart. Describe the texture of how it manifests for this person — not a generic archetype label. Include how this person responds when they feel unseen or unsupported.]
+
+**[Single bold sentence — a defining truth about this specific person's relational life, derived from the chart. Not life advice. Not a universal observation.]**
+```
+
+#### 💼 Career
+
+**DATA SOURCES:**
+Read all four pillars together — career is shaped by inherited environment, earning drive, identity at work, and ultimate vocation working in combination:
+- **Inherited Career Environment** (`data['核心命盘']['四柱实体']['年柱']['十神']` and `data['核心命盘']['四柱实体']['年柱']['作用']`) — what professional world did family set you up for? Did you inherit expectations, connections, or constraints? Did you enter the working world with advantage or having to carve your own path?
+- **Core Earning Drive & Work Style** (`data['核心命盘']['四柱实体']['月柱']['十神']` and `data['核心命盘']['四柱实体']['月柱']['作用']`) — how do you naturally work: structured or creative, leading or delegating, building or advising? This governs your public role and career engine across the prime working years.
+- **Identity at Work** (`data['核心命盘']['四柱实体']['日柱']['十神']` and `data['核心命盘']['四柱实体']['日柱']['作用']`) — how does your sense of self interact with authority, peers, and ambition? Do you thrive under structure or resist it? Is career a vehicle for self-expression or obligation?
+- **Life's Work & Vocation** (`data['核心命盘']['四柱实体']['时柱']['十神']` and `data['核心命盘']['四柱实体']['时柱']['作用']`) — what do you ultimately build or leave behind? Does the chart point toward a deeper calling, entrepreneurial legacy, or quiet mastery?
+- Season and climate (`data['基本信息']['时令']`) — whether your elemental makeup is supported for public expression and professional visibility.
+- Any `神煞` across all four pillars (`data['核心命盘']['四柱实体'][pillar]['神煞']`) — interpret as career traits (authority, restlessness, love of learning, independence, risk-taking).
+- **CRITICAL: Life Timeline (`data['运程']['大运阶段']`)** — for each decade, use the actual `开始年龄` and `结束年龄` from the data (do not use fixed age cutoffs). Read `运程['大运阶段'][i]['运柱']['季节状态']` and pillar interactions. Use the four pillars as thematic lenses:
+  - **Month Pillar lens** — governs earning capacity, public role, and career momentum; most relevant across the prime working decades
+  - **Day Pillar lens** — governs how identity and authority intersect; most relevant when career tests or defines the self
+  - **Hour Pillar lens** — governs vocation, legacy projects, and what is ultimately built; most relevant in later decades
+  - For each decade: note `运程['大运阶段'][i]['运柱']['旬空']` for void branches that hollow a career domain, and whether the decade shows advancement energy (临官/帝旺/生/禄) or constraint (空/死/墓/衰)
+
+**STEP 1 — DATA SCAN (do this silently before writing)**
+Read each value and form a specific verdict — do not leave any point unanswered:
+- **Year Pillar `十神` and `作用`** → what professional baseline did family create? (正官/七杀 = authority path/pressure; 正印/偏印 = knowledge headstart; 正财/偏财 = commercial; 比肩/劫财 = self-made; 食神/伤官 = creative/unconventional). Clashing `作用` = disruption to career launch
+- **Month Pillar `十神` and `作用`** → how does this person naturally work? (正官 = structured/institutional; 七杀 = competitive/driven; 正财/偏财 = commercially motivated; 正印/偏印 = knowledge/advisory; 食神 = skilled/methodical; 伤官 = entrepreneurial/expressive; 比肩/劫财 = independent/peer)
+- **Day Pillar `十神` and `作用`** → how does the self relate to career? (正官/七杀 = duty/drive; 正印/偏印 = growth/service; 正财/偏财 = building; 食神/伤官 = expression; 比肩/劫财 = competition/collaboration)
+- **Hour Pillar `十神` and `作用`** → what is ultimately built? (正官/七杀 = institutional; 正印/偏印 = knowledge legacy; 正财/偏财 = entrepreneurial; 食神/伤官 = creative; 比肩/劫财 = collaborative)
+- **Authority and culture profile** → derive from the Day Pillar's `十神` relationship: how does this person's sense of self interact with authority figures? (正官 in Day = responds to fair, structured leadership; 七杀 in Day = thrives under demanding but results-driven leaders, chafes under bureaucracy; 正印 in Day = needs a mentor-like figure who invests in their growth; 伤官 in Day = resists control, performs best with autonomy; 比肩/劫财 in Day = thrives among peers, resists hierarchy). Then check Month Pillar `作用` for clashing interactions (六冲/刑) — these signal the specific authority dynamics or organisational environments where friction tends to ignite. Combine into a verdict: what leadership style unlocks this person, and what dynamic tends to slow them down.
+- **Industry and role domain** → derive from Month Pillar `十神` (primary signal for working style and public role) + Day Master element (the elemental texture of best-fit work) + any `神煞` related to skill, talent, or vocation across the four pillars. Identify 2–3 concrete domains where these converge — not by naming chart mechanics but by the nature of the work itself (e.g. "environments that reward precision and depth over speed," "client-facing work where trust is built slowly," "roles that sit at the intersection of structure and creative problem-solving").
+- **For each `大运阶段`**: record actual `开始年龄`, `结束年龄`. First, glance at `大运阶段[i]['作用']['关系总览']` — the headline list of dominant interaction types (合局 = harmonious; 正克 = direct control/pressure; 透合/暗 = hidden/subtle; 同气共鸣 = amplification). This orients what to look for in the detail below. Then read all signals and combine into a verdict:
+  1. `运柱['季节状态']` + `运柱['运干十二长生']` → overall career energy (临官/帝旺/禄 = peak; 长生/冠带/沐浴 = growing; 衰/病 = declining; 死/墓 = restructuring; 绝 = reinvention)
+  2. `运柱['地势']` → branch life stage
+  3. `运柱['十神']` (天干 + 本气/中气/余气) → career role the decade activates (正官 = structured authority; 七杀 = competitive drive; 正印/偏印 = learning; 正财/偏财 = commercial; 食神/伤官 = creative/entrepreneurial; 比肩/劫财 = peer/independent)
+  4. `运柱['五行']['主导气势']` → internal dynamic (天生地/地克天/天克地/截脚)
+  5. `运柱['通根']` → rooting of luck pillar stem (本气根/中气根/余气根)
+  6. `大运阶段[i]['五行力量']` → elemental balance this decade — check each element's `百分比` and `旺衰`; identify dominant and depleted. Is the authority element (官杀 element for this Day Master) 旺/相 = supported, or 休/囚/死 = weakened? The `能级['核心建议']` for the depleted element signals where professional strain will be felt
+  7. `大运阶段[i]['作用']['柱位动态']` → which natal pillars activated? Prioritise: 月柱 (公role/earning: 六合/生 = momentum; 六冲/刑 = disruption); 日柱 (identity tested); absent = domain quiet
+  8. `大运阶段[i]['作用']['根基']` → rooting of each natal pillar this decade (深根 = backed; 无根/浅根 = weakened)
+  9. `运柱['旬空']` → void branch — note which career domain is hollowed
+  10. `大运阶段[i]['神煞']` → stars active this decade (日系/年系/月系/杂项) — interpret as career traits
+  - **Combine into a verdict**: e.g. "peak energy decade, 正官 ten god, 六合 on Month Pillar with 深根 = strong advancement decade with institutional backing — title or authority solidifies"
+
+**STEP 2 — WRITE**
+
+**WRITING RULES — apply to every block below without exception:**
+- **No hedging.** Do not use "likely," "may," "perhaps," "possibly," "sometimes," or similar qualifiers. State what the chart shows directly.
+- **Every sentence must be falsifiable.** If a sentence could appear unchanged in a report for a different chart, rewrite it. Each sentence must be earnable only from this chart's specific data.
+- **No advice or warnings.** Do not use "you must," "be wary of," "you should." State observations only.
+- **Industries and roles: each domain needs its own reason.** Do not give one shared reason for multiple domains — each must have a specific reason drawn from this chart that explains the fit.
+- **The closing bold sentence must be a derived truth.** Specific to this chart — not a universal observation about ambition or work. If it could appear in a different report unchanged, rewrite it.
+
+Output exactly in this format (do not include the code fences in your output):
+```
+**Your professional nature:**
+[2 sentences. Synthesise the four-pillar picture — the environment you started in (Year), how you naturally work (Month), how identity shapes ambition (Day), what you ultimately build (Hour). Weave into natural prose; do NOT list traits.]
+
+**How your career has unfolded:**
+[Walk each life phase using natural language — 'in your twenties', 'in your thirties', 'in midlife', 'in later years' — mapped to the actual decade ages from the data. Do NOT write about childhood or teenage years; career narration begins at the first decade where real professional activity is plausible (typically the first 大运 that falls in the twenties or later). CRITICAL: each phase must open with a concrete signal from the chart — what the decade's energy was doing to the Month or Day Pillar — before any narrative observation follows. If you cannot point to a specific signal in the data for a phase, do not write that phase. Formative decades (Month lens): earning capacity and career identity building. Prime decades (Day lens): peak, plateau, or reckoning? Later decades (Hour lens): legacy, mastery, or quieter role? Close with one sentence: steady ascent, dramatic reinvention, or deepening specialisation?]
+
+**Your fit with bosses and culture:**
+[3–4 sentences. First, describe the leadership style that draws out the best in this person — what kind of authority figure they respond to, and what kind of working culture (the pace, the structure, the degree of autonomy) allows them to do their finest work. Then describe the dynamics that tend to slow them down — not specific people to avoid, but the organisational patterns, management styles, or cultural environments where friction tends to build and output suffers. Derive both from the authority profile established in STEP 1. Weave into natural prose; frame constructively.]
+
+**Industries and roles to consider:**
+[2–3 sentences. Name 2–3 concrete domains or role types where this person's elemental nature, working style, and skill-related stars converge. Each domain must have its own specific reason drawn from this chart — what it is about that domain that fits this chart in particular, not a shared reason across all. These are tendencies and natural fits, not prescriptions.]
+
+**[Single bold sentence — a defining truth about the arc of this person's professional life, derived from the chart. Not a universal observation about ambition or work.]**
+```
+
+#### 🌿 Health
+
+**DATA SOURCES:**
+Read all four pillars together — health is shaped by genetic baseline, stress response, core vitality, and long-term constitution working in combination:
+- **Inherited Constitution** (`data['核心命盘']['四柱实体']['年柱']['十神']`, `data['核心命盘']['四柱实体']['年柱']['藏干']`, and `data['核心命盘']['四柱实体']['年柱']['作用']`) — what genetic or familial health patterns did you begin with? Did your starting constitution give you robustness or vulnerability?
+- **Body Under Pressure** (`data['核心命盘']['四柱实体']['月柱']['十神']`, `data['核心命盘']['四柱实体']['月柱']['藏干']`, and `data['核心命盘']['四柱实体']['月柱']['作用']`) — how does your body respond to career demands, social stress, and sustained effort? Is your system resilient or prone to burnout during high-output phases?
+- **Core Vitality** (`data['日主']['十二长生']`, `data['日主']['得地']`, `data['核心命盘']['四柱实体']['日柱']['通根']`, and `data['核心命盘']['四柱实体']['日柱']['作用']`) — the fundamental constitutional strength of the self: deep roots = strong recovery capacity; shallow roots = lower recovery threshold, the part of the body that feels pressure first degrades earliest under load. This is the primary health signal.
+- **Later-Life Constitution** (`data['核心命盘']['四柱实体']['时柱']['十神']`, `data['核心命盘']['四柱实体']['时柱']['藏干']`, and `data['核心命盘']['四柱实体']['时柱']['作用']`) — what accumulates in the body over time? Does the chart point toward robust aging or a need for deliberate maintenance in later decades?
+- Most depleted element (`data['五行力量']['五行力量分析']`, lowest `百分比`) — identifies the body system most deserving of conscious care across the lifespan.
+- Climate remedy (`data['基本信息']['时令']['调候分析']['调节药方']`) — the element the chart most needs also signals what physically restores you.
+- Any `神煞` across all four pillars (`data['核心命盘']['四柱实体'][pillar]['神煞']`) — interpret as health traits, sensitivities, or recuperative gifts.
+- **CRITICAL: Life Timeline (`data['运程']['大运阶段']`)** — for each decade, use the actual `开始年龄` and `结束年龄` from the data (do not use fixed age cutoffs). Read `运程['大运阶段'][i]['运柱']['季节状态']` for vitality shifts. Use the four pillars as thematic lenses:
+  - **Year Pillar lens** — governs inherited constitution and early-life health patterns; most relevant in the earliest decades
+  - **Month Pillar lens** — governs how stress and sustained effort affect the body; most relevant during the high-demand working decades
+  - **Day Pillar lens** — governs core vitality and recovery capacity; the primary signal across all decades
+  - **Hour Pillar lens** — governs long-term accumulation, chronic patterns, and how the body ages; most relevant in later decades
+  - For each decade: note `运程['大运阶段'][i]['运柱']['旬空']` for void branches that hollow vitality, and whether the decade shows strong energy (旺/帝旺/生) or depletion (衰/病/死/墓)
+
+**STEP 1 — DATA SCAN (do this silently before writing)**
+Read each value and form a specific verdict — do not leave any point unanswered:
+- **Year Pillar `十神`, `藏干`, `作用`** → what constitutional baseline was inherited? Strong `季节状态` + deep `通根` = robust start; weak/clashing/voided = sensitive start. `藏干` reveals latent constitutional qualities. Clashing `作用` = early environmental stress on the body
+- **Month Pillar `十神`, `藏干`, `作用`** → how does the body respond to sustained demand? (正官/七杀 = chronic stress; 正印/偏印 = restorative capacity; 食神/伤官 = high creative output; 比肩/劫财 = competitive overexertion; 正财/偏财 = body taxed by doing)
+- **`日主['十二长生']`** → primary vitality signal (帝旺/临官 = peak; 长生/冠带/沐浴 = growing; 衰/病 = declining; 死/墓/绝 = depleted)
+- **`日主['得地']`** → rooted in birth season? true = stronger constitution; false = more dependent on deliberate management; name the part of the body that feels pressure first
+- **Day Pillar `通根`** → rooting depth (本气根 = robust recovery; 中气根 = moderate; 余气根/无根 = shallow/sensitive)
+- **Hour Pillar `十神`, `藏干`, `作用`** → what accumulates over time? (正官/七杀 = tension/structural; 正印/偏印 = restorative aging; 食神/伤官 = overextension risk; 正财/偏财 = doing-heavy; 比肩/劫财 = needs sustainable outlet)
+- **`五行力量['五行力量分析']` lowest `百分比`** → most depleted body system (木 = liver/nervous system; 火 = heart/circulation; 土 = digestion/gut; 金 = lungs/respiratory/skin; 水 = kidneys/lower back/endocrine). From this system, derive 1–2 concrete early warning signals — the specific physical or behavioural signs that appear before a crash for this constitution. Base them on how that system characteristically degrades under sustained load, not on a generic wellness list.
+- **`基本信息['时令']['调候分析']['调节药方']`** → restorative element. Combine with the Day Master's own elemental nature to derive the specific type of rest or recovery that works for this constitution — the conditions, pace, and texture of recovery. (e.g. a chart needing Fire with a Wood Day Master restores through warmth, gentle movement, and connection; a chart needing Water with a Metal Day Master restores through stillness, deep sleep, and sensory reduction.) The restoration description should feel particular to this chart.
+- **For each `大运阶段`**: record actual `开始年龄`, `结束年龄`. First, glance at `大运阶段[i]['作用']['关系总览']` — the headline list of dominant interaction types (合局 = harmonious; 正克 = direct control/pressure; 透合/暗 = hidden/subtle; 同气共鸣 = amplification). This orients what to look for in the detail below. Then read all signals and combine into a verdict:
+  1. `运柱['季节状态']` + `运柱['运干十二长生']` → vitality level (旺/帝旺 = peak; 长生/冠带 = growing; 衰/病 = declining; 死/墓 = low reserves; 绝 = depletion/renewal)
+  2. `运柱['地势']` → branch life stage
+  3. `运柱['十神']` (天干 + 本气/中气/余气) → health dynamic the decade brings (正印/偏印 = restorative; 正官/七杀 = high demand; 食神/伤官 = high output; 比肩/劫财 = competitive; 正财/偏财 = doing-heavy)
+  4. `运柱['五行']['主导气势']` → internal dynamic (天生地/地克天/天克地/截脚)
+  5. `运柱['通根']` → rooting of luck pillar stem (本气根/中气根/余气根)
+  6. `大运阶段[i]['五行力量']` → elemental balance this decade — check each element's `百分比` and `旺衰`; identify dominant and depleted. Is the Day Master's own element 旺/相 = body supported, or 休/囚/死 = constitution under strain? Also note the lowest `百分比` element — its body system is most vulnerable that decade. The `能级['核心建议']` for the depleted element signals what needs protection
+  7. `大运阶段[i]['作用']['柱位动态']` → which natal pillars activated? Prioritise: 日柱 (六合/生 = recovering; 六冲/刑/害 = stress/illness risk; note 强度); 月柱 (clashing = burnout risk); absent = domain not stressed
+  8. `大运阶段[i]['作用']['根基']` → rooting of each natal pillar this decade (深根 = resilient; 无根/浅根 = vulnerable)
+  9. `运柱['旬空']` → void branch — note which vitality domain is hollowed
+  10. `大运阶段[i]['神煞']` → stars active this decade (日系/年系/月系/杂项) — interpret as health archetypes or physical tendencies
+  11. **Current decade**: identify the decade covering the person's current age. Note its vitality level, the most depleted element, and whether any void branch falls on the Day Pillar or a health-relevant domain. Derive only physical signals — do not pull in relational or career dynamics from the decade. This feeds the `What to watch for` block.
+  - **Combine into a verdict**: e.g. "衰 energy decade, 七杀 ten god, 六冲 on Day Pillar with 无根 = significant depletion period — chronic stress load, active rest and restoration essential"
+
+**STEP 2 — WRITE**
+
+**WRITING RULES — apply to every block below without exception:**
+- **No hedging.** Do not use "likely," "may," "perhaps," "possibly," "sometimes," or similar qualifiers. State what the chart shows directly.
+- **Every sentence must be falsifiable.** If a sentence could appear unchanged in a report for a different chart, rewrite it. Each sentence must be earnable only from this chart's specific data.
+- **No advice or warnings — except in `What to watch for`.** For all other blocks, do not use "be especially vigilant," "you must," "watch for," "be wary of." State observations only. The `What to watch for` block is the sole exception where specific, chart-derived recovery advice is permitted.
+- **`What to watch for` must commit to one body part.** Do not list signals from multiple systems — derive everything from the single most depleted element and name only the signals and advice specific to that part.
+- **The closing bold sentence must be a derived truth.** Specific to this chart — not motivational language, not a universal observation about health or self-care. If it could appear in a different report unchanged, rewrite it.
+
+Output exactly in this format (do not include the code fences in your output):
+```
+**Your physical nature:**
+[2 sentences. Synthesise the four-pillar picture — inherited baseline (Year), how the body handles sustained pressure (Month), core vitality and recovery capacity (Day), what accumulates or protects over time (Hour). Name the part of the body that feels pressure first and at least one concrete physical expression of how strain manifests — not abstract states like 'reactive' or 'sensitive'. Weave into natural prose; do NOT list traits or use chart terminology.]
+
+**How your health has evolved:**
+[Walk the life arc using broader phases — early years, twenties and thirties, midlife, later years — mapped to the actual decade ages from the data. CRITICAL: each phase must open with a concrete signal from the chart — the decade's vitality level and where in the body that pressure landed — before any narrative observation follows. Do not describe career demands, life events, or emotional circumstances — describe only what the chart shows about physical vitality and where in the body that decade's pressure was felt. If you cannot point to a specific physical signal in the data for a phase, do not write that phase. Derive the tone of each phase entirely from the chart — do not apply preset assumptions about what each life phase should feel like. Close with one sentence: is vitality in this chart steady, cyclical, or something that requires active stewardship?]
+
+**What to watch for:**
+[4–5 sentences covering four things in order, as flowing prose — no sub-headers:
+1. Name the part of the body that feels pressure first for this constitution, derived from the most depleted element.
+2. The specific early warning signals that appear in that part before a crash under sustained load — name the signal, not the element or body system label.
+3. What happens physically when those signals are ignored and the person pushes past their limits — specific to this body part, not a generic fatigue statement.
+4. What this constitution responds to — specific, chart-derived advice on what counteracts or prevents that breakdown for this body. Not generic wellness tips — tied directly to the depleted element and climate remedy.]
+
+**What restores you:**
+[1–2 sentences. Derived from the climate remedy element combined with the Day Master's elemental nature, describe the specific conditions, pace, and texture of recovery that works for this constitution. Be specific enough that the reader recognises it as their own — not a general wellness menu.]
+
+
+**[Single bold sentence — a defining truth about how this person's body works and what it asks of them, derived from this chart. Not motivational language. Not a universal health observation.]**
+```
+
+### 5. 3 Defining Events
+
+Choose **three specific events** from the person’s life that left a permanent mark.
+**STRICT RULE: Only select events from cycles that have already occurred — the event’s year range must end on or before {{ current_year }}. Do not select or reference any event from a cycle that starts after {{ current_year }}.**
+These should be diverse in nature — not all challenges, not all gifts.
+Base your selection on:
+
+- **Early childhood events** from `运程['小运阶段']`.
+  These are year‑by‑year influences from birth until the first 10‑year phase begins.
+  A `小运` year with a strong interaction (e.g., opening a vault, a clash, or an unusual star in `神煞`) can pinpoint a foundational event — a childhood illness, a family change, an early gift or wound that shaped your sense of safety or self.
+
+- **Past 10‑year Luck Phases** (`运程['大运阶段']` that ended before the current year).
+  Look for phases where the `运柱` interacts strongly with the Day Pillar (entries in `作用` arrays where `组合` includes `日柱`).
+  A harmonious interaction (e.g., six‑combination) suggests a positive event like a marriage or career breakthrough.
+  A tense interaction (e.g., six‑clash) suggests an upheaval like a move, loss, or difficult ending.
+
+- **Transitions between Luck Phases** – the year when one 10‑year phase ends and another begins often marks a significant event.
+
+- **Common human milestones** combined with the chart’s elemental and interaction data to infer the emotional quality of likely events.
+
+**How to Write Each Event**
+Use the format below. The header label should reflect the event type. Each sub-point is a **full paragraph**, not a single sentence. Minimum sentence counts are enforced — do not write one-liners.
+
+```
+#### Event Type | YYYY–YYYY · Age [X–Y]
+#### [Emoji] [Evocative Theme Name]
+
+**What was happening:**
+[3–4 sentences. Describe the kind of external conditions, pressures, or changes that defined this period — open-ended enough to fit many circumstances, but grounded in the data signals (cycle energy, pillar interactions, star archetypes). What was the external texture of life? What was shifting or colliding around them?]
+
+**What it stirred:**
+[3–4 sentences. The full emotional quality beneath the surface — not just one word like "relief" or "grief", but the specific texture: the mix of feelings, the contradictions, the things they couldn't name at the time. What did it feel like from the inside?]
+
+**What it permanently changed:**
+[3–4 sentences. A belief, a capacity, an identity, or a way of moving through the world that was never quite the same after this period. Be specific about what shifted — not just "they grew stronger" but what exactly changed and how.]
+
+**What it still whispers:**
+[2–3 sentences. How this moment still echoes in their present life — a quiet knowing they carry, a recurring pattern they can now name, or an untapped strength waiting to be fully claimed.]
+```
+### 6. Your Life So Far
+
+**CRITICAL: Write an entry for EVERY phase listed below without exception. Do not stop until all phases up to {{ current_year }} are written.**
+
+For each phase, follow this two-step process:
+
+**STEP 1 — DATA SCAN (do this silently before writing)**
+Before writing a single word of narrative, look up the following for this decade from Section 7:
+
+  - **Decade energy & strength:** `运柱.季节状态` (e.g. "旺 极强" = expansive outward force; "死 极弱" = quiet internal energy) and `运柱.地势` (the branch's power relative to the day master's element — if 墓/死/绝, self-expression is suppressed even if the branch element is strong).
+  - **Life stage arc:** `运柱.运干十二长生` — 长生 = fresh start; 帝旺 = peak power; 墓 = transition/ending; 绝 = severance before renewal. This tells you the arc of the decade.
+  - **Stem stability:** `运柱.通根` — 本气根 = firmly anchored; 中气根 = moderate stability; 余气根 = unstable, easily deflected.
+  - **Internal dynamic:** `运柱.五行.主导气势` — 天生地 = surface energy feeds depth, decade deepens inward; 地克天 = inner structure restrains outward expression; 天克地 = outward expression overrides depth; 截脚 = the decade's stem is cut off at the root, energy is constrained.
+  - **Void branch:** `运柱.旬空` — any branch listed here is hollowed during this decade; the life domain it governs feels suspended or inaccessible.
+  - **Hidden stems:** `运柱.藏干[*].干` and its corresponding `运柱.十神.本气` — these hidden energies colour the decade quietly. 比肩/劫财 = self-reinforcement; 印 = nurture/protection; 财 = resources/output; 官/杀 = pressure/authority; 食/伤 = creativity/expression.
+  - **Elemental balance:** `五行力量.{element}.百分比` for all five elements — find the highest (dominant, what came naturally) and lowest (depleted, where you felt stretched). Use `五行力量.{element}.能级.状态描述` for the felt texture.
+  - **Headline scan:** `作用.关系总览` — a quick list of the dominant interaction types active this decade.
+  - **Pillar-level interactions:** For each pillar (年柱/月柱/日柱/时柱), check all three tiers in order: `作用.柱位动态.{pillar}.第一梯队_纲领层`, then `作用.柱位动态.{pillar}.第二梯队_气势层`, then `作用.柱位动态.{pillar}.第三梯队_琐碎层`. Note every pillar that has at least one entry across any tier — all of these life domains are touched this decade. Tier-1 entries drive the headline narrative; tier-2 entries sustain the undercurrent; tier-3 entries add subtle ambient texture (use sparingly). For pillars with entries in the same tier, compare `强度` to determine relative impact (`强势主流` > `显著影响` > `中等衰减` > `大幅衰减`). Life domain mapping:
+    - 年柱 activated → family, ancestry, home environment
+    - 月柱 activated → career, school, public role
+    - 日柱 activated → identity, closest relationships, self-image
+    - 时柱 activated → ambitions, creative projects, what you were quietly building
+  - **Interaction modifiers:** For each interaction entry, check `紧贴` (true = direct, immediate effect) and `根基` of both parties (浅根 controlling a 深根 target = pressure only, not transformation).
+  - **Pillar root amplification:** `作用.根基.{pillar}.根基强度` — 深根 = that life domain is strongly backed this decade; 无根 = that domain operates without support.
+  - **Stars:** `神煞.日系`, `神煞.年系`, `神煞.月系`, `神煞.杂项` — translate any stars present as lived personality traits or life patterns, never by name.
+
+**STEP 2 — WRITE**
+Using what you found in STEP 1 — DATA SCAN, write the entry in this exact format (do not include the code fences in your output):
+```
+#### YYYY–YYYY · Ages X–Y
+#### [Emoji] [Evocative Phase Name]
+
+[Paragraph 1 — 4–6 sentences. Name the specific life domain that was most activated (e.g. “your career”, “your closest relationships”, “your sense of home”). Describe the emotional climate of that domain using the headline interaction. Use the star quality if present.]
+
+[Paragraph 2 — 4–6 sentences. Bring in the emotional texture from the elemental balance — what came easily and what felt like a gap. Anchor it to a concrete lived experience: school pressures, a relationship dynamic, a professional challenge, a shift in living situation. End with a forward-looking hook that creates tension or curiosity.]
+
+**[One bolded sentence — the defining truth of this era. Make it feel like something the reader has always known but never articulated.]**
+```
+
+**Phases to cover:**
+1. **Early childhood** (birth to age `运程[‘起运信息’][‘起运年份’]` - 1) — use `小运阶段` dominant energies for texture. No Step 1 scan needed; describe the overall emotional atmosphere of earliest years.
+2. **Each entry in `运程[‘大运阶段’]`** whose start year is ≤ {{ current_year }} — apply the full STEP 1 scan for each.
+
+Do not use any Chinese terms in your output. Translate all interaction types and concepts into plain language.

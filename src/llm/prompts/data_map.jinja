@@ -39,6 +39,21 @@ Reference these specific JSON keys to build your narrative. Do not guess; the da
 ## 6. ELEMENTAL STRENGTHS (五行力量)
 {{ data['五行力量'] | tojson(indent=2) }}
 
+{# ====================== 6b. WEALTH INSIGHTS ====================== #}
+{% if data['wealth_insights'] %}
+## 6b. WEALTH INSIGHTS (pre-computed — use active_patterns and verdicts directly)
+
+Active patterns: {{ data['wealth_insights']['active_patterns'] | tojson }}
+
+{% for p in data['wealth_insights']['patterns'] %}{% if p['matched'] %}
+- **{{ p['name'] }}** [{{ p['confidence'] }}]: {{ p['verdict'] }}
+  Evidence: {{ p['evidence'] }}
+{% endif %}{% endfor %}
+{% if data['wealth_insights']['no_match_default'] %}
+{{ data['wealth_insights']['no_match_default'] }}
+{% endif %}
+{% endif %}
+
 {# ====================== 7. LIFE TIMELINE (运程) ====================== #}
 ## 7. LIFE TIMELINE (运程)
 * **起运信息:**
