@@ -23,7 +23,7 @@ Natal patterns are organised in four tiers:
 Cycle events are produced by four focused helpers called from _get_cycle_wealth_events.
 
 Usage:
-    from src.astronomer_calculations.wealth_interpretive_insights import extract_wealth_insights
+    from src.astronomer_calculations.interpretive_insights_wealth import extract_wealth_insights
     wealth_insights = extract_wealth_insights(raw_data)
 """
 
@@ -175,24 +175,6 @@ def _get_wealth_positions(shi_shen: dict) -> dict:
     return {"in_stems": in_stems, "in_branches": in_branches, "all": in_stems + in_branches}
 
 
-def _dm_strength_score(ri_zhu: dict) -> int:
-    """
-    Scores DM strength 0–5 with weighted classical factors:
-      得令: 1 point if True
-      得地: 深根=2, 中根=1, 浅根/无根=0
-      得势: 1 point per supporting stem, capped at 2
-
-    Thresholds:
-      >= 3 → strong
-         2 → moderate
-      <= 1 → weak
-    """
-    de_ling = int(ri_zhu["得令"]["得令"])
-    root_map = {"深根": 2, "中根": 1, "浅根": 0, "无根": 0}
-    de_di = root_map.get(ri_zhu["得地"]["通根"], 0)
-    de_shi = min(len(ri_zhu["得势"]["支持天干"]), 2)
-    return de_ling + de_di + de_shi
-
 
 def _get_branch_chars(bazi: dict) -> dict:
     """Returns {"年支": "丑", "月支": "亥", "日支": "辰", "时支": "申"}"""
@@ -337,7 +319,7 @@ def _pattern_abundant_wealth(wp: dict, ri_zhu: dict, wu_xing: dict, dm_elem: str
     """
     if len(wp["all"]) < 3:
         return None
-    score       = _dm_strength_score(ri_zhu)
+    score       = ri_zhu["强弱分数"]
     wealth_elem = WEALTH_ELEMENT_MAP[dm_elem]
     wealth_tier = wu_xing["五行力量分析"][wealth_elem]["能级"]["名称"]
     dm_tier     = wu_xing["五行力量分析"][dm_elem]["能级"]["名称"]
@@ -502,7 +484,7 @@ def _pattern_self_generated_wealth(shi_shen: dict, wp: dict, ri_zhu: dict, wu_xi
     food_tier = wu_xing["五行力量分析"][food_elem]["能级"]["名称"]
     if food_tier not in FOOD_GOD_HURT_OFFICER_STRONG_ENOUGH:
         return None
-    score = _dm_strength_score(ri_zhu)
+    score = ri_zhu["强弱分数"]
     if score >= 3:
         jiedu = "财靠自力，食伤化财 — 强势日主驾驭食伤，将才华与输出持续转化为财富。"
     elif score == 2:
@@ -557,7 +539,7 @@ def _pattern_wealth_supported_by_yin(shi_shen: dict, wp: dict, ri_zhu: dict, wu_
     # 印多埋财: fully excessive 印星 smothers 食伤 and buries wealth
     if yin_tier in YIN_EXCESSIVE:
         return None
-    score = _dm_strength_score(ri_zhu)
+    score = ri_zhu["强弱分数"]
     if score <= 1:
         return None
     # 偏旺 印星 — supportive but warrants a cautionary note
@@ -584,7 +566,7 @@ def _pattern_rivals_take_wealth(wp: dict, wu_xing: dict, ri_zhu: dict, dm_elem: 
     bi_jie_tier = wu_xing["五行力量分析"][dm_elem]["能级"]["名称"]
     if bi_jie_tier not in {"偏旺", "极旺", "极亢"}:
         return None
-    score = _dm_strength_score(ri_zhu)
+    score = ri_zhu["强弱分数"]
     if score >= 3:
         jiedu = "比劫元素旺盛，日主强势尚可掌控财星 — 财运竞争激烈，善用合作与分工可化解。"
     elif score == 2:
@@ -611,7 +593,7 @@ def _pattern_wealth_leaked(wp: dict, wu_xing: dict, ri_zhu: dict, dm_elem: str) 
     food_tier = wu_xing["五行力量分析"][food_elem]["能级"]["名称"]
     if food_tier not in FOOD_GOD_HURT_OFFICER_EXCESSIVE:
         return None
-    score = _dm_strength_score(ri_zhu)
+    score = ri_zhu["强弱分数"]
     if score >= 3:
         jiedu = f"食伤({food_elem})过旺，日主虽强尚可承受，但持续耗泄仍会分散财气 — 宜聚焦核心财源，避免过度输出才华而忽略积累。"
     elif score == 2:
@@ -776,7 +758,7 @@ def _pattern_wealth_clashed(shi_shen: dict, interactions: dict, wp: dict, ri_zhu
     if not clashed_detail:
         return None
 
-    score = _dm_strength_score(ri_zhu)
+    score = ri_zhu["强弱分数"]
     if score >= 3:
         jiedu = "财星受命盘冲克，但日主够强，财务挫折可恢复 — 波折不影响整体财富积累。若大运财运动态中同柱出现激活（天干合或六合），冲力可被化解。"
     elif score == 2:
@@ -1226,7 +1208,7 @@ def extract_wealth_insights(raw_data: dict) -> dict:
 
 # ============================================================================
 # EXECUTION
-# python -m src.astronomer_calculations.wealth_interpretive_insights
+# python -m src.astronomer_calculations.interpretive_insights_wealth
 # ============================================================================
 
 if __name__ == "__main__":
@@ -1236,7 +1218,7 @@ if __name__ == "__main__":
     from src.services.astronomer_data_aggregator import AstroDataAggregator
     from src.utils.logging import configure_logging, get_logger
 
-    # python -m src.astronomer_calculations.wealth_interpretive_insights
+    # python -m src.astronomer_calculations.interpretive_insights_wealth
 
     configure_logging()
     logger = get_logger(__name__)

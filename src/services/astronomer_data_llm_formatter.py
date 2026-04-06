@@ -5,6 +5,7 @@ Converts raw astronomer data into LLM-friendly formats.
 Organizes complex astrological data into semantic groups for better LLM understanding.
 """
 
+
 class AstroDataLLMFormatter:
     """Formats aggregated astronomer data for LLM consumption"""
 
@@ -18,8 +19,18 @@ class AstroDataLLMFormatter:
         self.raw_data = raw_data
 
     def _extract_wealth_insights(self) -> dict:
-        from src.astronomer_calculations.wealth_interpretive_insights import extract_wealth_insights
+        from src.astronomer_calculations.interpretive_insights_wealth import (
+            extract_wealth_insights,
+        )
+
         return extract_wealth_insights(self.raw_data)
+
+    def _extract_relationship_insights(self) -> dict:
+        from src.astronomer_calculations.interpretive_insights_relationships import (
+            extract_relationship_insights,
+        )
+
+        return extract_relationship_insights(self.raw_data)
 
     def _extract_basic_info(self) -> dict:
         """
@@ -256,11 +267,16 @@ class AstroDataLLMFormatter:
 
         wu_xing_force = wu_xing_data.get("五行力量", {})
         _EXCLUDE = {"基本信息", "四柱"}
-        wu_xing_distribution = {k: v for k, v in wu_xing_force.items() if k not in _EXCLUDE}
+        wu_xing_distribution = {
+            k: v for k, v in wu_xing_force.items() if k not in _EXCLUDE
+        }
 
         wu_xing_scoring_explanation = wu_xing_data.get("五行相位动力", {})
 
-        return {"五行力量": wu_xing_distribution, "五行相位动力": wu_xing_scoring_explanation}
+        return {
+            "五行力量": wu_xing_distribution,
+            "五行相位动力": wu_xing_scoring_explanation,
+        }
 
     def _extract_bone_weight(self) -> dict:
         """
@@ -368,7 +384,9 @@ class AstroDataLLMFormatter:
         return {
             "起运信息": xiao_yun.get("起运前", {}),
             "小运阶段": xiao_yun.get("小运周期", {}),
-            "大运阶段": da_yun.get("大运周期", {})[1:],  # Skip the first 大运 cycle which is a placeholder. Fill it with 小运 data instead for the pre-luck phase.
+            "大运阶段": da_yun.get("大运周期", {})[
+                1:
+            ],  # Skip the first 大运 cycle which is a placeholder. Fill it with 小运 data instead for the pre-luck phase.
         }
 
     def format_for_llm(self) -> dict:
@@ -398,6 +416,7 @@ class AstroDataLLMFormatter:
                 "五行相位动力": self._extract_wu_xing().get("五行相位动力", {}),
             },
             "wealth_insights": self._extract_wealth_insights(),
+            "relationship_insights": self._extract_relationship_insights(),
         }
 
         return formatted_data
