@@ -41,17 +41,31 @@ Reference these specific JSON keys to build your narrative. Do not guess; the da
 
 {# ====================== 6b. WEALTH INSIGHTS ====================== #}
 {% if data['wealth_insights'] %}
-## 6b. WEALTH INSIGHTS (pre-computed — use active_patterns and verdicts directly)
+## 6b. WEALTH INSIGHTS (pre-computed — use 解读 directly)
 
-Active patterns: {{ data['wealth_insights']['active_patterns'] | tojson }}
+### 财运综合评估 (synthesis — anchor your wealth narrative here first)
+{% set syn = data['wealth_insights']['财运综合评估'] %}
+- **主格局:** {{ syn['主格局'] if syn['主格局'] else '无明显主格局' }}
+- **辅助来源:** {{ syn['辅助来源'] | join('、') if syn['辅助来源'] else '无' }}
+- **风险因素:** {{ syn['风险因素'] | join('、') if syn['风险因素'] else '无' }}
+- **综合解读:** {{ syn['综合解读'] }}
 
-{% for p in data['wealth_insights']['patterns'] %}{% if p['matched'] %}
-- **{{ p['name'] }}** [{{ p['confidence'] }}]: {{ p['verdict'] }}
-  Evidence: {{ p['evidence'] }}
-{% endif %}{% endfor %}
-{% if data['wealth_insights']['no_match_default'] %}
-{{ data['wealth_insights']['no_match_default'] }}
+### 命盘财运格局 (natal — structural facts, always true)
+{% for p in data['wealth_insights']['命盘财运格局'] %}
+- **{{ p['格局名称'] }}**: {{ p['解读'] }}
+  依据: {{ p['依据'] }}
+{% endfor %}
+{% if data['wealth_insights']['无格局提示'] %}
+{{ data['wealth_insights']['无格局提示'] }}
 {% endif %}
+
+### 大运财运动态 (temporal — what each relevant 大运 does to natal wealth)
+{% for ev in data['wealth_insights']['大运财运动态'] %}
+**{{ ev['大运'] }} [{{ ev['状态'] }}]**
+{% for eff in ev['财运作用'] %}
+- [{{ eff['作用类型'] }}] {{ eff['解读'] }}（{{ eff['互动类型'] }}，{{ eff['强度'] }}）
+{% endfor %}
+{% endfor %}
 {% endif %}
 
 {# ====================== 7. LIFE TIMELINE (运程) ====================== #}

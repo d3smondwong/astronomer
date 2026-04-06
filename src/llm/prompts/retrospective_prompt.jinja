@@ -41,7 +41,7 @@ Format your output for this section exactly as shown below including the ending 
 - [statement 6]
 - [statement 7]
 
-*If 3 or more sound like you, this report was written for you.*
+*If 5 or more sound like you, this report was written for you.*
 ```
 
 ### 3. Your Core Identity
@@ -102,7 +102,10 @@ For each of the four areas below, follow the two-step process. Never use Chinese
 
 #### 💰 Wealth
 **DATA SOURCES:**
-- **WEALTH INSIGHTS** (Section 6b above) — pre-computed pattern verdicts. Use each active pattern's `verdict` directly in your writing. Do not re-derive from raw pillars. The `evidence` field shows supporting data.
+- **WEALTH INSIGHTS** (Section 6b above) — three pre-computed layers:
+  - **财运综合评估** (synthesis header): **anchor your wealth narrative to `综合解读` first.** This is the net assessment that weighs all patterns together. Open the wealth section with this framing, then use individual patterns as supporting detail.
+  - **命盘财运格局** (natal patterns): use each pattern's `解读` directly in your writing. Do not re-derive from raw pillars. The `依据` field shows supporting data.
+  - **大运财运动态** (cycle events): each entry gives the 大运 label, status (当运/已过/未来), and a list of `财运作用` effects with their `解读`. Use these to narrate *when* wealth activates, disrupts, or opens — they take precedence over manual inspection of `运程` for wealth timing.
 
 Read all four pillars together — wealth is shaped by inheritance, earning, control, and legacy working in combination:
 - **Family Foundation** (`data['核心命盘']['四柱实体']['年柱']['十神']`) — does the Year Pillar show inherited wealth (正财/偏财) or a lean start (官/杀)? This sets the baseline you begin from.
@@ -120,6 +123,7 @@ Read all four pillars together — wealth is shaped by inheritance, earning, con
 
 **STEP 1 — DATA SCAN (do this silently before writing)**
 Read each value and form a specific verdict — do not leave any point unanswered:
+- **`wealth_insights['财运综合评估']`** → read this first. Note `主格局` (structural anchor), `辅助来源` (supporting sources that fired), `风险因素` (active drags that fired), and `综合解读` (the net assessment sentence). This is the top-down frame — all subsequent pillar and cycle verdicts must be interpreted through this lens, not the other way around.
 - **Year Pillar `十神`** → what wealth baseline did family provide? (正财 = stable household income; 偏财 = speculative/entrepreneurial family wealth; 正官/七杀 = financially conservative or lean family; 正印/偏印 = knowledge/status but not material wealth; 比肩 = family wealth divided among many; 劫财 = family wealth lost or taken — lean inheritance)
 - **Month Pillar `十神`** → how does earning happen? (正财 = steady salary/methodical accumulation; 偏财 = deals/windfalls/variable income; 正官 = income through structured employment; 七杀 = hard-won income under pressure; 食神 = skills/craft-based earning; 伤官 = unconventional income, may conflict with authority; 正印/偏印 = credentialled income, stable but not wealth-generating; 比肩/劫财 = earnings shared or drained by peers). Then go one level deeper: cross-reference the Day Master's element and any 神煞 related to skill or talent to derive a *specific domain label* for this person's earning — not a generic archetype but something concrete (e.g. "sustained analytical work across complex systems," "high-stakes negotiation and deal-making," "creative or advisory work with discerning clients," "building and managing teams or processes"). This label must appear in the written output.
 - **Day Pillar `十神`** → does money stay or leave? (正财 = disciplined holder, accumulates steadily; 偏财 = money flows in waves — spends freely; 比肩/劫财 = money leaks to others; 食神/伤官 = spends on lifestyle or expression)
@@ -146,17 +150,29 @@ Read each value and form a specific verdict — do not leave any point unanswere
 
 Output exactly in this format (do not include the code fences in your output):
 ```
-**Your relationship with wealth:**
-[2 sentences. Synthesise the four-pillar picture — where you started (Year), how you earn (Month), whether you hold it (Day), what remains (Hour). Use the specific domain label derived in STEP 1 to name the type of work through which earning capacity is strongest — not 'hard work' or 'effort' but the concrete domain specific to this chart. Weave into natural prose; do NOT list traits.]
+**Your afinity with wealth:**
+[3 sentences total.
+ - Sentence 1: Open with the structural anchor from `财运综合评估['主格局']` (e.g., 财多身弱, 财重身轻, 财身相停, 身强驾财) and mention `辅助来源` and `风险因素` that either support or complicate it. Ground in four-pillar picture: where you started (Year), how you earn (Month), whether you hold it (Day), what remains (Hour). Use the specific domain label from STEP 1 to name earning capacity — not a generic archetype.
+ - Sentence 2: How does wealth naturally move *through* you? Derive from Day Pillar 十神 and `命盘财运格局` patterns. Does it come from your own effort/creation (食伤生财 active)? Does it accumulate steadily (正财)? Is it volatile and opportunistic (偏财)? Does it leak or get shared (比劫)? Does it require you to build systems (身强驾财 with scale)? State one clear dynamic about how money behaves in your hands. Cross-reference patterns to validate your interpretation, but keep it consistent with the synthesis frame — **pattern list supports but does not override `财运综合评估.综合解读`**. No archetypes or hedging; describe the actual money flow.
+ - Sentence 3: Name the relational or immediate environmental condition that shapes your wealth — simply and directly. Ask: Is wealth flowing *through* relationships (配偶财星, 祖业财星 in `辅助来源`)? Is it being *drained* by competition or loss (比劫夺财, 财星泄财 in `风险因素`)? Is it *generated* by your own output (食伤生财 as anchor)? Is it *commanded* by your strength (身强驾财 as anchor)? State the actual relational dynamic from the data, not a template. One clear sentence about whether wealth is shared, protected, created, or commanded. No hedging, no drama.
+]
+
+**Growing up:**
+[2–3 sentences. Start by reading `财运综合评估` to understand the inherited structural pattern, then validate with Year Pillar detail.
+ - **From `财运综合评估`**: Does `主格局` suggest you inherited wealth pressure (财多身弱/财重身轻) or strength (财身相停/身强驾财)? This reveals your baseline burden or advantage. Are there inherited/external wealth sources in `辅助来源` (祖业财星, 配偶财星)? This shows what family provided. Are there structural drains in `风险因素` (比劫夺财, 财库未冲)? This shows what family struggled with or what was blocked.
+ - **From Year Pillar `十神`**: What money messages did family instil? (正财 = stable income, taught saving; 偏财 = opportunity-seeking, taught risk; 比肩/劫财 = resource scarcity, taught competition; 正印/偏印 = knowledge over cash, taught learning; 正官/七杀 = duty/discipline, taught obligation). If Year Pillar `作用` clashes with Month/Day (六冲/刑), note early disruption — family wealth story was interrupted.
+ - **Connect to present**: "Your family [provided/struggled with] X, leaving you with a [guardian/builder/cautious/opportunistic] approach to money that still shapes how you hold or release resources today."
+ - Do NOT use BaZi terms in output — translate to plain English about family money culture and how it shaped your financial temperament.
+]
 
 **How wealth has evolved through your life:**
-[Walk each life phase using natural language — 'in your twenties', 'in your thirties', 'in midlife', 'in later years' — mapped to the actual decade ages from the data. Do NOT write about childhood or teenage years; wealth narration begins at the first decade where real financial activity is plausible (typically the first 大运 that falls in the twenties or later). Formative decades (Month lens): earning capacity through career or education. Prime decades (Day lens): personal accumulation and control. Later decades (Hour lens): preservation or depletion. Close with one sentence: self-made or inherited — steady flow or peaks and troughs?]
+[Walk each life phase using natural language — 'in your twenties', 'in your thirties', 'in midlife', 'in later years' — mapped to the actual decade ages from the data. Do NOT write about childhood or teenage years; wealth narration begins at the first decade where real financial activity is plausible (typically the first 大运 that falls in the twenties or later). Formative decades (Month lens): earning capacity through career or education. Prime decades (Day lens): personal accumulation and control. Later decades (Hour lens): preservation or depletion. For each decade, cross-reference `wealth_insights['大运财运动态']` — if that decade has an entry, use its `财运作用[].解读` to name the specific wealth event (开库, 食伤生财, 冲破, 运星落空, etc.) that shaped the period; if no entry exists, the decade had no notable wealth-specific activation. Close with one sentence: self-made or inherited — steady flow or peaks and troughs?]
 
-**Your wealth, recently:**
-[Read the decade that covers the person's current age. From the wealth element's strength, the pillar interactions active this decade, and whether any void branch falls on an earning or accumulation domain — write 3–4 sentences describing what financial themes have been running in the background. Derive the language from this chart's specific data. Do not name chart mechanics. Do not use generic archetypes.]
+**Your wealth overview between [ages from `大运阶段['开始年龄']` to `大运阶段['结束年龄']`]:**
+[Read the decade that covers the person's current age. From the wealth element's strength, the pillar interactions active this decade, and whether any void branch falls on an earning or accumulation domain — write 3–4 sentences describing what financial themes have been running in the background. Cross-reference `wealth_insights['大运财运动态']` for this decade to identify which wealth events are shaping this period. Derive the language from this chart's specific data. Do not name chart mechanics. Do not use generic archetypes.]
 
 **What opens the door to abundance:**
-[1–2 sentences. What circumstances, mindsets, or seasons unlock flow? What blocks it?]
+[2 sentences. What circumstances, mindsets, or seasons unlock flow? What blocks it?]
 
 **[Single bold sentence — a defining truth about this person's wealth destiny that ties past, present, and future together.]**
 ```
@@ -220,7 +236,8 @@ Write 4–5 sentences if siblings are included; 3–4 sentences if omitted.]
 **Romance:**
 [3–4 sentences. Synthesise the Day Pillar into a character snapshot: who this person is as a partner, what they attract, what they find hard to give or receive, what lies beneath the surface in intimacy. Do not describe evolution here — that belongs in the timeline below. Weave into natural prose; do NOT list traits.]
 
-[Walk the romantic arc using natural language — 'as a young adult', 'in your twenties', 'in your thirties', 'in midlife', 'in later years' — mapped to the actual decade ages from the data. CRITICAL: each phase must open with a concrete signal from the chart — what the decade's energy was doing to the Day Pillar — before any emotional observation follows. If you cannot point to a specific signal in the data for a phase, do not write that phase. For any decade flagged `SIGNIFICANT ROMANTIC EVENT — POSITIVE` in STEP 1: after the standard phase observation, add 2–3 sentences on the likely commitment or deepening — what the chart shows about that period, the emotional quality of it, and what it established. For any decade flagged `SIGNIFICANT ROMANTIC EVENT — NEGATIVE`: after the standard phase observation, add 2–3 sentences on the rupture or strain — what put the relationship under pressure, what the emotional weight of that period was, and what it left behind. Only write these extra sentences for flagged decades. Close with one sentence: has love asked more of you than you expected — or less?]
+**How your romantic relationships have evolved:**
+[Walk the romantic arc using natural language — using the actual age ranges from the data (e.g. 'in your teens', 'as a young adult', 'in your twenties', 'in your thirties', 'in midlife', 'in your later years') — mapped to each decade from the data. Do NOT skip age ranges that are present in the data; start from whichever decade appears first (even if earlier than twenties) and progress through all present decades. CRITICAL: each phase must open with a concrete signal from the chart — what the decade's energy was doing to the Day Pillar — before any emotional observation follows. If you cannot point to a specific signal in the data for a phase, do not write that phase. For any decade flagged `SIGNIFICANT ROMANTIC EVENT — POSITIVE` in STEP 1: after the standard phase observation, add 2–3 sentences on the likely commitment or deepening — what the chart shows about that period, the emotional quality of it, and what it established. For any decade flagged `SIGNIFICANT ROMANTIC EVENT — NEGATIVE`: after the standard phase observation, add 2–3 sentences on the rupture or strain — what put the relationship under pressure, what the emotional weight of that period was, and what it left behind. Only write these extra sentences for flagged decades. Close with one sentence: has love asked more of you than you expected — or less?]
 
 **Friendship:**
 [2–3 sentences. Synthesise the Month Pillar into social style: the role naturally taken in friendships, how social confidence has moved across life, and where reciprocity tends to break down. State observations only — no advice or warnings. Weave into natural prose; do NOT list traits.]

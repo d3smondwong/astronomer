@@ -156,7 +156,6 @@ if __name__ == "__main__":
     from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
     from src.services.astronomer_data_aggregator import AstroDataAggregator
     from src.services.astronomer_data_llm_formatter import AstroDataLLMFormatter
-    from astronomer_calculations.wealth_interpretive_insights import extract_wealth_insights
 
     # python -m src.llm.llm_service
 
@@ -184,8 +183,7 @@ if __name__ == "__main__":
         longitude=longitude,
         gender=gender,
     )
-    wealth_insights = extract_wealth_insights(raw_data)
-    llm_friendly_data = AstroDataLLMFormatter(raw_data, wealth_insights=wealth_insights).format_for_llm()
+    llm_friendly_data = AstroDataLLMFormatter(raw_data).format_for_llm()
 
     logger.info("=== Running LLM Analysis ===")
     result = analyse_bazi(llm_friendly_data)

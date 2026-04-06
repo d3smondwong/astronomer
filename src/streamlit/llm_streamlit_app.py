@@ -215,12 +215,8 @@ if analyze_button:
                 gender=gender,
             )
 
-            # Pre-compute interpretive insights
-            from astronomer_calculations.wealth_interpretive_insights import extract_wealth_insights
-            wealth_insights = extract_wealth_insights(raw_data)
-
             # Format data for LLM
-            formatter = AstroDataLLMFormatter(raw_data, wealth_insights=wealth_insights)
+            formatter = AstroDataLLMFormatter(raw_data)
             llm_friendly_data = formatter.format_for_llm()
 
         logger.info("✅ BaZi analysis completed successfully")
