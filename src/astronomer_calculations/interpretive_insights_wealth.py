@@ -1044,7 +1044,7 @@ def _get_cycle_wealth_events(
         if effects:
             events.append({
                 "大运": cycle.get("周期", ""),
-                "状态": zhuangtai,
+                "运势": zhuangtai,
                 "财运作用": effects,
             })
 
@@ -1133,7 +1133,7 @@ def extract_wealth_insights(raw_data: dict) -> dict:
     Returns:
         {
             "命盘财运格局": list of matched pattern dicts (格局编号, 格局名称, 解读, 依据),
-            "大运财运动态": list of cycle event dicts (大运, 状态, 财运作用),
+            "大运财运动态": list of cycle event dicts (大运, 运势, 财运作用),
             "无格局提示":   str | None — fallback text when no natal pattern matched
         }
     """

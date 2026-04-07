@@ -61,8 +61,102 @@ Reference these specific JSON keys to build your narrative. Do not guess; the da
 
 ### 大运财运动态 (temporal — what each relevant 大运 does to natal wealth)
 {% for ev in data['wealth_insights']['大运财运动态'] %}
-**{{ ev['大运'] }} [{{ ev['状态'] }}]**
+**{{ ev['大运'] }} [{{ ev['运势'] }}]**
 {% for eff in ev['财运作用'] %}
+- [{{ eff['作用类型'] }}] {{ eff['解读'] }}（{{ eff['互动类型'] }}，{{ eff['强度'] }}）
+{% endfor %}
+{% endfor %}
+{% endif %}
+
+{# ====================== 6c. RELATIONSHIP INSIGHTS ====================== #}
+{% if data['relationship_insights'] %}
+## 6c. RELATIONSHIP INSIGHTS (pre-computed — use 解读 directly)
+
+### 命盘关系格局 (natal — structural facts, always true)
+
+#### 感情 (Romance)
+{% for p in data['relationship_insights']['命盘关系格局']['感情'] %}
+- **{{ p['格局名称'] }}**: {{ p['解读'] }}
+  依据: {{ p['依据'] }}
+{% endfor %}
+
+#### 原生家庭 (Family of Origin)
+{% for p in data['relationship_insights']['命盘关系格局']['原生家庭'] %}
+- **{{ p['格局名称'] }}**: {{ p['解读'] }}
+  依据: {{ p['依据'] }}
+{% endfor %}
+
+#### 朋友人际 (Friendship & Peers)
+{% for p in data['relationship_insights']['命盘关系格局']['朋友人际'] %}
+- **{{ p['格局名称'] }}**: {{ p['解读'] }}
+  依据: {{ p['依据'] }}
+{% endfor %}
+
+### 大运感情动态 (per-decade — romance, family, friendship for every cycle)
+{% for ev in data['relationship_insights']['大运感情动态'] %}
+**{{ ev['大运'] }}{% if ev['年龄'] %} ({{ ev['年龄'] }}){% endif %} [{{ ev['运势'] }}]**
+- 感情: [{{ ev['感情']['运势'] }}] {{ ev['感情']['解读'] }}
+- 原生家庭: [{{ ev['原生家庭']['运势'] }}] {{ ev['原生家庭']['解读'] }}
+- 朋友人际: [{{ ev['朋友人际']['运势'] }}] {{ ev['朋友人际']['解读'] }}
+{% endfor %}
+{% if data['relationship_insights']['无格局提示'] %}
+{{ data['relationship_insights']['无格局提示'] }}
+{% endif %}
+{% endif %}
+
+{# ====================== 6d. CAREER INSIGHTS ====================== #}
+{% if data['career_insights'] %}
+## 6d. CAREER INSIGHTS (pre-computed — use 解读 directly)
+
+### 事业综合评估 (synthesis — anchor your career narrative here first)
+{% set syn = data['career_insights']['事业综合评估'] %}
+- **主格局:** {{ syn['主格局'] if syn['主格局'] else '无明显主格局' }}
+- **辅助来源:** {{ syn['辅助来源'] | join('、') if syn['辅助来源'] else '无' }}
+- **风险因素:** {{ syn['风险因素'] | join('、') if syn['风险因素'] else '无' }}
+- **综合解读:** {{ syn['综合解读'] }}
+
+### 命盘职业格局 (natal — structural facts, always true)
+{% for p in data['career_insights']['命盘职业格局'] %}
+- **{{ p['格局名称'] }}**: {{ p['解读'] }}
+  依据: {{ p['依据'] }}
+{% endfor %}
+{% if data['career_insights']['无格局提示'] %}
+{{ data['career_insights']['无格局提示'] }}
+{% endif %}
+
+### 大运职业动态 (temporal — what each relevant 大运 does to natal career)
+{% for ev in data['career_insights']['大运职业动态'] %}
+**{{ ev['大运'] }} [{{ ev['运势'] }}]**
+{% for eff in ev['职业作用'] %}
+- [{{ eff['作用类型'] }}] {{ eff['解读'] }}（{{ eff['互动类型'] }}，{{ eff['强度'] }}）
+{% endfor %}
+{% endfor %}
+{% endif %}
+
+{# ====================== 6e. HEALTH INSIGHTS ====================== #}
+{% if data['health_insights'] %}
+## 6e. HEALTH INSIGHTS (pre-computed — use 解读 directly)
+
+### 健康综合评估
+{% set syn = data['health_insights']['健康综合评估'] %}
+- **整体体质:** {{ syn['整体体质'] }}
+- **主要风险:** {{ syn['主要风险'] | join('、') if syn['主要风险'] else '无' }}
+- **有利因素:** {{ syn['有利因素'] | join('、') if syn['有利因素'] else '无' }}
+- **综合解读:** {{ syn['综合解读'] }}
+
+### 命盘健康格局 (natal — structural facts, always true)
+{% for p in data['health_insights']['命盘健康格局'] %}
+- **{{ p['格局名称'] }}**: {{ p['解读'] }}
+  依据: {{ p['依据'] }}
+{% endfor %}
+{% if data['health_insights']['无格局提示'] %}
+{{ data['health_insights']['无格局提示'] }}
+{% endif %}
+
+### 大运健康动态 (temporal — what each relevant 大运 does to health)
+{% for ev in data['health_insights']['大运健康动态'] %}
+**{{ ev['大运'] }} [{{ ev['运势'] }}]**
+{% for eff in ev['健康作用'] %}
 - [{{ eff['作用类型'] }}] {{ eff['解读'] }}（{{ eff['互动类型'] }}，{{ eff['强度'] }}）
 {% endfor %}
 {% endfor %}

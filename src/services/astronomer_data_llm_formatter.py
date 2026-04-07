@@ -32,6 +32,20 @@ class AstroDataLLMFormatter:
 
         return extract_relationship_insights(self.raw_data)
 
+    def _extract_career_insights(self) -> dict:
+        from src.astronomer_calculations.interpretive_insights_career import (
+            extract_career_insights,
+        )
+
+        return extract_career_insights(self.raw_data)
+
+    def _extract_health_insights(self) -> dict:
+        from src.astronomer_calculations.interpretive_insights_health import (
+            extract_health_insights,
+        )
+
+        return extract_health_insights(self.raw_data)
+
     def _extract_basic_info(self) -> dict:
         """
         Extract and organize basic birth information for LLM consumption.
@@ -417,6 +431,8 @@ class AstroDataLLMFormatter:
             },
             "wealth_insights": self._extract_wealth_insights(),
             "relationship_insights": self._extract_relationship_insights(),
+            "career_insights": self._extract_career_insights(),
+            "health_insights": self._extract_health_insights(),
         }
 
         return formatted_data
