@@ -1,4 +1,4 @@
-active_provider: deepseek  # Options: gemini | claude | huggingface | deepseek
+active_provider: gemini  # Options: gemini | claude | huggingface | deepseek
 
 providers:
   gemini:
