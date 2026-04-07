@@ -587,6 +587,13 @@ def get_day_master(lunar_birthday: Lunar) -> dict:
     de_di = compute_de_di(day_elem, zhis)
     de_shi = compute_de_shi(day_stem, gans)
 
+    _root_map = {"深根": 2, "中根": 1, "浅根": 0, "无根": 0}
+    strength_score = (
+        int(de_ling["得令"])
+        + _root_map.get(de_di["通根"], 0)
+        + min(len(de_shi["支持天干"]), 2)
+    )
+
     return {
         "日主": {
             "天干": day_stem,
@@ -596,6 +603,7 @@ def get_day_master(lunar_birthday: Lunar) -> dict:
             "得令": de_ling,
             "得地": de_di,
             "得势": de_shi,
+            "强弱分数": strength_score,  # 0–5; >=3 strong, 2 moderate, <=1 weak
         }
     }
 
