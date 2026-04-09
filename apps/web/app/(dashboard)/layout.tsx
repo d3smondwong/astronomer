@@ -92,7 +92,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </Button>
                 </Link>
               </div>
-              
+
               <div className="space-y-1">
                 {profiles.length === 0 ? (
                   <p className="text-sm text-muted-foreground px-2 py-1">
@@ -115,7 +115,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           {profile.name}
                         </Button>
                       </Link>
-                      
+
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button
@@ -161,10 +161,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </Button>
               </Link>
 
-              <Link href="/ai-oracle">
+              <Link href="/ai_oracle_chat">
                 <Button
                   variant="ghost"
-                  className={`w-full justify-start ${isActive('ai-oracle') ? 'bg-accent' : ''}`}
+                  className={`w-full justify-start ${isActive('ai_oracle_chat') ? 'bg-accent' : ''}`}
                 >
                   <MessageSquare className="w-4 h-4 mr-2" />
                   AI Oracle Chat
