@@ -3,6 +3,12 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Node modules
+node_modules/
+
+# Next
+.next/
+
 # reports
 reports/
 
