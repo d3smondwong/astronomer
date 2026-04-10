@@ -1,34 +1,53 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getProfile, type BaziProfile } from '@/lib/baziCalculator';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useParams, useRouter } from 'next/navigation';
+import { getProfile, getProfiles, deleteProfile, type BaziProfile } from '@/lib/baziOrchestrator';
+import { Card, Tag, Tabs, Button, Popconfirm } from 'antd';
 import { format } from 'date-fns';
-import { Calendar, Clock, MapPin, User } from 'lucide-react';
-import { VictoryPie, VictoryChart, VictoryBar, VictoryTheme, VictoryAxis, VictoryLabel } from 'victory';
+import { Calendar, Clock, MapPin, User, Trash2 } from 'lucide-react';
+import { VictoryPie, VictoryChart, VictoryBar, VictoryTheme, VictoryAxis } from 'victory';
+import { toast } from 'sonner';
 
-interface PageProps {
-  params: {
-    profileId: string;
-  };
-}
-
-export default function ProfilePage({ params }: PageProps) {
+export default function ProfilePage() {
+  const params = useParams<{ profileId: string }>();
+  const router = useRouter();
   const [profile, setProfile] = useState<BaziProfile | null>(null);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    if (params.profileId) {
-      const loadedProfile = getProfile(params.profileId);
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (isClient && params?.profileId) {
+      const loadedProfile = getProfile(params.profileId as string);
       setProfile(loadedProfile || null);
     }
-  }, [params.profileId]);
+  }, [params?.profileId, isClient]);
 
-  if (!profile) {
+  const handleDeleteProfile = () => {
+    if (params?.profileId) {
+      deleteProfile(params.profileId as string);
+      toast.success('Profile deleted successfully');
+
+      // Get all remaining profiles
+      const allProfiles = getProfiles();
+
+      // If there are other profiles, navigate to the first one
+      if (allProfiles.length > 0) {
+        router.push(`/profile/${allProfiles[0].id}`);
+      } else {
+        // If no profiles left, go to home
+        router.push('/');
+      }
+    }
+  };
+
+  if (!isClient || !profile) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-muted-foreground">Profile not found</p>
+        <p className="text-gray-500">{isClient ? 'Profile not found' : 'Loading profile...'}</p>
       </div>
     );
   }
@@ -36,7 +55,6 @@ export default function ProfilePage({ params }: PageProps) {
   const { baziChart } = profile;
   if (!baziChart) return null;
 
-  // Prepare data for charts
   const elementData = Object.entries(baziChart.elements).map(([element, value]) => ({
     x: element.charAt(0).toUpperCase() + element.slice(1),
     y: value,
@@ -56,312 +74,604 @@ export default function ProfilePage({ params }: PageProps) {
     fill: elementColors[item.x as keyof typeof elementColors],
   }));
 
-  return (
-    <div className="h-full overflow-auto">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Profile Header */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle className="text-3xl mb-2">{profile.name}</CardTitle>
-                <CardDescription className="space-y-2">
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      {format(profile.birthDate, 'PPP')}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      {profile.birthTime}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
-                      {profile.birthLocation}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <User className="w-4 h-4" />
-                      {profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}
-                    </span>
-                  </div>
-                </CardDescription>
+  // Lookup tables for Heavenly Stems (GAN) and Earthly Branches (ZHI)
+  const GAN_LABELS: Record<string, string> = {
+    甲: 'Yang Wood', 乙: 'Yin Wood', 丙: 'Yang Fire', 丁: 'Yin Fire',
+    戊: 'Yang Earth', 己: 'Yin Earth', 庚: 'Yang Metal', 辛: 'Yin Metal',
+    壬: 'Yang Water', 癸: 'Yin Water',
+  };
+
+  const ZHI_LABELS: Record<string, string> = {
+    子: 'Water Rat', 丑: 'Earth Ox', 寅: 'Wood Tiger', 卯: 'Wood Rabbit',
+    辰: 'Earth Dragon', 巳: 'Fire Snake', 午: 'Fire Horse', 未: 'Earth Goat',
+    申: 'Metal Monkey', 酉: 'Metal Rooster', 戌: 'Earth Dog', 亥: 'Water Pig',
+  };
+
+  const SHI_SHEN_LABELS: Record<string, string> = {
+    '比肩': 'Companion',
+    '劫财': 'Wealth Robber',
+    '食神': 'Food God',
+    '伤官': 'Hurting Officer',
+    '偏财': 'Indirect Wealth',
+    '正财': 'Direct Wealth',
+    '七杀': 'Seven Killings',
+    '正官': 'Direct Officer',
+    '偏印': 'Indirect Resource',
+    '正印': 'Direct Resource',
+    '我': 'Self',
+  };
+
+  const PillarCard = ({
+    relationshipLabel,
+    pillarLabel,
+    pillar,
+    isDayMaster = false,
+  }: {
+    relationshipLabel: string;
+    pillarLabel: string;
+    pillar: any;
+    isDayMaster?: boolean;
+  }) => {
+    const heavenlyChar = pillar.heavenlyStem;
+    const earthlyChar = pillar.earthlyBranch;
+    const heavenlyName = GAN_LABELS[heavenlyChar] || heavenlyChar;
+    const earthlyName = ZHI_LABELS[earthlyChar] || earthlyChar;
+
+    const hiddenStemPairs = [
+      { stem: pillar.mainQi, tenGod: pillar.mainQiTenGod },
+      { stem: pillar.middleQi, tenGod: pillar.middleQiTenGod },
+      { stem: pillar.residualQi, tenGod: pillar.residualQiTenGod },
+    ].filter((pair) => pair.stem != null) as { stem: string; tenGod: string | null }[];
+
+    return (
+      <div
+        style={{
+          position: 'relative',
+          background: isDayMaster ? 'rgba(115, 92, 0, 0.04)' : '#faf8f2',
+          border: isDayMaster ? '2px solid rgba(115, 92, 0, 0.3)' : '1px solid rgba(115, 92, 0, 0.15)',
+          borderRadius: '12px',
+          padding: '24px 20px',
+          minHeight: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+        }}
+      >
+        {/* Day Master Badge */}
+        {isDayMaster && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '-16px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'linear-gradient(135deg, #735c00, #a08000)',
+              color: 'white',
+              borderRadius: '20px',
+              padding: '4px 14px',
+              fontSize: '11px',
+              fontWeight: '600',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              fontFamily: 'Noto Serif, serif',
+            }}
+          >
+            Day Master
+          </div>
+        )}
+
+        {/* Relationship & Pillar Labels */}
+        <div style={{ marginBottom: '12px' }}>
+          <h3
+            style={{
+              fontSize: '10px',
+              fontWeight: '600',
+              color: 'rgba(115, 92, 0, 0.45)',
+              margin: 0,
+              textTransform: 'uppercase',
+              letterSpacing: '0.15em',
+              fontFamily: 'Noto Serif, serif',
+            }}
+          >
+            {relationshipLabel}
+          </h3>
+          <p
+            style={{
+              fontSize: '13px',
+              color: '#4d4635',
+              opacity: 0.7,
+              margin: '4px 0 0 0',
+              fontStyle: 'italic',
+            }}
+          >
+            {pillarLabel}
+          </p>
+        </div>
+
+        {/* HEAVENLY STEM Section */}
+        <div style={{ width: '100%', marginBottom: '16px' }}>
+          <label
+            style={{
+              fontSize: '10px',
+              fontWeight: '600',
+              color: 'rgba(115, 92, 0, 0.45)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              fontFamily: 'Noto Serif, serif',
+              display: 'block',
+              marginBottom: '8px',
+            }}
+          >
+            Heavenly Stem
+          </label>
+          <div
+            style={{
+              fontSize: '56px',
+              fontWeight: '700',
+              color: isDayMaster ? '#735c00' : '#4d4635',
+              margin: '12px 0 12px 0',
+              lineHeight: 1,
+              fontFamily: 'Ma Shan Zheng, serif',
+            }}
+          >
+            {heavenlyChar}
+          </div>
+          <p
+            style={{
+              fontSize: '13px',
+              color: '#4d4635',
+              opacity: 0.75,
+              margin: 0,
+              fontStyle: 'italic',
+            }}
+          >
+            {heavenlyName}
+          </p>
+          {pillar.heavenlyStemTenGod && (() => {
+            const displayChar = pillar.heavenlyStemTenGod === '日主' ? '我' : pillar.heavenlyStemTenGod;
+            const displayLabel = pillar.heavenlyStemTenGod === '日主' ? 'Self' : (SHI_SHEN_LABELS[pillar.heavenlyStemTenGod] ?? pillar.heavenlyStemTenGod);
+            return (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  border: '1px solid rgba(115, 92, 0, 0.25)',
+                  borderRadius: '8px',
+                  padding: '4px 10px',
+                  background: 'rgba(115, 92, 0, 0.06)',
+                  marginTop: '8px',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '13px',
+                    color: 'rgba(115, 92, 0, 0.75)',
+                    fontFamily: 'Ma Shan Zheng, serif',
+                  }}
+                >
+                  {displayChar}
+                </span>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    color: 'rgba(115, 92, 0, 0.6)',
+                    fontFamily: 'Noto Serif, serif',
+                    marginTop: '2px',
+                  }}
+                >
+                  {displayLabel}
+                </span>
               </div>
-              <Badge variant={profile.useTrueSolarTime ? 'default' : 'secondary'}>
-                {profile.useTrueSolarTime ? 'True Solar Time' : 'Standard Time'}
-              </Badge>
+            );
+          })()}
+        </div>
+
+        {/* Divider */}
+        <div
+          style={{
+            width: '80%',
+            height: '1px',
+            background: 'rgba(115, 92, 0, 0.12)',
+            margin: '6px 0',
+          }}
+        />
+
+        {/* EARTHLY BRANCH Section */}
+        <div style={{ width: '100%', marginBottom: '12px', marginTop: '12px' }}>
+          <label
+            style={{
+              fontSize: '10px',
+              fontWeight: '600',
+              color: 'rgba(115, 92, 0, 0.45)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              fontFamily: 'Noto Serif, serif',
+              display: 'block',
+              marginBottom: '8px',
+            }}
+          >
+            Earthly Branch
+          </label>
+          <div
+            style={{
+              fontSize: '56px',
+              fontWeight: '700',
+              color: '#4d4635',
+              opacity: 0.8,
+              margin: '12px 0 12px 0',
+              lineHeight: 1,
+              fontFamily: 'Ma Shan Zheng, serif',
+            }}
+          >
+            {earthlyChar}
+          </div>
+          <p
+            style={{
+              fontSize: '13px',
+              color: '#4d4635',
+              opacity: 0.75,
+              margin: 0,
+              fontStyle: 'italic',
+            }}
+          >
+            {earthlyName}
+          </p>
+        </div>
+
+        {/* Divider */}
+        <div
+          style={{
+            width: '80%',
+            height: '1px',
+            background: 'rgba(115, 92, 0, 0.12)',
+            margin: '6px 0',
+          }}
+        />
+
+        {/* HIDDEN STEMS Section */}
+        <div style={{ width: '100%', marginTop: '6px' }}>
+          <label
+            style={{
+              fontSize: '10px',
+              fontWeight: isDayMaster ? '700' : '600',
+              color: 'rgba(115, 92, 0, 0.45)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              fontFamily: 'Noto Serif, serif',
+              display: 'block',
+              marginBottom: '12px',
+            }}
+          >
+            Hidden Stems
+          </label>
+          {hiddenStemPairs.length > 0 ? (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '16px',
+                flexWrap: 'wrap',
+              }}
+            >
+              {hiddenStemPairs.map(({ stem, tenGod }, idx: number) => (
+                <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div
+                    style={{
+                      fontSize: '36px',
+                      fontWeight: '600',
+                      color: '#4d4635',
+                      lineHeight: 1,
+                      fontFamily: 'Ma Shan Zheng, serif',
+                      marginBottom: '6px',
+                    }}
+                  >
+                    {stem}
+                  </div>
+                  <p
+                    style={{
+                      fontSize: '11px',
+                      color: 'rgba(77, 70, 53, 0.6)',
+                      margin: 0,
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {GAN_LABELS[stem] || stem}
+                  </p>
+                  {tenGod && (
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        border: '1px solid rgba(115, 92, 0, 0.2)',
+                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        background: 'rgba(115, 92, 0, 0.05)',
+                        marginTop: '4px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          color: 'rgba(115, 92, 0, 0.7)',
+                          fontFamily: 'Ma Shan Zheng, serif',
+                        }}
+                      >
+                        {tenGod}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '9px',
+                          color: 'rgba(115, 92, 0, 0.55)',
+                          fontFamily: 'Noto Serif, serif',
+                          marginTop: '1px',
+                        }}
+                      >
+                        {SHI_SHEN_LABELS[tenGod] ?? tenGod}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
-          </CardHeader>
+          ) : (
+            <p style={{ fontSize: '12px', color: '#4d4635', opacity: 0.45, margin: 0 }}>
+              None
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="h-full overflow-auto" style={{ overflowX: 'hidden' }}>
+      <div className="max-w-7xl mx-auto p-6 space-y-6" style={{ overflowX: 'hidden' }}>
+        {/* Profile Header */}
+        <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold mb-4 font-serif text-gold-deep">{profile.name}</h1>
+              <div className="space-y-2">
+                <div className="flex items-center gap-6 text-sm text-bronze-muted">
+                  <span className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    {format(profile.birthDate, 'PPP')}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    {profile.birthTime}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    {profile.birthLocation}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    {profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {(profile.latitude != null && profile.longitude != null) && (
+                <Tag color="blue">
+                  {profile.latitude.toFixed(4)}° / {profile.longitude.toFixed(4)}°
+                </Tag>
+              )}
+              <Popconfirm
+                title="Delete Profile"
+                description={`Are you sure you want to delete "${profile.name}"? This action cannot be undone.`}
+                onConfirm={handleDeleteProfile}
+                okText="Delete"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true }}
+              >
+                <Button danger type="text" size="small" icon={<Trash2 className="w-4 h-4" />}>
+                  Delete
+                </Button>
+              </Popconfirm>
+            </div>
+          </div>
         </Card>
 
         {/* Tabs */}
-        <Tabs defaultValue="pillars" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="pillars">Four Pillars</TabsTrigger>
-            <TabsTrigger value="elements">Elements</TabsTrigger>
-            <TabsTrigger value="insights">Insights</TabsTrigger>
-          </TabsList>
-
-          {/* Four Pillars Tab */}
-          <TabsContent value="pillars" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Year Pillar */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Year Pillar</CardTitle>
-                  <CardDescription>Ancestry & Childhood</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="text-center">
-                      <div className="text-4xl font-bold text-primary mb-2">
-                        {baziChart.yearPillar.heavenlyStem.split(' ')[0]}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {baziChart.yearPillar.heavenlyStem}
-                      </p>
-                    </div>
-                    <div className="text-center border-t pt-2">
-                      <div className="text-4xl font-bold text-secondary mb-2">
-                        {baziChart.yearPillar.earthlyBranch.split(' ')[0]}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {baziChart.yearPillar.earthlyBranch}
-                      </p>
-                      <Badge variant="outline" className="mt-2">
-                        {baziChart.yearPillar.animal}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Month Pillar */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Month Pillar</CardTitle>
-                  <CardDescription>Parents & Early Life</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="text-center">
-                      <div className="text-4xl font-bold text-primary mb-2">
-                        {baziChart.monthPillar.heavenlyStem.split(' ')[0]}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {baziChart.monthPillar.heavenlyStem}
-                      </p>
-                    </div>
-                    <div className="text-center border-t pt-2">
-                      <div className="text-4xl font-bold text-secondary mb-2">
-                        {baziChart.monthPillar.earthlyBranch.split(' ')[0]}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {baziChart.monthPillar.earthlyBranch}
-                      </p>
-                      <Badge variant="outline" className="mt-2">
-                        {baziChart.monthPillar.animal}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Day Pillar */}
-              <Card className="border-2 border-primary">
-                <CardHeader>
-                  <CardTitle className="text-lg">Day Pillar</CardTitle>
-                  <CardDescription>Self & Spouse</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="text-center">
-                      <div className="text-4xl font-bold text-primary mb-2">
-                        {baziChart.dayPillar.heavenlyStem.split(' ')[0]}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {baziChart.dayPillar.heavenlyStem}
-                      </p>
-                      <Badge className="mt-2">Day Master</Badge>
-                    </div>
-                    <div className="text-center border-t pt-2">
-                      <div className="text-4xl font-bold text-secondary mb-2">
-                        {baziChart.dayPillar.earthlyBranch.split(' ')[0]}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {baziChart.dayPillar.earthlyBranch}
-                      </p>
-                      <Badge variant="outline" className="mt-2">
-                        {baziChart.dayPillar.animal}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Hour Pillar */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Hour Pillar</CardTitle>
-                  <CardDescription>Children & Later Life</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="text-center">
-                      <div className="text-4xl font-bold text-primary mb-2">
-                        {baziChart.hourPillar.heavenlyStem.split(' ')[0]}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {baziChart.hourPillar.heavenlyStem}
-                      </p>
-                    </div>
-                    <div className="text-center border-t pt-2">
-                      <div className="text-4xl font-bold text-secondary mb-2">
-                        {baziChart.hourPillar.earthlyBranch.split(' ')[0]}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {baziChart.hourPillar.earthlyBranch}
-                      </p>
-                      <Badge variant="outline" className="mt-2">
-                        {baziChart.hourPillar.animal}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Elements Tab */}
-          <TabsContent value="elements" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Element Distribution</CardTitle>
-                  <CardDescription>Your Five Element Balance</CardDescription>
-                </CardHeader>
-                <CardContent className="flex justify-center">
-                  <svg viewBox="0 0 400 400" className="w-full max-w-md">
-                    <VictoryPie
-                      standalone={false}
-                      width={400}
-                      height={400}
-                      data={pieData}
-                      colorScale={pieData.map(d => d.fill)}
-                      labels={({ datum }) => `${datum.x}\n${datum.y}`}
-                      style={{
-                        labels: { fontSize: 16, fill: 'white' },
-                      }}
-                      innerRadius={80}
+        <Tabs
+          items={[
+            {
+              key: 'pillars',
+              label: 'Four Pillars',
+              children: (
+                <div className="space-y-4" style={{ overflowX: 'hidden' }}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" style={{ position: 'relative', paddingTop: '20px', minWidth: 0 }}>
+                    <PillarCard
+                      relationshipLabel="ANCESTRY"
+                      pillarLabel="Year Pillar"
+                      pillar={baziChart.yearPillar}
+                      isDayMaster={false}
                     />
-                  </svg>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Element Strength</CardTitle>
-                  <CardDescription>Comparative View</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <svg viewBox="0 0 450 300" className="w-full">
-                    <VictoryChart
-                      standalone={false}
-                      width={450}
-                      height={300}
-                      domainPadding={30}
-                      theme={VictoryTheme.material}
-                    >
-                      <VictoryAxis />
-                      <VictoryAxis dependentAxis />
-                      <VictoryBar
-                        data={elementData}
-                        style={{
-                          data: {
-                            fill: ({ datum }) => elementColors[datum.x as keyof typeof elementColors],
-                          },
-                        }}
-                      />
-                    </VictoryChart>
-                  </svg>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Lucky Elements</CardTitle>
-                <CardDescription>Elements that can bring balance to your chart</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-2">
-                  {baziChart.luckyElements.map((element) => (
-                    <Badge
-                      key={element}
-                      className="text-lg px-4 py-2"
-                      style={{
-                        backgroundColor: elementColors[element as keyof typeof elementColors],
-                      }}
-                    >
-                      {element}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Insights Tab */}
-          <TabsContent value="insights" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Personality Analysis</CardTitle>
-                <CardDescription>Based on your Day Master</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-base leading-relaxed">{baziChart.personality}</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Life Aspects</CardTitle>
-                <CardDescription>Key areas influenced by your Bazi chart</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium mb-2">Career & Wealth</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Your {baziChart.dayPillar.element} day master suggests a career path that allows
-                      for creativity and personal expression. Lucky elements can guide career choices.
-                    </p>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium mb-2">Relationships</h4>
-                    <p className="text-sm text-muted-foreground">
-                      The Day Pillar's earthly branch represents your spouse palace. Understanding this
-                      helps in relationship compatibility and harmony.
-                    </p>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium mb-2">Health & Wellness</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Element imbalances can indicate areas of health to watch. Strengthening weak
-                      elements through lifestyle choices promotes wellbeing.
-                    </p>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium mb-2">Personal Growth</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Your chart reveals natural talents and areas for development. Focus on cultivating
-                      your lucky elements for optimal growth.
-                    </p>
+                    <PillarCard
+                      relationshipLabel="PARENTS"
+                      pillarLabel="Month Pillar"
+                      pillar={baziChart.monthPillar}
+                      isDayMaster={false}
+                    />
+                    <PillarCard
+                      relationshipLabel="SELF"
+                      pillarLabel="Day Pillar"
+                      pillar={baziChart.dayPillar}
+                      isDayMaster={true}
+                    />
+                    <PillarCard
+                      relationshipLabel="CHILDREN"
+                      pillarLabel="Hour Pillar"
+                      pillar={baziChart.hourPillar}
+                      isDayMaster={false}
+                    />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              ),
+            },
+            {
+              key: 'elements',
+              label: 'Elements',
+              children: (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+                      <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">Element Distribution</h3>
+                      <p className="text-sm text-bronze-muted/70 mb-4">Your Five Element Balance</p>
+                      <svg viewBox="0 0 400 400" className="w-full max-w-md mx-auto">
+                        <VictoryPie
+                          standalone={false}
+                          width={400}
+                          height={400}
+                          data={pieData}
+                          colorScale={pieData.map(d => d.fill)}
+                          labels={({ datum }) => `${datum.x}\n${datum.y}`}
+                          style={{
+                            labels: { fontSize: 16, fill: 'white' },
+                          }}
+                          innerRadius={80}
+                        />
+                      </svg>
+                    </Card>
+
+                    <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+                      <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">Element Strength</h3>
+                      <p className="text-sm text-bronze-muted/70 mb-4">Comparative View</p>
+                      <svg viewBox="0 0 450 300" className="w-full">
+                        <VictoryChart
+                          standalone={false}
+                          width={450}
+                          height={300}
+                          domainPadding={30}
+                          theme={VictoryTheme.material}
+                        >
+                          <VictoryAxis />
+                          <VictoryAxis dependentAxis />
+                          <VictoryBar
+                            data={elementData}
+                            style={{
+                              data: {
+                                fill: ({ datum }) => elementColors[datum.x as keyof typeof elementColors],
+                              },
+                            }}
+                          />
+                        </VictoryChart>
+                      </svg>
+                    </Card>
+                  </div>
+
+                  <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+                    <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">Lucky Elements</h3>
+                    <p className="text-sm text-bronze-muted/70 mb-4">Elements that can bring balance to your chart</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {baziChart.luckyElements.map((element) => (
+                        <Tag
+                          key={element}
+                          color={elementColors[element as keyof typeof elementColors]}
+                          style={{ color: 'white', fontSize: '14px', padding: '4px 12px' }}
+                        >
+                          {element}
+                        </Tag>
+                      ))}
+                    </div>
+                  </Card>
+                </div>
+              ),
+            },
+            {
+              key: 'insights',
+              label: 'Insights',
+              children: (
+                <div className="space-y-4">
+                  <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+                    <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">Personality Profile</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm text-bronze-muted/70 mb-2">Your Archetype: <strong className="text-gold-deep">{baziChart.personalityTraits.archetype}</strong></p>
+                        <p className="text-sm text-bronze-muted/70 mb-2">Element: <strong className="text-gold-deep">{baziChart.personalityTraits.element}</strong></p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-bronze-muted/70 mb-2">Key Traits:</p>
+                        <div className="flex gap-2 flex-wrap">
+                          {baziChart.personalityTraits.traits.map((trait) => (
+                            <Tag key={trait} style={{ color: '#735c00', backgroundColor: 'rgba(115, 92, 0, 0.1)' }}>
+                              {trait}
+                            </Tag>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm text-bronze-muted/70 mb-2">Strengths:</p>
+                        <ul className="list-disc list-inside text-sm text-bronze-muted">
+                          {baziChart.personalityTraits.strengths.map((strength) => (
+                            <li key={strength}>{strength}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="text-sm text-bronze-muted/70 mb-2">Areas to Note:</p>
+                        <ul className="list-disc list-inside text-sm text-bronze-muted">
+                          {baziChart.personalityTraits.challenges.map((challenge) => (
+                            <li key={challenge}>{challenge}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="text-sm text-bronze-muted/70 mb-2">Lucky Colors: <strong>{baziChart.personalityTraits.luckyColors.join(', ')}</strong></p>
+                        <p className="text-sm text-bronze-muted/70">Lucky Numbers: <strong>{baziChart.personalityTraits.luckyNumbers.join(', ')}</strong></p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+                    <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">Your Summary</h3>
+                    <p className="text-base leading-relaxed text-bronze-muted mb-4">{baziChart.personalitySummary}</p>
+                  </Card>
+
+                  <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+                    <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">Life Aspects</h3>
+                    <p className="text-sm text-bronze-muted/70 mb-4">Key areas influenced by your Bazi chart</p>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="p-4 border border-gold-deep/10 rounded-lg">
+                        <h4 className="font-medium mb-2 text-gold-deep">Career & Wealth</h4>
+                        <p className="text-sm text-bronze-muted/80">
+                          Your {baziChart.personalityTraits.element} element suggests focusing on careers that align with your natural strengths.
+                          Lucky elements provide additional guidance for prosperity.
+                        </p>
+                      </div>
+                      <div className="p-4 border border-gold-deep/10 rounded-lg">
+                        <h4 className="font-medium mb-2 text-gold-deep">Relationships</h4>
+                        <p className="text-sm text-bronze-muted/80">
+                          The Day Pillar's earthly branch represents your spouse palace. Understanding this
+                          helps in relationship compatibility and harmony.
+                        </p>
+                      </div>
+                      <div className="p-4 border border-gold-deep/10 rounded-lg">
+                        <h4 className="font-medium mb-2 text-gold-deep">Health & Wellness</h4>
+                        <p className="text-sm text-bronze-muted/80">
+                          Element imbalances can indicate areas of health to watch. Strengthening weak
+                          elements through lifestyle choices promotes wellbeing.
+                        </p>
+                      </div>
+                      <div className="p-4 border border-gold-deep/10 rounded-lg">
+                        <h4 className="font-medium mb-2 text-gold-deep">Personal Growth</h4>
+                        <p className="text-sm text-bronze-muted/80">
+                          Your chart reveals natural talents and areas for development. Focus on cultivating
+                          your lucky elements for optimal growth.
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              ),
+            },
+          ]}
+        />
       </div>
     </div>
   );

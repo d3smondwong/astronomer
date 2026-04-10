@@ -1,11 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getProfiles, type BaziProfile } from '@/lib/baziCalculator';
-import { Heart, Zap, ShieldAlert } from 'lucide-react';
+import { Card, Select, Tag } from 'antd';
+import { getProfiles, type BaziProfile } from '@/lib/baziOrchestrator';
+import { Heart, Zap } from 'lucide-react';
 import { VictoryChart, VictoryBar, VictoryTheme, VictoryAxis, VictoryGroup } from 'victory';
 
 export default function CompatibilityPage() {
@@ -27,7 +25,6 @@ export default function CompatibilityPage() {
     const elements1 = selectedProfile1.baziChart.elements;
     const elements2 = selectedProfile2.baziChart.elements;
 
-    // Calculate element harmony (simplified)
     let harmony = 0;
     let total = 0;
 
@@ -49,253 +46,147 @@ export default function CompatibilityPage() {
 
   const getCompatibilityDescription = (score: number) => {
     if (score >= 75) {
-      return 'Your charts show excellent harmony! Your elements complement each other beautifully, creating a balanced and supportive relationship.';
+      return 'Excellent compatibility! These two profiles have harmonious element distributions and complement each other well.';
     } else if (score >= 60) {
-      return 'There is good compatibility between your charts. While there are some differences, they can create growth opportunities when approached with understanding.';
+      return 'Good compatibility. The profiles show positive element interactions with some areas of natural harmony.';
     } else if (score >= 45) {
-      return 'Your charts show moderate compatibility. Success requires conscious effort to understand and respect each other\'s elemental natures.';
+      return 'Fair compatibility. There are some complementary elements, but also areas that may require understanding and compromise.';
     } else {
-      return 'Your charts present challenges in compatibility. This relationship may require extra patience and compromise, but can lead to significant personal growth.';
+      return 'Challenging compatibility. The profiles have very different element distributions and may require significant effort to harmonize.';
     }
   };
 
   const compatibility = calculateCompatibility();
 
-  const chartData = selectedProfile1?.baziChart && selectedProfile2?.baziChart
-    ? Object.keys(selectedProfile1.baziChart.elements).map((element) => ({
-        element: element.charAt(0).toUpperCase() + element.slice(1),
-        profile1: selectedProfile1.baziChart!.elements[element as keyof typeof selectedProfile1.baziChart.elements],
-        profile2: selectedProfile2.baziChart!.elements[element as keyof typeof selectedProfile2.baziChart.elements],
-      }))
-    : [];
+  const profileOptions = profiles.map(p => ({
+    label: p.name,
+    value: p.id,
+  }));
 
   return (
-    <div className="h-full overflow-auto">
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Compatibility Analysis</h1>
-          <p className="text-muted-foreground">
-            Compare two Bazi charts to understand relationship dynamics and harmony
-          </p>
-        </div>
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-semibold mb-2 font-serif text-gold-deep">Bazi Compatibility</h1>
+        <p className="font-serif italic text-bronze-muted/70">Compare the compatibility between two Bazi charts</p>
+      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Select Profiles to Compare</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">First Person</label>
-                <Select value={profile1} onValueChange={setProfile1}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a profile" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {profiles.map((p) => (
-                      <SelectItem key={p.id} value={p.id} disabled={p.id === profile2}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Second Person</label>
-                <Select value={profile2} onValueChange={setProfile2}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a profile" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {profiles.map((p) => (
-                      <SelectItem key={p.id} value={p.id} disabled={p.id === profile1}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+      <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+        <div className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium font-serif text-bronze-muted/70">First Person</label>
+              <Select
+                value={profile1 || undefined}
+                onChange={setProfile1}
+                placeholder="Select a profile"
+                options={profileOptions}
+              />
             </div>
-          </CardContent>
-        </Card>
 
-        {compatibility && (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle>Compatibility Score</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center gap-8">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium font-serif text-bronze-muted/70">Second Person</label>
+              <Select
+                value={profile2 || undefined}
+                onChange={setProfile2}
+                placeholder="Select a profile"
+                options={profileOptions.filter(p => p.value !== profile1)}
+              />
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {compatibility && selectedProfile1 && selectedProfile2 && (
+        <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+          <div className="space-y-6">
+            <div className="text-center space-y-4">
+              <div>
+                <h2 className="text-2xl font-semibold mb-2 font-serif text-gold-deep">
+                  {selectedProfile1.name} & {selectedProfile2.name}
+                </h2>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="p-4 bg-gold-deep/5 border border-gold-deep/10 rounded-lg">
+                  <div className="text-4xl font-bold text-gold-deep mb-2">{compatibility.score}%</div>
+                  <Tag color={
+                    compatibility.score >= 75 ? 'green' :
+                    compatibility.score >= 60 ? 'blue' :
+                    compatibility.score >= 45 ? 'orange' :
+                    'red'
+                  }>
+                    {compatibility.rating}
+                  </Tag>
+                </div>
+
+                <div className="p-4 bg-gold-deep/5 border border-gold-deep/10 rounded-lg">
                   <div className="text-center">
-                    <div className="text-6xl font-bold text-primary mb-2">
-                      {compatibility.score}%
-                    </div>
-                    <Badge
-                      variant={
-                        compatibility.rating === 'Excellent'
-                          ? 'default'
-                          : compatibility.rating === 'Good'
-                          ? 'secondary'
-                          : 'outline'
-                      }
-                      className="text-lg px-4 py-1"
-                    >
-                      {compatibility.rating}
-                    </Badge>
+                    <Heart className="w-8 h-8 text-gold-deep mx-auto mb-2" />
+                    <p className="font-semibold text-bronze-muted">Emotional Connection</p>
+                    <p className="text-sm text-bronze-muted/70">Based on element balance</p>
                   </div>
                 </div>
-                <p className="text-center text-muted-foreground mt-6 max-w-2xl mx-auto">
+
+                <div className="p-4 bg-gold-deep/5 border border-gold-deep/10 rounded-lg">
+                  <div className="text-center">
+                    <Zap className="w-8 h-8 text-gold-deep mx-auto mb-2" />
+                    <p className="font-semibold text-bronze-muted">Energy Alignment</p>
+                    <p className="text-sm text-bronze-muted/70">Element harmony</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <p className="text-base leading-relaxed text-gray-700">
                   {compatibility.description}
                 </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Element Comparison</CardTitle>
-                <CardDescription>
-                  Comparing the five elements between {selectedProfile1?.name} and {selectedProfile2?.name}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-center">
-                  <svg viewBox="0 0 600 400" className="w-full max-w-3xl">
-                    <VictoryChart
-                      standalone={false}
-                      width={600}
-                      height={400}
-                      domainPadding={{ x: 50 }}
-                      theme={VictoryTheme.material}
-                    >
-                      <VictoryAxis />
-                      <VictoryAxis dependentAxis />
-                      <VictoryGroup offset={20} colorScale={['#3b82f6', '#f59e0b']}>
-                        <VictoryBar
-                          data={chartData.map(d => ({ x: d.element, y: d.profile1 }))}
-                        />
-                        <VictoryBar
-                          data={chartData.map(d => ({ x: d.element, y: d.profile2 }))}
-                        />
-                      </VictoryGroup>
-                    </VictoryChart>
-                  </svg>
-                </div>
-                <div className="flex justify-center gap-6 mt-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-[#3b82f6] rounded"></div>
-                    <span className="text-sm">{selectedProfile1?.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-[#f59e0b] rounded"></div>
-                    <span className="text-sm">{selectedProfile2?.name}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="grid md:grid-cols-3 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Heart className="w-5 h-5 text-red-500" />
-                    Strengths
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 text-sm">
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500 mt-1">✓</span>
-                      <span>Shared elemental balance creates mutual understanding</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500 mt-1">✓</span>
-                      <span>Complementary energies support personal growth</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500 mt-1">✓</span>
-                      <span>Natural harmony in communication styles</span>
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Zap className="w-5 h-5 text-yellow-500" />
-                    Opportunities
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 text-sm">
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-500 mt-1">→</span>
-                      <span>Learning from each other's strengths</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-500 mt-1">→</span>
-                      <span>Balancing contrasting elements together</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-500 mt-1">→</span>
-                      <span>Growing through differences in perspective</span>
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-orange-500" />
-                    Considerations
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 text-sm">
-                    <li className="flex items-start gap-2">
-                      <span className="text-orange-500 mt-1">!</span>
-                      <span>Be mindful of element clashes during conflicts</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-orange-500 mt-1">!</span>
-                      <span>Respect different approaches to life challenges</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-orange-500 mt-1">!</span>
-                      <span>Practice patience during imbalanced periods</span>
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
+              </div>
             </div>
-          </>
-        )}
 
-        {!compatibility && profiles.length < 2 && (
-          <Card>
-            <CardContent className="py-12">
-              <p className="text-center text-muted-foreground">
-                You need at least 2 profiles to perform compatibility analysis.
-                <br />
-                Create more profiles from the home page.
-              </p>
-            </CardContent>
-          </Card>
-        )}
+            {selectedProfile1.baziChart && selectedProfile2.baziChart && (
+              <div className="border-t border-gold-deep/10 pt-6">
+                <h3 className="text-lg font-semibold mb-4 font-serif text-gold-deep">Element Comparison</h3>
+                <svg viewBox="0 0 600 400" className="w-full">
+                  <VictoryChart
+                    standalone={false}
+                    width={600}
+                    height={400}
+                    domainPadding={40}
+                    theme={VictoryTheme.material}
+                  >
+                    <VictoryAxis />
+                    <VictoryAxis dependentAxis />
+                    <VictoryGroup offset={15}>
+                      <VictoryBar
+                        data={Object.entries(selectedProfile1.baziChart.elements).map(([k, v]) => ({
+                          x: k,
+                          y: v,
+                        }))}
+                        style={{ data: { fill: '#1f77b4' } }}
+                      />
+                      <VictoryBar
+                        data={Object.entries(selectedProfile2.baziChart.elements).map(([k, v]) => ({
+                          x: k,
+                          y: v,
+                        }))}
+                        style={{ data: { fill: '#ff7f0e' } }}
+                      />
+                    </VictoryGroup>
+                  </VictoryChart>
+                </svg>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
 
-        {!compatibility && profiles.length >= 2 && (
-          <Card>
-            <CardContent className="py-12">
-              <p className="text-center text-muted-foreground">
-                Select two profiles above to see their compatibility analysis
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      {!compatibility && (profile1 || profile2) && (
+        <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+          <p className="text-center text-bronze-muted/70">
+            Please select both profiles to view compatibility analysis
+          </p>
+        </Card>
+      )}
     </div>
   );
 }

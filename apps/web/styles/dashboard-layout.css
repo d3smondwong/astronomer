@@ -1,0 +1,85 @@
+/* Dashboard responsive layout using CSS media queries */
+
+/* Default: Expanded sidebar (12%) */
+.dashboard-sider {
+  width: 12% !important;
+}
+
+.dashboard-content {
+  margin-left: 12%;
+}
+
+
+.sidebar-section-label,
+.sidebar-nav-label,
+.sidebar-profile-name {
+  display: inline;
+}
+
+.sidebar-divider {
+  display: block;
+}
+
+.sidebar-nav-item {
+  justify-content: flex-start !important;
+  padding: 8px 12px !important;
+}
+
+.sidebar-user-profile {
+  flex-direction: row;
+  gap: 10px;
+}
+
+.sidebar-user-profile > div:nth-child(2),
+.sidebar-login-btn {
+  display: block;
+}
+
+/* Collapsed: Small screens (< 1024px) - 85px sidebar - handled by JavaScript */
+@media (max-width: 1023px) {
+
+  /* Hide section labels */
+  .sidebar-section-label {
+    display: none;
+  }
+
+  /* Hide divider */
+  .sidebar-divider {
+    display: none;
+  }
+
+  /* Center nav items and hide text */
+  .sidebar-nav-item {
+    justify-content: center !important;
+    padding: 8px 0 !important;
+  }
+
+  .sidebar-nav-label {
+    display: none;
+  }
+
+  /* Show first 3 letters for profile names */
+  .sidebar-profile-name::before {
+    content: attr(data-short);
+  }
+
+  .sidebar-profile-name {
+    font-size: 0;
+  }
+
+  /* Stack user profile vertically and center */
+  .sidebar-user-profile {
+    flex-direction: column;
+    gap: 0;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .sidebar-user-profile > div:nth-child(2) {
+    display: none;
+  }
+
+  .sidebar-login-btn {
+    display: none;
+  }
+}

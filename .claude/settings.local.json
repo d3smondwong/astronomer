@@ -12,7 +12,8 @@
       "Read(//c/ProgramData/Anaconda3/**)",
       "Bash(conda env:*)",
       "Bash(conda run:*)",
-      "Bash(\"C:\\\\Users\\\\d3smo\\\\anaconda3\\\\envs\\\\astronomer\\\\python.exe\" -m src.astronomer_calculations.cycle_interactions)"
+      "Bash(\"C:\\\\Users\\\\d3smo\\\\anaconda3\\\\envs\\\\astronomer\\\\python.exe\" -m src.astronomer_calculations.cycle_interactions)",
+      "Bash(npm run:*)"
     ]
   }
 }

@@ -1,12 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card, Input, Button, Avatar as AntAvatar, Spin } from 'antd';
 import { Send, Bot, User as UserIcon } from 'lucide-react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 interface Message {
   id: string;
@@ -26,12 +22,10 @@ export default function AIOraclePage() {
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSend = async () => {
@@ -48,166 +42,121 @@ export default function AIOraclePage() {
     setInput('');
     setIsTyping(true);
 
-    // Simulate AI response (in a real app, this would call an API)
-    setTimeout(() => {
-      const response = generateOracleResponse(input);
+    try {
+      const response = await fetch('/api/oracle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: input }),
+      });
+
+      const data = await response.json();
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: response,
+        content: data.response || "I apologize, but I'm unable to provide guidance at this moment. Please try again.",
         timestamp: new Date(),
       };
+
       setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I apologize, but I encountered an error. Please try again later.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
-  };
-
-  const generateOracleResponse = (question: string): string => {
-    const lowerQuestion = question.toLowerCase();
-
-    // Simple pattern matching for demonstration
-    if (lowerQuestion.includes('career') || lowerQuestion.includes('job') || lowerQuestion.includes('work')) {
-      return "In matters of career, the ancient wisdom teaches us that success comes from aligning with our elemental nature. Your strongest element should guide your professional path. Metal types excel in structured environments, Water types in creative fields, Wood types in growth-oriented roles, Fire types in leadership, and Earth types in nurturing professions. Consider what brings you both challenge and joy.";
-    } else if (lowerQuestion.includes('relationship') || lowerQuestion.includes('love') || lowerQuestion.includes('partner')) {
-      return "Relationships flourish when there is elemental harmony. The Day Pillar reveals your approach to partnerships. Those with strong Fire energy bring passion, Water brings depth, Earth brings stability, Metal brings loyalty, and Wood brings flexibility. Understanding both your nature and your partner's elements is key to lasting harmony.";
-    } else if (lowerQuestion.includes('wealth') || lowerQuestion.includes('money') || lowerQuestion.includes('fortune')) {
-      return "Wealth flows along the channels of your favorable elements. When you engage in activities that strengthen your lucky elements, prosperity naturally follows. The ancient masters taught that wealth is not forced but cultivated, like a garden that needs the right conditions to flourish. Align your endeavors with your chart's guidance.";
-    } else if (lowerQuestion.includes('health') || lowerQuestion.includes('wellness')) {
-      return "Health in Bazi philosophy is about elemental balance. When one element is too strong or too weak, disharmony manifests in the physical body. Pay attention to the elements that are imbalanced in your chart. Strengthen weak elements through colors, directions, foods, and activities associated with those elements.";
-    } else if (lowerQuestion.includes('lucky') || lowerQuestion.includes('favorable')) {
-      return "Your lucky elements are the keys to enhancing your fortune. Incorporate these elements into your daily life through colors, directions, materials, and career choices. The more you align with your favorable elements, the more opportunities and positive energy will flow to you naturally.";
-    } else {
-      return "The universe speaks in cycles and patterns. Your question touches upon the eternal dance of yin and yang, the interplay of the five elements. Remember that destiny is not fixed but rather a path illuminated by choices. Your Bazi chart reveals tendencies and potential, but your will shapes the outcome. Seek balance in all things, and harmony will follow.";
     }
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="border-b px-6 py-4 bg-card">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Bot className="w-6 h-6 text-primary" />
-          AI Oracle Chat
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Seek wisdom from the ancient art of Bazi fortune telling
-        </p>
+    <div className="h-full flex flex-col p-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-semibold mb-2 font-serif text-gold-deep">AI Oracle Chat</h1>
+        <p className="font-serif italic text-bronze-muted/70">Ask the oracle for guidance on your Bazi chart and life path</p>
       </div>
 
-      <ScrollArea className="flex-1 p-6" ref={scrollRef}>
-        <div className="max-w-3xl mx-auto space-y-6">
+      <Card className="flex-1 flex flex-col bg-surface-lowest border border-gold-deep/10" style={{ background: '#faf8f3' }}>
+        <div
+          className="flex-1 overflow-auto space-y-4 p-4 mb-4"
+          ref={messagesEndRef}
+        >
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex gap-4 ${
-                message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-              }`}
+              className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <Avatar className={message.role === 'user' ? 'bg-primary' : 'bg-secondary'}>
-                <AvatarFallback>
-                  {message.role === 'user' ? (
-                    <UserIcon className="w-5 h-5" />
-                  ) : (
-                    <Bot className="w-5 h-5" />
-                  )}
-                </AvatarFallback>
-              </Avatar>
+              {message.role === 'assistant' && (
+                <div className="flex-shrink-0">
+                  <AntAvatar
+                    size={32}
+                    icon={<Bot className="w-4 h-4" />}
+                    style={{ backgroundColor: '#735c00' }}
+                  />
+                </div>
+              )}
 
-              <Card className={`flex-1 ${message.role === 'user' ? 'bg-primary text-primary-foreground' : ''}`}>
-                <CardContent className="p-4">
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {message.content}
-                  </p>
-                  <p className={`text-xs mt-2 ${
-                    message.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                  }`}>
-                    {message.timestamp.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
-                </CardContent>
-              </Card>
+              <div
+                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                  message.role === 'user'
+                    ? 'gold-gradient text-white'
+                    : 'bg-gold-deep/5 border border-gold-deep/10 text-bronze-muted'
+                }`}
+              >
+                <p className="text-sm leading-relaxed">{message.content}</p>
+              </div>
+
+              {message.role === 'user' && (
+                <div className="flex-shrink-0">
+                  <AntAvatar
+                    size={32}
+                    icon={<UserIcon className="w-4 h-4" />}
+                    style={{ backgroundColor: '#735c00' }}
+                  />
+                </div>
+              )}
             </div>
           ))}
 
           {isTyping && (
-            <div className="flex gap-4">
-              <Avatar className="bg-secondary">
-                <AvatarFallback>
-                  <Bot className="w-5 h-5" />
-                </AvatarFallback>
-              </Avatar>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></span>
-                    <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                    <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="flex gap-3 justify-start">
+              <div className="flex-shrink-0">
+                <AntAvatar
+                  size={32}
+                  icon={<Bot className="w-4 h-4" />}
+                  style={{ backgroundColor: '#735c00' }}
+                />
+              </div>
+              <div className="bg-gold-deep/5 border border-gold-deep/10 px-4 py-2 rounded-lg">
+                <Spin size="small" />
+              </div>
             </div>
           )}
         </div>
-      </ScrollArea>
 
-      <div className="border-t p-4 bg-card">
-        <div className="max-w-3xl mx-auto flex gap-2">
+        <div className="border-t border-gold-deep/10 pt-4 flex gap-2">
           <Input
-            placeholder="Ask the oracle..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            onPressEnter={handleSend}
+            placeholder="Ask the oracle..."
             disabled={isTyping}
+            size="large"
+            className="bazi-input"
           />
-          <Button onClick={handleSend} disabled={isTyping || !input.trim()}>
-            <Send className="w-4 h-4" />
-          </Button>
+          <Button
+            icon={<Send className="w-4 h-4" />}
+            onClick={handleSend}
+            loading={isTyping}
+            size="large"
+            className="gold-gradient"
+            style={{ color: 'white', border: 'none' }}
+          />
         </div>
-      </div>
-
-      {/* Sample Questions */}
-      {messages.length === 1 && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl px-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-center">Try asking...</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button
-                  variant="outline"
-                  className="justify-start text-left h-auto py-3"
-                  onClick={() => setInput("What career path suits my element?")}
-                >
-                  What career path suits my element?
-                </Button>
-                <Button
-                  variant="outline"
-                  className="justify-start text-left h-auto py-3"
-                  onClick={() => setInput("How can I improve my luck?")}
-                >
-                  How can I improve my luck?
-                </Button>
-                <Button
-                  variant="outline"
-                  className="justify-start text-left h-auto py-3"
-                  onClick={() => setInput("What should I know about relationships?")}
-                >
-                  What should I know about relationships?
-                </Button>
-                <Button
-                  variant="outline"
-                  className="justify-start text-left h-auto py-3"
-                  onClick={() => setInput("Tell me about wealth and prosperity")}
-                >
-                  Tell me about wealth and prosperity
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      </Card>
     </div>
   );
 }

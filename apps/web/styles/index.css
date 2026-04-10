@@ -1,4 +1,9 @@
-@import './fonts.css';
-@import './tailwind.css';
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
+@import "tailwindcss";
 @import './theme.css';
+@import './base.css';
+@import './landing.css';
+@import './dashboard-theme.css';
+@import './dashboard-layout.css';
 @import 'react-day-picker/dist/style.css';

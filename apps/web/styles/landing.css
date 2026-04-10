@@ -1,0 +1,30 @@
+/* Landing page and global utilities */
+.glass-panel {
+  background: rgba(251, 249, 244, 0.8);
+  backdrop-filter: blur(12px);
+}
+
+.gold-gradient {
+  background: linear-gradient(135deg, #735c00 0%, #d4af37 100%);
+}
+
+.bazi-input {
+  border: none !important;
+  border-bottom: 1px solid var(--color-outline-variant) !important;
+  background: #f0eee9 !important;
+  transition: border-color 0.3s ease !important;
+  box-shadow: none !important;
+}
+
+.bazi-input:focus {
+  outline: none !important;
+  border-bottom: 1px solid var(--color-gold-deep) !important;
+}
+
+.feature-card {
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+}

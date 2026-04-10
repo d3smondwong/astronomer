@@ -1,3 +1,21 @@
+/* Celestial Dawn Theme */
+@theme {
+  --font-serif: "Noto Serif", serif;
+  --color-parchment: #fbf9f4;
+  --color-gold-deep: #735c00;
+  --color-gold-light: #d4af37;
+  --color-bronze-muted: #4d4635;
+  --color-surface-container: #f0eee9;
+  --color-surface-low: #f5f3ee;
+  --color-surface-lowest: #ffffff;
+  --color-outline-variant: rgba(127, 118, 99, 0.15);
+
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.5rem;
+  --radius-full: 0.75rem;
+}
+
+/* Legacy color system (for dashboard) */
 @custom-variant dark (&:is(.dark *));
 
 :root {
