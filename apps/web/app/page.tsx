@@ -4,8 +4,8 @@ import React from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
-import Header from './components/Header';
-import Footer from './components/Footer';
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 import {
   Form,
   Input,
@@ -20,7 +20,6 @@ import {
   Stars,
   Calendar,
   Clock,
-  MapPin,
   Info,
   Trees
 } from 'lucide-react';
@@ -29,6 +28,7 @@ import TempleBuddhistIcon from '@mui/icons-material/TempleBuddhist';
 import TimelineOutlinedIcon from '@mui/icons-material/TimelineOutlined';
 import { saveProfile, calculateBazi, type BaziProfile } from '@/lib/baziOrchestrator';
 import { toast } from 'sonner';
+import PlacesAutocompleteInput from '@/components/PlacesAutocompleteInput';
 
 
 const Hero = () => (
@@ -86,6 +86,14 @@ const BaziForm = () => {
       latitude: '1.3253',
       longitude: '103.808053',
       solarCorrection: true,
+    });
+  };
+
+  const onPlaceSelect = (lat: number, lng: number, address: string) => {
+    form.setFieldsValue({
+      location: address,
+      latitude: String(lat),
+      longitude: String(lng),
     });
   };
 
@@ -207,48 +215,18 @@ const BaziForm = () => {
             name="location"
             rules={[{ required: true, message: 'Please enter your birth location' }]}
           >
-            <Input placeholder="City, Country" className="bazi-input h-10" suffix={<MapPin className="w-4 h-4 text-bronze-muted/40" />} />
+            <PlacesAutocompleteInput
+              placeholder="City, Country"
+              className="bazi-input h-10"
+              onPlaceSelect={onPlaceSelect}
+              onClear={() => {
+                form.setFieldsValue({ latitude: '', longitude: '' });
+              }}
+            />
           </Form.Item>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Form.Item
-              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Latitude</span>}
-              name="latitude"
-              rules={[
-                { required: true, message: 'Required' },
-                {
-                  pattern: /^-?([0-8]?[0-9]|90)(\.[0-9]{1,6})?$/,
-                  message: 'Valid latitude -90 to 90'
-                }
-              ]}
-            >
-              <Input
-                placeholder="e.g., 1.3253"
-                type="number"
-                step="0.0001"
-                className="bazi-input h-10"
-              />
-            </Form.Item>
-
-            <Form.Item
-              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Longitude</span>}
-              name="longitude"
-              rules={[
-                { required: true, message: 'Required' },
-                {
-                  pattern: /^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]{1,6})?$/,
-                  message: 'Valid longitude -180 to 180'
-                }
-              ]}
-            >
-              <Input
-                placeholder="e.g., 103.8415"
-                type="number"
-                step="0.0001"
-                className="bazi-input h-10"
-              />
-            </Form.Item>
-          </div>
+          <Form.Item name="latitude" hidden><Input /></Form.Item>
+          <Form.Item name="longitude" hidden><Input /></Form.Item>
 
           <Button
             type="primary"

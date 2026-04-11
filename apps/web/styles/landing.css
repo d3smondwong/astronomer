@@ -28,3 +28,8 @@
 .feature-card:hover {
   transform: translateY(-4px);
 }
+
+/* Ensure Google Places autocomplete dropdown renders above form elements */
+.pac-container {
+  z-index: 9999;
+}
