@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getProfile, getProfiles, deleteProfile, type BaziProfile } from '@/lib/baziOrchestrator';
+import { type LifeStageInfo } from '@/lib/twelveLifeStages';
+import { type NaYinInfo } from '@/lib/naYin';
+import { type VoidInfo } from '@/lib/void';
 import { Card, Tag, Tabs, Button, Popconfirm } from 'antd';
 import { format } from 'date-fns';
 import { Calendar, Clock, MapPin, User, Trash2 } from 'lucide-react';
@@ -106,19 +109,30 @@ export default function ProfilePage() {
     pillarLabel,
     pillar,
     isDayMaster = false,
+    lifeStages,
+    naYin,
+    xunKong,
+    showVoidSection = true,
+    voidCheckPair,
   }: {
     relationshipLabel: string;
     pillarLabel: string;
     pillar: any;
     isDayMaster?: boolean;
+    lifeStages?: { xingYun: LifeStageInfo | null; ziZuo: LifeStageInfo | null } | null;
+    naYin?: NaYinInfo | null;
+    xunKong?: VoidInfo | null;
+    showVoidSection?: boolean;
+    voidCheckPair?: VoidInfo | null;  // Day Pillar's void pair, used to check this pillar's earthly branch
   }) => {
     const heavenlyChar = pillar.heavenlyStem;
     const earthlyChar = pillar.earthlyBranch;
     const heavenlyName = GAN_LABELS[heavenlyChar] || heavenlyChar;
     const earthlyName = ZHI_LABELS[earthlyChar] || earthlyChar;
+    const isVoid = voidCheckPair != null && voidCheckPair.chinese.includes(earthlyChar);
 
     const hiddenStemPairs = [
-      { stem: pillar.mainQi, tenGod: pillar.mainQiTenGod },
+      { stem: pillar.primaryQi, tenGod: pillar.primaryQiTenGod },
       { stem: pillar.middleQi, tenGod: pillar.middleQiTenGod },
       { stem: pillar.residualQi, tenGod: pillar.residualQiTenGod },
     ].filter((pair) => pair.stem != null) as { stem: string; tenGod: string | null }[];
@@ -190,7 +204,7 @@ export default function ProfilePage() {
         </div>
 
         {/* HEAVENLY STEM Section */}
-        <div style={{ width: '100%', marginBottom: '16px' }}>
+        <div style={{ width: '100%' }}>
           <label
             style={{
               fontSize: '10px',
@@ -274,12 +288,12 @@ export default function ProfilePage() {
             width: '80%',
             height: '1px',
             background: 'rgba(115, 92, 0, 0.12)',
-            margin: '6px 0',
+            margin: '16px 0',
           }}
         />
 
         {/* EARTHLY BRANCH Section */}
-        <div style={{ width: '100%', marginBottom: '12px', marginTop: '12px' }}>
+        <div style={{ width: '100%' }}>
           <label
             style={{
               fontSize: '10px',
@@ -318,6 +332,24 @@ export default function ProfilePage() {
           >
             {earthlyName}
           </p>
+          <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '8px' }}>
+            <div
+              style={{
+                borderLeft: `3px solid ${isVoid ? '#8C2F2F' : 'transparent'}`,
+                background: isVoid ? 'rgba(140, 47, 47, 0.08)' : 'transparent',
+                padding: '4px 12px',
+                width: '60%',
+                boxSizing: 'border-box',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <span style={{ fontSize: '11px', color: '#8C2F2F', fontFamily: 'Noto Serif, serif', fontStyle: 'italic', visibility: isVoid ? 'visible' : 'hidden' }}>
+                Void
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Divider */}
@@ -326,12 +358,12 @@ export default function ProfilePage() {
             width: '80%',
             height: '1px',
             background: 'rgba(115, 92, 0, 0.12)',
-            margin: '6px 0',
+            margin: '16px 0',
           }}
         />
 
         {/* HIDDEN STEMS Section */}
-        <div style={{ width: '100%', marginTop: '6px' }}>
+        <div style={{ width: '100%' }}>
           <label
             style={{
               fontSize: '10px',
@@ -355,8 +387,23 @@ export default function ProfilePage() {
                 flexWrap: 'wrap',
               }}
             >
-              {hiddenStemPairs.map(({ stem, tenGod }, idx: number) => (
+              {hiddenStemPairs.map(({ stem, tenGod }, idx: number) => {
+                const QI_LABELS = ['Primary Qi', 'Middle Qi', 'Residual Qi'];
+                return (
                 <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <span
+                    style={{
+                      fontSize: '9px',
+                      fontWeight: '600',
+                      color: 'rgba(115, 92, 0, 0.4)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      fontFamily: 'Noto Serif, serif',
+                      marginBottom: '6px',
+                    }}
+                  >
+                    {QI_LABELS[idx]}
+                  </span>
                   <div
                     style={{
                       fontSize: '36px',
@@ -414,12 +461,260 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p style={{ fontSize: '12px', color: '#4d4635', opacity: 0.45, margin: 0 }}>
               None
             </p>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div
+          style={{
+            width: '80%',
+            height: '1px',
+            background: 'rgba(115, 92, 0, 0.12)',
+            margin: '16px 0',
+          }}
+        />
+
+        {/* VOID BRANCH PAIRS Section */}
+        <div style={{ width: '100%' }}>
+          <label
+            style={{
+              fontSize: '10px',
+              fontWeight: '600',
+              color: 'rgba(115, 92, 0, 0.45)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              fontFamily: 'Noto Serif, serif',
+              display: 'block',
+              marginBottom: '8px',
+            }}
+          >
+            Void Branch Pairs
+          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', margin: '12px 0' }}>
+            {xunKong && showVoidSection ? (
+              <>
+                <div
+                  style={{
+                    height: '56px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '56px',
+                    fontWeight: '700',
+                    color: '#4d4635',
+                    opacity: 1.0,
+                    lineHeight: 1,
+                    fontFamily: 'Ma Shan Zheng, serif',
+                    marginBottom: '12px',
+                  }}
+                >
+                  {xunKong.chinese}
+                </div>
+                <p
+                  style={{
+                    fontSize: '13px',
+                    color: '#4d4635',
+                    opacity: 0.75,
+                    margin: 0,
+                    fontStyle: 'italic',
+                  }}
+                >
+                  {xunKong.english}
+                </p>
+              </>
+            ) : (
+              <>
+                <div
+                  style={{
+                    height: '56px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '20px',
+                    fontWeight: '700',
+                    color: '#4d4635',
+                    opacity: 0.45,
+                    marginBottom: '12px',
+                  }}
+                >
+                  —
+                </div>
+                <p style={{ fontSize: '13px', margin: 0, visibility: 'hidden' }}>–</p>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div
+          style={{
+            width: '80%',
+            height: '1px',
+            background: 'rgba(115, 92, 0, 0.12)',
+            margin: '16px 0',
+          }}
+        />
+
+        {/* 12 LIFE STAGES Section */}
+        <div style={{ width: '100%' }}>
+          <label
+            style={{
+              fontSize: '10px',
+              fontWeight: '600',
+              color: 'rgba(115, 92, 0, 0.45)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              fontFamily: 'Noto Serif, serif',
+              display: 'block',
+              marginBottom: '8px',
+            }}
+          >
+            12 Life Stages
+          </label>
+
+          <div style={{ display: 'flex', gap: '12px' }}>
+            {/* Day Master reference */}
+            <div style={{ flex: 1 }}>
+              <span
+                style={{
+                  fontSize: '9px',
+                  fontWeight: '600',
+                  color: 'rgba(115, 92, 0, 0.35)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  fontFamily: 'Noto Serif, serif',
+                }}
+              >
+                Day Master
+              </span>
+              {lifeStages?.xingYun ? (
+                <>
+                  <div
+                    style={{
+                      fontSize: '56px',
+                      fontWeight: '700',
+                      color: '#4d4635',
+                      margin: '6px 0 4px 0',
+                      lineHeight: 1,
+                      fontFamily: 'Ma Shan Zheng, serif',
+                    }}
+                  >
+                    {lifeStages.xingYun.chinese}
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#4d4635', opacity: 0.75, margin: 0, fontStyle: 'italic' }}>
+                    {lifeStages.xingYun.english}
+                  </p>
+                </>
+              ) : (
+                <p style={{ fontSize: '20px', fontWeight: '700', color: '#4d4635', opacity: 0.45, margin: '6px 0 0 0' }}>—</p>
+              )}
+            </div>
+
+            {/* Pillar's Heavenly Stem reference */}
+            <div style={{ flex: 1 }}>
+              <span
+                style={{
+                  fontSize: '9px',
+                  fontWeight: '600',
+                  color: 'rgba(115, 92, 0, 0.35)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  fontFamily: 'Noto Serif, serif',
+                }}
+              >
+                Pillar's Stem
+              </span>
+              {lifeStages?.ziZuo ? (
+                <>
+                  <div
+                    style={{
+                      fontSize: '56px',
+                      fontWeight: '700',
+                      color: '#4d4635',
+                      margin: '6px 0 4px 0',
+                      lineHeight: 1,
+                      fontFamily: 'Ma Shan Zheng, serif',
+                    }}
+                  >
+                    {lifeStages.ziZuo.chinese}
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#4d4635', opacity: 0.75, margin: 0, fontStyle: 'italic' }}>
+                    {lifeStages.ziZuo.english}
+                  </p>
+                </>
+              ) : (
+                <p style={{ fontSize: '20px', fontWeight: '700', color: '#4d4635', opacity: 0.45, margin: '6px 0 0 0' }}>—</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div
+          style={{
+            width: '80%',
+            height: '1px',
+            background: 'rgba(115, 92, 0, 0.12)',
+            margin: '16px 0',
+          }}
+        />
+
+        {/* NAYIN Section */}
+        <div style={{ width: '100%' }}>
+          <label
+            style={{
+              fontSize: '10px',
+              fontWeight: '600',
+              color: 'rgba(115, 92, 0, 0.45)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              fontFamily: 'Noto Serif, serif',
+              display: 'block',
+              marginBottom: '8px',
+            }}
+          >
+            NaYin
+          </label>
+          {naYin ? (
+            <>
+              <div
+                style={{
+                  fontSize: '56px',
+                  fontWeight: '700',
+                  color: '#4d4635',
+                  opacity: 1.0,
+                  margin: '12px 0 12px 0',
+                  lineHeight: 1,
+                  fontFamily: 'Ma Shan Zheng, serif',
+                }}
+              >
+                {naYin.chinese}
+              </div>
+              <p
+                style={{
+                  fontSize: '13px',
+                  color: '#4d4635',
+                  opacity: 0.75,
+                  margin: 0,
+                  fontStyle: 'italic',
+                }}
+              >
+                {naYin.english}
+              </p>
+            </>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100px', width: '100%' }}>
+              <p style={{ fontSize: '20px', fontWeight: '700', color: '#4d4635', opacity: 0.45, margin: 0 }}>
+                —
+              </p>
+            </div>
           )}
         </div>
       </div>
@@ -491,24 +786,41 @@ export default function ProfilePage() {
                       pillarLabel="Year Pillar"
                       pillar={baziChart.yearPillar}
                       isDayMaster={false}
+                      lifeStages={baziChart.lifeStages?.year}
+                      naYin={baziChart.naYin?.year}
+                      xunKong={baziChart.xunKong?.year}
+                      voidCheckPair={baziChart.xunKong?.day}
                     />
                     <PillarCard
                       relationshipLabel="PARENTS"
                       pillarLabel="Month Pillar"
                       pillar={baziChart.monthPillar}
                       isDayMaster={false}
+                      lifeStages={baziChart.lifeStages?.month}
+                      naYin={baziChart.naYin?.month}
+                      xunKong={baziChart.xunKong?.month}
+                      showVoidSection={false}
+                      voidCheckPair={baziChart.xunKong?.day}
                     />
                     <PillarCard
                       relationshipLabel="SELF"
                       pillarLabel="Day Pillar"
                       pillar={baziChart.dayPillar}
                       isDayMaster={true}
+                      lifeStages={baziChart.lifeStages?.day}
+                      naYin={baziChart.naYin?.day}
+                      xunKong={baziChart.xunKong?.day}
                     />
                     <PillarCard
                       relationshipLabel="CHILDREN"
                       pillarLabel="Hour Pillar"
                       pillar={baziChart.hourPillar}
                       isDayMaster={false}
+                      lifeStages={baziChart.lifeStages?.hour}
+                      naYin={baziChart.naYin?.hour}
+                      xunKong={baziChart.xunKong?.hour}
+                      showVoidSection={false}
+                      voidCheckPair={baziChart.xunKong?.day}
                     />
                   </div>
                 </div>
