@@ -6,11 +6,34 @@ import dayjs from 'dayjs';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button, Divider, Layout, Popconfirm, Modal, Form, Input, DatePicker, TimePicker, Radio, Switch, Tooltip } from 'antd';
-import { Plus, Users, MessageSquare, User, Trash2, Calendar, Clock, MapPin, Info } from 'lucide-react';
+import { Plus, Users, MessageSquare, User, Trash2, Calendar, Clock, Info } from 'lucide-react';
+import PlacesAutocompleteInput from '@/components/PlacesAutocompleteInput';
 import { getProfiles, deleteProfile, saveProfile, calculateBazi, type BaziProfile } from '@/lib/baziOrchestrator';
 import { toast } from 'sonner';
 
 const { Sider, Content } = Layout;
+
+const TimePickerWithSolar = ({ value, onChange }: { value?: any; onChange?: (val: any) => void }) => (
+  <div>
+    <TimePicker
+      value={value}
+      onChange={onChange}
+      className="w-full bazi-input h-10"
+      format="HH:mm"
+      showNow={false}
+      suffixIcon={<Clock className="w-4 h-4 text-bronze-muted/40" />}
+    />
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+      <Form.Item name="solarCorrection" valuePropName="checked" noStyle initialValue={true}>
+        <Switch size="small" />
+      </Form.Item>
+      <span style={{ fontSize: '10px', color: '#4d4635' }}>Solar Time</span>
+      <Tooltip title="Calculates exact solar noon for precision.">
+        <Info className="w-3 h-3 text-bronze-muted/40 cursor-help" />
+      </Tooltip>
+    </div>
+  </div>
+);
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -40,6 +63,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const loadProfiles = () => {
     const loadedProfiles = getProfiles();
     setProfiles(loadedProfiles);
+  };
+
+  const onPlaceSelect = (lat: number, lng: number, address: string) => {
+    form.setFieldsValue({ location: address, latitude: String(lat), longitude: String(lng) });
   };
 
   const handleAddProfile = () => {
@@ -370,30 +397,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               <DatePicker className="w-full bazi-input h-10" suffixIcon={<Calendar className="w-4 h-4 text-bronze-muted/40" />} />
             </Form.Item>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <Form.Item
-                label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Time of Birth</span>}
-                name="time"
-                rules={[{ required: true, message: 'Please select your birth time' }]}
-              >
-                <TimePicker className="w-full bazi-input h-10" format="HH:mm" suffixIcon={<Clock className="w-4 h-4 text-bronze-muted/40" />} />
-              </Form.Item>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '-16px' }}>
-                <Form.Item name="solarCorrection" valuePropName="checked" noStyle initialValue={true}>
-                  <Switch size="small" />
-                </Form.Item>
-                <span style={{ fontSize: '10px', color: '#4d4635' }}>Solar Time</span>
-                <Tooltip title="Calculates exact solar noon for precision.">
-                  <Info className="w-3 h-3 text-bronze-muted/40 cursor-help" />
-                </Tooltip>
-              </div>
-            </div>
+            <Form.Item
+              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Time of Birth</span>}
+              name="time"
+              rules={[{ required: true, message: 'Please select your birth time' }]}
+            >
+              <TimePickerWithSolar />
+            </Form.Item>
           </div>
 
           <Form.Item
             label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Gender</span>}
             name="gender"
             rules={[{ required: true, message: 'Please select your gender' }]}
+            style={{ marginTop: '-12px' }}
           >
             <Radio.Group style={{ display: 'flex', gap: '24px' }}>
               <Radio value="female"><span style={{ fontSize: '12px' }}>Female</span></Radio>
@@ -406,7 +423,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             name="location"
             rules={[{ required: true, message: 'Please enter your birth location' }]}
           >
-            <Input placeholder="City, Country" className="bazi-input h-10" suffix={<MapPin className="w-4 h-4 text-bronze-muted/40" />} />
+            <PlacesAutocompleteInput
+                placeholder="Hospital, Country"
+                className="bazi-input h-10"
+                onPlaceSelect={onPlaceSelect}
+                onClear={() => {
+                  form.setFieldsValue({ latitude: '', longitude: '' });
+                }}
+              />
           </Form.Item>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
