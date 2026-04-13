@@ -1,10 +1,8 @@
 /// <reference types="google.maps" />
 'use client';
 
-import React, { useEffect, useRef } from 'react';
-import { Input } from 'antd';
+import { FC, useEffect, useRef } from 'react';
 import { initGoogleMapsAPI } from '@/lib/google-loader';
-import { MapPin } from 'lucide-react';
 
 interface PlacesAutocompleteInputProps {
   value?: string;
@@ -16,15 +14,12 @@ interface PlacesAutocompleteInputProps {
   disabled?: boolean;
 }
 
-// Define fields outside to keep the reference stable
-const AUTOCOMPLETE_FIELDS = ['geometry', 'formatted_address', 'name'];
-
-const PlacesAutocompleteInput: React.FC<PlacesAutocompleteInputProps> = ({
+const PlacesAutocompleteInput: FC<PlacesAutocompleteInputProps> = ({
   value,
   onChange,
   onPlaceSelect,
   onClear,
-  placeholder,
+  placeholder = 'City, Country',
   className,
   disabled,
 }) => {
@@ -32,95 +27,86 @@ const PlacesAutocompleteInput: React.FC<PlacesAutocompleteInputProps> = ({
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   useEffect(() => {
-    // 1. Guard: Don't re-init if we already have an instance
-    if (autocompleteRef.current) return;
+    let isMounted = true;
 
-    const initAutocomplete = async () => {
+    if (autocompleteRef.current || !inputRef.current) return;
+
+    const init = async () => {
       try {
-        // Initialize Google Maps API globally (first call sets options, subsequent calls are no-ops)
         if (!initGoogleMapsAPI()) return;
-
-        // Import the Places library
         await google.maps.importLibrary('places');
 
-        if (!inputRef.current) return;
+        if (!isMounted || !inputRef.current) return;
 
-        // 2. The Widget handles the "Session Token" automatically
-        const instance = new google.maps.places.Autocomplete(inputRef.current, {
-          fields: AUTOCOMPLETE_FIELDS,
-          types: [],
-          locationBias: {
-            north: 20.0,   // Northern Thailand/Vietnam
-            south: -11.0,  // Southern Indonesia
-            east: 141.0,   // Indonesia/Papua border
-            west: 95.0,    // Western tip of Sumatra/Thailand
-          },
-        } as any);
+        const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
+          fields: ['geometry', 'formatted_address', 'name'],
+          bounds: new google.maps.LatLngBounds(
+            { lat: -11.0, lng: 95.0 },  // SW: Southern Indonesia / Western Sumatra
+            { lat: 20.0,  lng: 141.0 }, // NE: Northern Thailand / Indonesia-Papua border
+          ),
+          strictBounds: false,
+        });
 
-        instance.addListener('place_changed', () => {
-          const place = instance.getPlace();
+        autocompleteRef.current = autocomplete;
+
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace();
           if (!place.geometry?.location) return;
 
           const lat = place.geometry.location.lat();
           const lng = place.geometry.location.lng();
-          const address = place.formatted_address || place.name || '';
+          const address = place.formatted_address ?? place.name ?? '';
 
           onPlaceSelect(lat, lng, address);
           onChange?.(address);
+
+          // Reflect the chosen address back into the input
+          if (inputRef.current) inputRef.current.value = address;
         });
 
-        autocompleteRef.current = instance;
       } catch (err) {
-        console.error('Google Autocomplete Error:', err);
+        console.error('Autocomplete init error:', err);
       }
     };
 
-    initAutocomplete();
+    init();
 
-    // 3. Cleanup: Remove listeners and orphaned Google dropdown container
     return () => {
+      isMounted = false;
       if (autocompleteRef.current) {
         google.maps.event.clearInstanceListeners(autocompleteRef.current);
+        autocompleteRef.current = null;
       }
-      // Remove the Google Places dropdown container from the DOM if it's orphaned
-      const pacContainers = document.querySelectorAll('.pac-container');
-      pacContainers.forEach(container => container.remove());
     };
-  }, []); // Empty dependency array ensures this runs ONCE
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    onChange?.(newValue);
-    if (!newValue && onClear) {
-      onClear();
+  // Sync placeholder and disabled dynamically
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.placeholder = placeholder;
+      inputRef.current.disabled = !!disabled;
     }
-  };
+  }, [placeholder, disabled]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Prevent Enter key from submitting the form if Google dropdown is open
-    if (e.key === 'Enter') {
-      const pacContainer = document.querySelector('.pac-container');
-      if (pacContainer && window.getComputedStyle(pacContainer).display !== 'none') {
-        e.preventDefault();
-      }
+  // Sync controlled value from outside (e.g. Form reset / pre-fill)
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.value = value ?? '';
     }
-  };
+  }, [value]);
 
   return (
-    <Input
-      ref={(antInputRef) => {
-        // Ant Design wraps the DOM input; access it via the nativeElement or input property
-        const el = (antInputRef as any)?.input ?? (antInputRef as any)?.nativeElement;
-        inputRef.current = el ?? null;
-      }}
-      value={value}
-      onChange={handleChange}
-      onKeyDown={handleKeyDown}
+    <input
+      ref={inputRef}
+      type="text"
+      defaultValue={value ?? ''}
       placeholder={placeholder}
-      className={className}
-      disabled={disabled}
-      suffix={<MapPin className="w-4 h-4 text-bronze-muted/40" />}
-      autoComplete="off"
+      disabled={!!disabled}
+      className={`gmp-autocomplete-input ${className ?? ''}`}
+      onChange={(e) => {
+        onChange?.(e.target.value);
+        if (!e.target.value && onClear) onClear();
+      }}
     />
   );
 };
