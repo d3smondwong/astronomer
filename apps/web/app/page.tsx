@@ -30,6 +30,29 @@ import { saveProfile, calculateBazi, type BaziProfile } from '@/lib/baziOrchestr
 import { toast } from 'sonner';
 import PlacesAutocompleteInput from '@/components/PlacesAutocompleteInput';
 
+// Wrapper so Ant Design can pass value/onChange to TimePicker while
+// rendering the Solar Time row inside the same Form.Item — error appears below both.
+const TimePickerWithSolar = ({ value, onChange }: { value?: any; onChange?: (val: any) => void }) => (
+  <div>
+    <TimePicker
+      value={value}
+      onChange={onChange}
+      className="w-full bazi-input h-10"
+      format="HH:mm"
+      showNow={false}
+      suffixIcon={<Clock className="w-4 h-4 text-bronze-muted/40" />}
+    />
+    <div className="flex items-center gap-2 mt-2">
+      <Form.Item name="solarCorrection" valuePropName="checked" noStyle initialValue={true}>
+        <Switch size="small" />
+      </Form.Item>
+      <span className="text-[10px] text-bronze-muted">Solar Time</span>
+      <Tooltip title="Calculates exact solar noon for precision.">
+        <Info className="w-3 h-3 text-bronze-muted/40 cursor-help" />
+      </Tooltip>
+    </div>
+  </div>
+);
 
 const Hero = () => (
   <div className="space-y-10 md:pt-12">
@@ -179,30 +202,20 @@ const BaziForm = () => {
             >
               <DatePicker className="w-full bazi-input h-10" suffixIcon={<Calendar className="w-4 h-4 text-bronze-muted/40" />} />
             </Form.Item>
-            <div className="flex flex-col">
-              <Form.Item
-                label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Time of Birth</span>}
-                name="time"
-                rules={[{ required: true, message: 'Please select your birth time' }]}
-              >
-                <TimePicker className="w-full bazi-input h-10" format="HH:mm" suffixIcon={<Clock className="w-4 h-4 text-bronze-muted/40" />} />
-              </Form.Item>
-              <div className="flex items-center gap-2 -mt-4">
-                <Form.Item name="solarCorrection" valuePropName="checked" noStyle initialValue={true}>
-                  <Switch size="small" />
-                </Form.Item>
-                <span className="text-[10px] text-bronze-muted">Solar Time</span>
-                <Tooltip title="Calculates exact solar noon for precision.">
-                  <Info className="w-3 h-3 text-bronze-muted/40 cursor-help" />
-                </Tooltip>
-              </div>
-            </div>
+            <Form.Item
+              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Time of Birth</span>}
+              name="time"
+              rules={[{ required: true, message: 'Please select your birth time' }]}
+            >
+              <TimePickerWithSolar />
+            </Form.Item>
           </div>
 
           <Form.Item
             label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Gender</span>}
             name="gender"
             rules={[{ required: true, message: 'Please select your gender' }]}
+            style={{ marginTop: '-12px' }}
           >
             <Radio.Group className="flex gap-6">
               <Radio value="female"><span className="text-xs">Female</span></Radio>
@@ -216,7 +229,7 @@ const BaziForm = () => {
             rules={[{ required: true, message: 'Please enter your birth location' }]}
           >
             <PlacesAutocompleteInput
-              placeholder="City, Country"
+              placeholder="Hospital, Country"
               className="bazi-input h-10"
               onPlaceSelect={onPlaceSelect}
               onClear={() => {
