@@ -9,6 +9,13 @@ node_modules/
 # Next
 .next/
 
+# Next.js / TypeScript
+tsconfig.tsbuildinfo
+.env.local
+.env.*.local
+.turbo/
+.vercel/
+
 # reports
 reports/
 
@@ -24,6 +31,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!apps/web/lib/
 lib64/
 parts/
 sdist/
