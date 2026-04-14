@@ -1,3 +1,22 @@
+/**
+ * theme.css — Celestial Dawn design system tokens.
+ *
+ * Single source of truth for all CSS variables used across the app.
+ * Covers brand colours, functional semantic tokens, dark mode overrides,
+ * and Tailwind v4 utility mappings. Imported by globals.css.
+ *
+ * Sections:
+ *   @theme          — Static brand tokens (parchment, gold, bronze, fonts).
+ *                     These become Tailwind utility classes (e.g. bg-parchment, text-gold-deep).
+ *   :root           — Functional/semantic tokens in light mode (background, primary, sidebar, etc.).
+ *   .dark           — Dark mode overrides for the same semantic tokens.
+ *   @theme inline   — Maps :root CSS vars to Tailwind utility classes (e.g. bg-background).
+ *   @layer base     — Element-level defaults: box-sizing reset, html font size, typography scale.
+ *
+ * To change a colour site-wide, edit the matching :root or .dark variable here.
+ * To add a new brand colour available as a Tailwind utility, add it to the @theme block.
+ */
+
 /* Celestial Dawn Theme — unified variables for landing + dashboard */
 
 @custom-variant dark (&:is(.dark *));
