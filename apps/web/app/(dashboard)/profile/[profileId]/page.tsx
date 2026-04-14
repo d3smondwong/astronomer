@@ -11,12 +11,16 @@ import { format } from 'date-fns';
 import { Calendar, Clock, MapPin, User, Trash2 } from 'lucide-react';
 import { VictoryPie, VictoryChart, VictoryBar, VictoryTheme, VictoryAxis } from 'victory';
 import { toast } from 'sonner';
+import { useLanguage } from '@/lib/languageContext';
+import { translations } from '@/lib/translations';
 
 export default function ProfilePage() {
   const params = useParams<{ profileId: string }>();
   const router = useRouter();
   const [profile, setProfile] = useState<BaziProfile | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const { language } = useLanguage();
+  const tr = translations.profile;
 
   useEffect(() => {
     setIsClient(true);
@@ -50,7 +54,7 @@ export default function ProfilePage() {
   if (!isClient || !profile) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500">{isClient ? 'Profile not found' : 'Loading profile...'}</p>
+        <p className="text-gray-500">{isClient ? tr.profileNotFound[language] : tr.loadingProfile[language]}</p>
       </div>
     );
   }
@@ -58,11 +62,13 @@ export default function ProfilePage() {
   const { baziChart } = profile;
   if (!baziChart) return null;
 
-  const elementData = Object.entries(baziChart.elements).map(([element, value]) => ({
-    x: element.charAt(0).toUpperCase() + element.slice(1),
-    y: value,
-    label: `${element.charAt(0).toUpperCase() + element.slice(1)}: ${value}`,
-  }));
+  const elementData = Object.entries(baziChart.elements).map(([element, value]) => {
+    const key = element.charAt(0).toUpperCase() + element.slice(1);
+    const displayName = language === 'en'
+      ? key
+      : (translations.element[key as keyof typeof translations.element]?.ch ?? key);
+    return { x: key, y: value, label: `${displayName}: ${value}` };
+  });
 
   const elementColors = {
     Wood: '#22c55e',
@@ -77,11 +83,18 @@ export default function ProfilePage() {
     fill: elementColors[item.x as keyof typeof elementColors],
   }));
 
-  // Lookup tables for Heavenly Stems (GAN) and Earthly Branches (ZHI)
+  // English labels for Heavenly Stems and Earthly Branches (used in English mode only)
   const GAN_LABELS: Record<string, string> = {
     甲: 'Yang Wood', 乙: 'Yin Wood', 丙: 'Yang Fire', 丁: 'Yin Fire',
     戊: 'Yang Earth', 己: 'Yin Earth', 庚: 'Yang Metal', 辛: 'Yin Metal',
     壬: 'Yang Water', 癸: 'Yin Water',
+  };
+
+  // Chinese polarity + element labels for Heavenly Stems
+  const GAN_LABELS_CH: Record<string, string> = {
+    甲: '阳木', 乙: '阴木', 丙: '阳火', 丁: '阴火',
+    戊: '阳土', 己: '阴土', 庚: '阳金', 辛: '阴金',
+    壬: '阳水', 癸: '阴水',
   };
 
   const ZHI_LABELS: Record<string, string> = {
@@ -90,22 +103,21 @@ export default function ProfilePage() {
     申: 'Metal Monkey', 酉: 'Metal Rooster', 戌: 'Earth Dog', 亥: 'Water Pig',
   };
 
+  // Chinese element + zodiac labels for Earthly Branches
+  const ZHI_LABELS_CH: Record<string, string> = {
+    子: '水鼠', 丑: '土牛', 寅: '木虎', 卯: '木兔',
+    辰: '土龙', 巳: '火蛇', 午: '火马', 未: '土羊',
+    申: '金猴', 酉: '金鸡', 戌: '土狗', 亥: '水猪',
+  };
+
   const SHI_SHEN_LABELS: Record<string, string> = {
-    '比肩': 'Companion',
-    '劫财': 'Wealth Robber',
-    '食神': 'Food God',
-    '伤官': 'Hurting Officer',
-    '偏财': 'Indirect Wealth',
-    '正财': 'Direct Wealth',
-    '七杀': 'Seven Killings',
-    '正官': 'Direct Officer',
-    '偏印': 'Indirect Resource',
-    '正印': 'Direct Resource',
-    '我': 'Self',
+    '比肩': 'Companion', '劫财': 'Wealth Robber', '食神': 'Food God',
+    '伤官': 'Hurting Officer', '偏财': 'Indirect Wealth', '正财': 'Direct Wealth',
+    '七杀': 'Seven Killings', '正官': 'Direct Officer', '偏印': 'Indirect Resource',
+    '正印': 'Direct Resource', '我': 'Self',
   };
 
   const PillarCard = ({
-    relationshipLabel,
     pillarLabel,
     pillar,
     isDayMaster = false,
@@ -115,7 +127,6 @@ export default function ProfilePage() {
     showVoidSection = true,
     voidCheckPair,
   }: {
-    relationshipLabel: string;
     pillarLabel: string;
     pillar: any;
     isDayMaster?: boolean;
@@ -171,28 +182,16 @@ export default function ProfilePage() {
               fontFamily: 'Noto Serif, serif',
             }}
           >
-            Day Master
+            {tr.dayMasterBadge[language]}
           </div>
         )}
 
-        {/* Relationship & Pillar Labels */}
+        {/* Pillar Label */}
         <div style={{ marginBottom: '12px' }}>
-          <h3
-            style={{
-              fontSize: '10px',
-              fontWeight: '600',
-              color: 'rgba(115, 92, 0, 0.45)',
-              margin: 0,
-              textTransform: 'uppercase',
-              letterSpacing: '0.15em',
-              fontFamily: 'Noto Serif, serif',
-            }}
-          >
-            {relationshipLabel}
-          </h3>
           <p
             style={{
-              fontSize: '13px',
+              fontSize: '16px',
+              fontWeight: '600',
               color: '#4d4635',
               opacity: 0.7,
               margin: '4px 0 0 0',
@@ -207,7 +206,7 @@ export default function ProfilePage() {
         <div style={{ width: '100%' }}>
           <label
             style={{
-              fontSize: '10px',
+              fontSize: '14px',
               fontWeight: '600',
               color: 'rgba(115, 92, 0, 0.45)',
               textTransform: 'uppercase',
@@ -217,7 +216,7 @@ export default function ProfilePage() {
               marginBottom: '8px',
             }}
           >
-            Heavenly Stem
+            {tr.heavenlyStem[language]}
           </label>
           <div
             style={{
@@ -240,7 +239,7 @@ export default function ProfilePage() {
               fontStyle: 'italic',
             }}
           >
-            {heavenlyName}
+            {language === 'en' ? heavenlyName : (GAN_LABELS_CH[heavenlyChar] ?? heavenlyChar)}
           </p>
           {pillar.heavenlyStemTenGod && (() => {
             const displayChar = pillar.heavenlyStemTenGod === '日主' ? '我' : pillar.heavenlyStemTenGod;
@@ -267,16 +266,18 @@ export default function ProfilePage() {
                 >
                   {displayChar}
                 </span>
-                <span
-                  style={{
-                    fontSize: '10px',
-                    color: 'rgba(115, 92, 0, 0.6)',
-                    fontFamily: 'Noto Serif, serif',
-                    marginTop: '2px',
-                  }}
-                >
-                  {displayLabel}
-                </span>
+                {language === 'en' && (
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      color: 'rgba(115, 92, 0, 0.6)',
+                      fontFamily: 'Noto Serif, serif',
+                      marginTop: '2px',
+                    }}
+                  >
+                    {displayLabel}
+                  </span>
+                )}
               </div>
             );
           })()}
@@ -296,7 +297,7 @@ export default function ProfilePage() {
         <div style={{ width: '100%' }}>
           <label
             style={{
-              fontSize: '10px',
+              fontSize: '14px',
               fontWeight: '600',
               color: 'rgba(115, 92, 0, 0.45)',
               textTransform: 'uppercase',
@@ -306,7 +307,7 @@ export default function ProfilePage() {
               marginBottom: '8px',
             }}
           >
-            Earthly Branch
+            {tr.earthlyBranch[language]}
           </label>
           <div
             style={{
@@ -330,7 +331,7 @@ export default function ProfilePage() {
               fontStyle: 'italic',
             }}
           >
-            {earthlyName}
+            {language === 'en' ? earthlyName : (ZHI_LABELS_CH[earthlyChar] ?? earthlyChar)}
           </p>
           <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '8px' }}>
             <div
@@ -346,7 +347,7 @@ export default function ProfilePage() {
               }}
             >
               <span style={{ fontSize: '11px', color: '#8C2F2F', fontFamily: 'Noto Serif, serif', fontStyle: 'italic', visibility: isVoid ? 'visible' : 'hidden' }}>
-                Void
+                {tr.voidLabel[language]}
               </span>
             </div>
           </div>
@@ -366,7 +367,7 @@ export default function ProfilePage() {
         <div style={{ width: '100%' }}>
           <label
             style={{
-              fontSize: '10px',
+              fontSize: '14px',
               fontWeight: isDayMaster ? '700' : '600',
               color: 'rgba(115, 92, 0, 0.45)',
               textTransform: 'uppercase',
@@ -376,7 +377,7 @@ export default function ProfilePage() {
               marginBottom: '12px',
             }}
           >
-            Hidden Stems
+            {tr.hiddenStems[language]}
           </label>
           {hiddenStemPairs.length > 0 ? (
             <div
@@ -388,18 +389,18 @@ export default function ProfilePage() {
               }}
             >
               {hiddenStemPairs.map(({ stem, tenGod }, idx: number) => {
-                const QI_LABELS = ['Primary Qi', 'Middle Qi', 'Residual Qi'];
+                const QI_LABELS = [tr.primaryQi[language], tr.middleQi[language], tr.residualQi[language]];
                 return (
                 <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <span
                     style={{
-                      fontSize: '9px',
+                      fontSize: '10px',
                       fontWeight: '600',
                       color: 'rgba(115, 92, 0, 0.4)',
                       textTransform: 'uppercase',
                       letterSpacing: '0.1em',
                       fontFamily: 'Noto Serif, serif',
-                      marginBottom: '6px',
+                      marginBottom: '8px',
                     }}
                   >
                     {QI_LABELS[idx]}
@@ -411,7 +412,7 @@ export default function ProfilePage() {
                       color: '#4d4635',
                       lineHeight: 1,
                       fontFamily: 'Ma Shan Zheng, serif',
-                      marginBottom: '6px',
+                      marginBottom: '8px',
                     }}
                   >
                     {stem}
@@ -424,7 +425,7 @@ export default function ProfilePage() {
                       lineHeight: 1.2,
                     }}
                   >
-                    {GAN_LABELS[stem] || stem}
+                    {language === 'en' ? (GAN_LABELS[stem] || stem) : (GAN_LABELS_CH[stem] || stem)}
                   </p>
                   {tenGod && (
                     <div
@@ -436,28 +437,31 @@ export default function ProfilePage() {
                         borderRadius: '6px',
                         padding: '3px 8px',
                         background: 'rgba(115, 92, 0, 0.05)',
-                        marginTop: '4px',
+                        marginTop: '8px',
                       }}
                     >
                       <span
                         style={{
-                          fontSize: '11px',
+                          fontSize: '13px',
                           color: 'rgba(115, 92, 0, 0.7)',
                           fontFamily: 'Ma Shan Zheng, serif',
+                          marginBottom: '4px',
                         }}
                       >
                         {tenGod}
                       </span>
-                      <span
-                        style={{
-                          fontSize: '9px',
-                          color: 'rgba(115, 92, 0, 0.55)',
-                          fontFamily: 'Noto Serif, serif',
-                          marginTop: '1px',
-                        }}
-                      >
-                        {SHI_SHEN_LABELS[tenGod] ?? tenGod}
-                      </span>
+                      {language === 'en' && (
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            color: 'rgba(115, 92, 0, 0.55)',
+                            fontFamily: 'Noto Serif, serif',
+                            marginTop: '1px',
+                          }}
+                        >
+                          {SHI_SHEN_LABELS[tenGod] ?? tenGod}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -466,7 +470,7 @@ export default function ProfilePage() {
             </div>
           ) : (
             <p style={{ fontSize: '12px', color: '#4d4635', opacity: 0.45, margin: 0 }}>
-              None
+              {tr.noneLabel[language]}
             </p>
           )}
         </div>
@@ -485,7 +489,7 @@ export default function ProfilePage() {
         <div style={{ width: '100%' }}>
           <label
             style={{
-              fontSize: '10px',
+              fontSize: '14px',
               fontWeight: '600',
               color: 'rgba(115, 92, 0, 0.45)',
               textTransform: 'uppercase',
@@ -495,9 +499,9 @@ export default function ProfilePage() {
               marginBottom: '8px',
             }}
           >
-            Void Branch Pairs
+            {tr.voidBranchPairs[language]}
           </label>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', margin: '12px 0' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', margin: 0 }}>
             {xunKong && showVoidSection ? (
               <>
                 <div
@@ -524,6 +528,9 @@ export default function ProfilePage() {
                     opacity: 0.75,
                     margin: 0,
                     fontStyle: 'italic',
+                    visibility: language === 'en' ? 'visible' : 'hidden',
+                    height: language === 'en' ? 'auto' : 0,
+                    overflow: 'hidden',
                   }}
                 >
                   {xunKong.english}
@@ -546,7 +553,7 @@ export default function ProfilePage() {
                 >
                   —
                 </div>
-                <p style={{ fontSize: '13px', margin: 0, visibility: 'hidden' }}>–</p>
+                <p style={{ fontSize: '13px', margin: 0, visibility: 'hidden', height: language === 'en' ? 'auto' : 0, overflow: 'hidden' }}>–</p>
               </>
             )}
           </div>
@@ -566,7 +573,7 @@ export default function ProfilePage() {
         <div style={{ width: '100%' }}>
           <label
             style={{
-              fontSize: '10px',
+              fontSize: '14px',
               fontWeight: '600',
               color: 'rgba(115, 92, 0, 0.45)',
               textTransform: 'uppercase',
@@ -576,7 +583,7 @@ export default function ProfilePage() {
               marginBottom: '8px',
             }}
           >
-            12 Life Stages
+            {tr.twelveLifeStages[language]}
           </label>
 
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -584,7 +591,7 @@ export default function ProfilePage() {
             <div style={{ flex: 1 }}>
               <span
                 style={{
-                  fontSize: '9px',
+                  fontSize: '12px',
                   fontWeight: '600',
                   color: 'rgba(115, 92, 0, 0.35)',
                   textTransform: 'uppercase',
@@ -592,7 +599,7 @@ export default function ProfilePage() {
                   fontFamily: 'Noto Serif, serif',
                 }}
               >
-                Day Master
+                {tr.dayMasterRef[language]}
               </span>
               {lifeStages?.xingYun ? (
                 <>
@@ -601,16 +608,18 @@ export default function ProfilePage() {
                       fontSize: '56px',
                       fontWeight: '700',
                       color: '#4d4635',
-                      margin: '6px 0 4px 0',
+                      margin: '6px 0 12px 0',
                       lineHeight: 1,
                       fontFamily: 'Ma Shan Zheng, serif',
                     }}
                   >
                     {lifeStages.xingYun.chinese}
                   </div>
-                  <p style={{ fontSize: '12px', color: '#4d4635', opacity: 0.75, margin: 0, fontStyle: 'italic' }}>
-                    {lifeStages.xingYun.english}
-                  </p>
+                  {language === 'en' && (
+                    <p style={{ fontSize: '12px', color: '#4d4635', opacity: 0.75, margin: 0, fontStyle: 'italic' }}>
+                      {lifeStages.xingYun.english}
+                    </p>
+                  )}
                 </>
               ) : (
                 <p style={{ fontSize: '20px', fontWeight: '700', color: '#4d4635', opacity: 0.45, margin: '6px 0 0 0' }}>—</p>
@@ -621,7 +630,7 @@ export default function ProfilePage() {
             <div style={{ flex: 1 }}>
               <span
                 style={{
-                  fontSize: '9px',
+                  fontSize: '12px',
                   fontWeight: '600',
                   color: 'rgba(115, 92, 0, 0.35)',
                   textTransform: 'uppercase',
@@ -629,7 +638,7 @@ export default function ProfilePage() {
                   fontFamily: 'Noto Serif, serif',
                 }}
               >
-                Pillar's Stem
+                {tr.pillarStemRef[language]}
               </span>
               {lifeStages?.ziZuo ? (
                 <>
@@ -638,16 +647,18 @@ export default function ProfilePage() {
                       fontSize: '56px',
                       fontWeight: '700',
                       color: '#4d4635',
-                      margin: '6px 0 4px 0',
+                      margin: '6px 0 12px 0',
                       lineHeight: 1,
                       fontFamily: 'Ma Shan Zheng, serif',
                     }}
                   >
                     {lifeStages.ziZuo.chinese}
                   </div>
-                  <p style={{ fontSize: '12px', color: '#4d4635', opacity: 0.75, margin: 0, fontStyle: 'italic' }}>
-                    {lifeStages.ziZuo.english}
-                  </p>
+                  {language === 'en' && (
+                    <p style={{ fontSize: '12px', color: '#4d4635', opacity: 0.75, margin: 0, fontStyle: 'italic' }}>
+                      {lifeStages.ziZuo.english}
+                    </p>
+                  )}
                 </>
               ) : (
                 <p style={{ fontSize: '20px', fontWeight: '700', color: '#4d4635', opacity: 0.45, margin: '6px 0 0 0' }}>—</p>
@@ -670,7 +681,7 @@ export default function ProfilePage() {
         <div style={{ width: '100%' }}>
           <label
             style={{
-              fontSize: '10px',
+              fontSize: '14px',
               fontWeight: '600',
               color: 'rgba(115, 92, 0, 0.45)',
               textTransform: 'uppercase',
@@ -680,7 +691,7 @@ export default function ProfilePage() {
               marginBottom: '8px',
             }}
           >
-            NaYin
+            {tr.naYin[language]}
           </label>
           {naYin ? (
             <>
@@ -697,17 +708,19 @@ export default function ProfilePage() {
               >
                 {naYin.chinese}
               </div>
-              <p
-                style={{
-                  fontSize: '13px',
-                  color: '#4d4635',
-                  opacity: 0.75,
-                  margin: 0,
-                  fontStyle: 'italic',
-                }}
-              >
-                {naYin.english}
-              </p>
+              {language === 'en' && (
+                <p
+                  style={{
+                    fontSize: '13px',
+                    color: '#4d4635',
+                    opacity: 0.75,
+                    margin: 0,
+                    fontStyle: 'italic',
+                  }}
+                >
+                  {naYin.english}
+                </p>
+              )}
             </>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100px', width: '100%' }}>
@@ -745,7 +758,7 @@ export default function ProfilePage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <User className="w-4 h-4" />
-                    {profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}
+                    {profile.gender === 'male' ? tr.male[language] : tr.female[language]}
                   </span>
                 </div>
               </div>
@@ -757,15 +770,15 @@ export default function ProfilePage() {
                 </Tag>
               )}
               <Popconfirm
-                title="Delete Profile"
+                title={tr.deleteTitle[language]}
                 description={`Are you sure you want to delete "${profile.name}"? This action cannot be undone.`}
                 onConfirm={handleDeleteProfile}
-                okText="Delete"
-                cancelText="Cancel"
+                okText={tr.deleteOk[language]}
+                cancelText={tr.deleteCancel[language]}
                 okButtonProps={{ danger: true }}
               >
                 <Button danger type="text" size="small" icon={<Trash2 className="w-4 h-4" />}>
-                  Delete
+                  {tr.deleteBtn[language]}
                 </Button>
               </Popconfirm>
             </div>
@@ -777,13 +790,12 @@ export default function ProfilePage() {
           items={[
             {
               key: 'pillars',
-              label: 'Four Pillars',
+              label: tr.tabFourPillars[language],
               children: (
                 <div className="space-y-4" style={{ overflowX: 'hidden' }}>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" style={{ position: 'relative', paddingTop: '20px', minWidth: 0 }}>
                     <PillarCard
-                      relationshipLabel="ANCESTRY"
-                      pillarLabel="Year Pillar"
+                      pillarLabel={tr.yearPillar[language]}
                       pillar={baziChart.yearPillar}
                       isDayMaster={false}
                       lifeStages={baziChart.lifeStages?.year}
@@ -792,8 +804,7 @@ export default function ProfilePage() {
                       voidCheckPair={baziChart.xunKong?.day}
                     />
                     <PillarCard
-                      relationshipLabel="PARENTS"
-                      pillarLabel="Month Pillar"
+                      pillarLabel={tr.monthPillar[language]}
                       pillar={baziChart.monthPillar}
                       isDayMaster={false}
                       lifeStages={baziChart.lifeStages?.month}
@@ -803,8 +814,7 @@ export default function ProfilePage() {
                       voidCheckPair={baziChart.xunKong?.day}
                     />
                     <PillarCard
-                      relationshipLabel="SELF"
-                      pillarLabel="Day Pillar"
+                      pillarLabel={tr.dayPillar[language]}
                       pillar={baziChart.dayPillar}
                       isDayMaster={true}
                       lifeStages={baziChart.lifeStages?.day}
@@ -812,8 +822,7 @@ export default function ProfilePage() {
                       xunKong={baziChart.xunKong?.day}
                     />
                     <PillarCard
-                      relationshipLabel="CHILDREN"
-                      pillarLabel="Hour Pillar"
+                      pillarLabel={tr.hourPillar[language]}
                       pillar={baziChart.hourPillar}
                       isDayMaster={false}
                       lifeStages={baziChart.lifeStages?.hour}
@@ -828,13 +837,13 @@ export default function ProfilePage() {
             },
             {
               key: 'elements',
-              label: 'Elements',
+              label: tr.tabElements[language],
               children: (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
-                      <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">Element Distribution</h3>
-                      <p className="text-sm text-bronze-muted/70 mb-4">Your Five Element Balance</p>
+                      <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">{tr.elementDistrib[language]}</h3>
+                      <p className="text-sm text-bronze-muted/70 mb-4">{tr.fiveElementBal[language]}</p>
                       <svg viewBox="0 0 400 400" className="w-full max-w-md mx-auto">
                         <VictoryPie
                           standalone={false}
@@ -842,7 +851,10 @@ export default function ProfilePage() {
                           height={400}
                           data={pieData}
                           colorScale={pieData.map(d => d.fill)}
-                          labels={({ datum }) => `${datum.x}\n${datum.y}`}
+                          labels={({ datum }) => {
+                            const name = language === 'en' ? datum.x : (translations.element[datum.x as keyof typeof translations.element]?.ch ?? datum.x);
+                            return `${name}\n${datum.y}`;
+                          }}
                           style={{
                             labels: { fontSize: 16, fill: 'white' },
                           }}
@@ -852,8 +864,8 @@ export default function ProfilePage() {
                     </Card>
 
                     <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
-                      <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">Element Strength</h3>
-                      <p className="text-sm text-bronze-muted/70 mb-4">Comparative View</p>
+                      <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">{tr.elementStrength[language]}</h3>
+                      <p className="text-sm text-bronze-muted/70 mb-4">{tr.comparativeView[language]}</p>
                       <svg viewBox="0 0 450 300" className="w-full">
                         <VictoryChart
                           standalone={false}
@@ -862,7 +874,9 @@ export default function ProfilePage() {
                           domainPadding={30}
                           theme={VictoryTheme.material}
                         >
-                          <VictoryAxis />
+                          <VictoryAxis
+                            tickFormat={(tick) => language === 'en' ? tick : (translations.element[tick as keyof typeof translations.element]?.ch ?? tick)}
+                          />
                           <VictoryAxis dependentAxis />
                           <VictoryBar
                             data={elementData}
@@ -878,8 +892,8 @@ export default function ProfilePage() {
                   </div>
 
                   <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
-                    <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">Lucky Elements</h3>
-                    <p className="text-sm text-bronze-muted/70 mb-4">Elements that can bring balance to your chart</p>
+                    <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">{tr.luckyElements[language]}</h3>
+                    <p className="text-sm text-bronze-muted/70 mb-4">{tr.luckyElemDesc[language]}</p>
                     <div className="flex gap-2 flex-wrap">
                       {baziChart.luckyElements.map((element) => (
                         <Tag
@@ -887,7 +901,7 @@ export default function ProfilePage() {
                           color={elementColors[element as keyof typeof elementColors]}
                           style={{ color: 'white', fontSize: '14px', padding: '4px 12px' }}
                         >
-                          {element}
+                          {language === 'en' ? element : (translations.element[element as keyof typeof translations.element]?.ch ?? element)}
                         </Tag>
                       ))}
                     </div>
@@ -897,18 +911,20 @@ export default function ProfilePage() {
             },
             {
               key: 'insights',
-              label: 'Insights',
+              label: tr.tabInsights[language],
               children: (
                 <div className="space-y-4">
                   <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
-                    <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">Personality Profile</h3>
+                    <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">{tr.personalityProfile[language]}</h3>
                     <div className="space-y-3">
                       <div>
-                        <p className="text-sm text-bronze-muted/70 mb-2">Your Archetype: <strong className="text-gold-deep">{baziChart.personalityTraits.archetype}</strong></p>
-                        <p className="text-sm text-bronze-muted/70 mb-2">Element: <strong className="text-gold-deep">{baziChart.personalityTraits.element}</strong></p>
+                        <p className="text-sm text-bronze-muted/70 mb-2">{tr.yourArchetype[language]} <strong className="text-gold-deep">{baziChart.personalityTraits.archetype}</strong></p>
+                        <p className="text-sm text-bronze-muted/70 mb-2">{tr.elementLabel[language]} <strong className="text-gold-deep">
+                          {language === 'en' ? baziChart.personalityTraits.element : (translations.element[baziChart.personalityTraits.element as keyof typeof translations.element]?.ch ?? baziChart.personalityTraits.element)}
+                        </strong></p>
                       </div>
                       <div>
-                        <p className="text-sm text-bronze-muted/70 mb-2">Key Traits:</p>
+                        <p className="text-sm text-bronze-muted/70 mb-2">{tr.keyTraits[language]}</p>
                         <div className="flex gap-2 flex-wrap">
                           {baziChart.personalityTraits.traits.map((trait) => (
                             <Tag key={trait} style={{ color: '#735c00', backgroundColor: 'rgba(115, 92, 0, 0.1)' }}>
@@ -918,7 +934,7 @@ export default function ProfilePage() {
                         </div>
                       </div>
                       <div>
-                        <p className="text-sm text-bronze-muted/70 mb-2">Strengths:</p>
+                        <p className="text-sm text-bronze-muted/70 mb-2">{tr.strengths[language]}</p>
                         <ul className="list-disc list-inside text-sm text-bronze-muted">
                           {baziChart.personalityTraits.strengths.map((strength) => (
                             <li key={strength}>{strength}</li>
@@ -926,7 +942,7 @@ export default function ProfilePage() {
                         </ul>
                       </div>
                       <div>
-                        <p className="text-sm text-bronze-muted/70 mb-2">Areas to Note:</p>
+                        <p className="text-sm text-bronze-muted/70 mb-2">{tr.areasToNote[language]}</p>
                         <ul className="list-disc list-inside text-sm text-bronze-muted">
                           {baziChart.personalityTraits.challenges.map((challenge) => (
                             <li key={challenge}>{challenge}</li>
@@ -934,48 +950,38 @@ export default function ProfilePage() {
                         </ul>
                       </div>
                       <div>
-                        <p className="text-sm text-bronze-muted/70 mb-2">Lucky Colors: <strong>{baziChart.personalityTraits.luckyColors.join(', ')}</strong></p>
-                        <p className="text-sm text-bronze-muted/70">Lucky Numbers: <strong>{baziChart.personalityTraits.luckyNumbers.join(', ')}</strong></p>
+                        <p className="text-sm text-bronze-muted/70 mb-2">{tr.luckyColors[language]} <strong>{baziChart.personalityTraits.luckyColors.join(', ')}</strong></p>
+                        <p className="text-sm text-bronze-muted/70">{tr.luckyNumbers[language]} <strong>{baziChart.personalityTraits.luckyNumbers.join(', ')}</strong></p>
                       </div>
                     </div>
                   </Card>
 
                   <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
-                    <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">Your Summary</h3>
+                    <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">{tr.yourSummary[language]}</h3>
                     <p className="text-base leading-relaxed text-bronze-muted mb-4">{baziChart.personalitySummary}</p>
                   </Card>
 
                   <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
-                    <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">Life Aspects</h3>
-                    <p className="text-sm text-bronze-muted/70 mb-4">Key areas influenced by your Bazi chart</p>
+                    <h3 className="text-lg font-semibold mb-2 font-serif text-gold-deep">{tr.lifeAspects[language]}</h3>
+                    <p className="text-sm text-bronze-muted/70 mb-4">{tr.lifeAspectsDesc[language]}</p>
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="p-4 border border-gold-deep/10 rounded-lg">
-                        <h4 className="font-medium mb-2 text-gold-deep">Career & Wealth</h4>
+                        <h4 className="font-medium mb-2 text-gold-deep">{tr.careerWealth[language]}</h4>
                         <p className="text-sm text-bronze-muted/80">
-                          Your {baziChart.personalityTraits.element} element suggests focusing on careers that align with your natural strengths.
-                          Lucky elements provide additional guidance for prosperity.
+                          {tr.careerWealthDesc[language].replace('{element}', language === 'en' ? baziChart.personalityTraits.element : (translations.element[baziChart.personalityTraits.element as keyof typeof translations.element]?.ch ?? baziChart.personalityTraits.element))}
                         </p>
                       </div>
                       <div className="p-4 border border-gold-deep/10 rounded-lg">
-                        <h4 className="font-medium mb-2 text-gold-deep">Relationships</h4>
-                        <p className="text-sm text-bronze-muted/80">
-                          The Day Pillar's earthly branch represents your spouse palace. Understanding this
-                          helps in relationship compatibility and harmony.
-                        </p>
+                        <h4 className="font-medium mb-2 text-gold-deep">{tr.relationships[language]}</h4>
+                        <p className="text-sm text-bronze-muted/80">{tr.relationshipsDesc[language]}</p>
                       </div>
                       <div className="p-4 border border-gold-deep/10 rounded-lg">
-                        <h4 className="font-medium mb-2 text-gold-deep">Health & Wellness</h4>
-                        <p className="text-sm text-bronze-muted/80">
-                          Element imbalances can indicate areas of health to watch. Strengthening weak
-                          elements through lifestyle choices promotes wellbeing.
-                        </p>
+                        <h4 className="font-medium mb-2 text-gold-deep">{tr.healthWellness[language]}</h4>
+                        <p className="text-sm text-bronze-muted/80">{tr.healthWellnessDesc[language]}</p>
                       </div>
                       <div className="p-4 border border-gold-deep/10 rounded-lg">
-                        <h4 className="font-medium mb-2 text-gold-deep">Personal Growth</h4>
-                        <p className="text-sm text-bronze-muted/80">
-                          Your chart reveals natural talents and areas for development. Focus on cultivating
-                          your lucky elements for optimal growth.
-                        </p>
+                        <h4 className="font-medium mb-2 text-gold-deep">{tr.personalGrowth[language]}</h4>
+                        <p className="text-sm text-bronze-muted/80">{tr.personalGrowthDesc[language]}</p>
                       </div>
                     </div>
                   </Card>

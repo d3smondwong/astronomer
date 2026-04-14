@@ -2,6 +2,7 @@ import 'antd/dist/reset.css';
 import type { Metadata } from "next";
 import "@/styles/index.css";
 import { ConfigProvider } from 'antd';
+import { LanguageProvider } from '@/lib/languageContext';
 
 const antdTheme = {
   token: {
@@ -43,7 +44,9 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         <ConfigProvider theme={antdTheme}>
-          {children}
+          <LanguageProvider>
+            {children}
+          </LanguageProvider>
         </ConfigProvider>
       </body>
     </html>

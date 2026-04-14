@@ -10,10 +10,12 @@ import { Plus, Users, MessageSquare, User, Trash2, Calendar, Clock, Info } from 
 import PlacesAutocompleteInput from '@/components/PlacesAutocompleteInput';
 import { getProfiles, deleteProfile, saveProfile, calculateBazi, type BaziProfile } from '@/lib/baziOrchestrator';
 import { toast } from 'sonner';
+import { useLanguage } from '@/lib/languageContext';
+import { translations } from '@/lib/translations';
 
 const { Sider, Content } = Layout;
 
-const TimePickerWithSolar = ({ value, onChange }: { value?: any; onChange?: (val: any) => void }) => (
+const TimePickerWithSolar = ({ value, onChange, solarTimeLabel }: { value?: any; onChange?: (val: any) => void; solarTimeLabel?: string }) => (
   <div>
     <TimePicker
       value={value}
@@ -27,7 +29,7 @@ const TimePickerWithSolar = ({ value, onChange }: { value?: any; onChange?: (val
       <Form.Item name="solarCorrection" valuePropName="checked" noStyle initialValue={true}>
         <Switch size="small" />
       </Form.Item>
-      <span style={{ fontSize: '10px', color: '#4d4635' }}>Solar Time</span>
+      <span style={{ fontSize: '10px', color: '#4d4635' }}>{solarTimeLabel ?? 'Solar Time'}</span>
       <Tooltip title="Calculates exact solar noon for precision.">
         <Info className="w-3 h-3 text-bronze-muted/40 cursor-help" />
       </Tooltip>
@@ -44,6 +46,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [loading, setLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { language, setLanguage } = useLanguage();
+  const tr = translations.sidebar;
 
   useEffect(() => {
     loadProfiles();
@@ -121,7 +125,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       };
 
       saveProfile(profileWithChart);
-      toast.success('Bazi chart generated successfully!');
+      toast.success(tr.successGenerated[language]);
 
       handleModalClose();
       loadProfiles();
@@ -130,7 +134,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.push(`/profile/${profileId}`);
     } catch (error) {
       console.error('Error generating Bazi chart:', error);
-      toast.error('Failed to generate Bazi chart. Please try again.');
+      toast.error(tr.errorGenerated[language]);
     } finally {
       setLoading(false);
     }
@@ -140,7 +144,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const remaining = profiles.filter((p) => p.id !== id);
     deleteProfile(id);
     setProfiles(remaining);
-    toast.success('Profile deleted');
+    toast.success(tr.successDeleted[language]);
 
     if (pathname.includes(id)) {
       if (remaining.length > 0) {
@@ -193,7 +197,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {!(isMounted && isCollapsed) && (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', padding: '0 4px' }}>
                     <h3 className="sidebar-section-label" style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(115, 92, 0, 0.5)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: 'Noto Serif, serif' }}>
-                      <span style={{ marginRight: '5px', fontSize: '14px', verticalAlign: 'middle', lineHeight: 1 }}>·</span>Profiles
+                      <span style={{ marginRight: '5px', fontSize: '14px', verticalAlign: 'middle', lineHeight: 1 }}>·</span>{tr.profiles[language]}
                     </h3>
                     <button
                       onClick={handleAddProfile}
@@ -215,7 +219,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div>
                   {profiles.length === 0 ? (
                     <p style={{ fontSize: '13px', color: '#4d4635', padding: '8px 12px', opacity: 0.45, fontStyle: 'italic' }}>
-                      No profiles yet
+                      {tr.noProfiles[language]}
                     </p>
                   ) : (
                     profiles.map((profile) => (
@@ -255,11 +259,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         </Link>
 
                         <Popconfirm
-                          title="Delete Profile"
+                          title={tr.deleteProfile[language]}
                           description={`Are you sure you want to delete "${profile.name}"? This action cannot be undone.`}
                           onConfirm={() => handleDeleteProfile(profile.id)}
-                          okText="Delete"
-                          cancelText="Cancel"
+                          okText={tr.deleteOk[language]}
+                          cancelText={tr.deleteCancel[language]}
                         >
                           <button
                             style={{
@@ -287,7 +291,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {!(isMounted && isCollapsed) && (
                   <div style={{ padding: '0 4px', marginBottom: '6px' }}>
                     <h3 className="sidebar-section-label" style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(115, 92, 0, 0.5)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: 'Noto Serif, serif' }}>
-                      <span style={{ marginRight: '5px', fontSize: '14px', verticalAlign: 'middle', lineHeight: 1 }}>·</span>Tools
+                      <span style={{ marginRight: '5px', fontSize: '14px', verticalAlign: 'middle', lineHeight: 1 }}>·</span>{tr.tools[language]}
                     </h3>
                   </div>
                 )}
@@ -309,7 +313,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     title="Compatibility"
                   >
                     <Users className="w-4 h-4" style={{ flexShrink: 0, opacity: isActive('compatibility') ? 1 : 0.55 }} />
-                    {!(isMounted && isCollapsed) && <span className="sidebar-nav-label">Compatibility</span>}
+                    {!(isMounted && isCollapsed) && <span className="sidebar-nav-label">{tr.compatibility[language]}</span>}
                   </div>
                 </Link>
 
@@ -330,7 +334,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     title="AI Oracle Chat"
                   >
                     <MessageSquare className="w-4 h-4" style={{ flexShrink: 0, opacity: isActive('ai_oracle_chat') ? 1 : 0.55 }} />
-                    {!(isMounted && isCollapsed) && <span className="sidebar-nav-label">AI Oracle Chat</span>}
+                    {!(isMounted && isCollapsed) && <span className="sidebar-nav-label">{tr.aiOracleChat[language]}</span>}
                   </div>
                 </Link>
               </div>
@@ -346,7 +350,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               }}>
                 <User className="w-5 h-5" style={{ color: '#735c00' }} />
               </div>
-              <p style={{ fontSize: '12px', fontWeight: '500', color: '#4d4635', margin: 0, fontFamily: 'Noto Serif, serif' }}>Guest</p>
+              <p style={{ fontSize: '12px', fontWeight: '500', color: '#4d4635', margin: 0, fontFamily: 'Noto Serif, serif' }}>{tr.guest[language]}</p>
               <button className="sidebar-login-btn" style={{
                 fontSize: '10px', color: '#735c00', background: 'transparent',
                 border: '1px solid rgba(115, 92, 0, 0.3)', cursor: 'pointer',
@@ -357,8 +361,42 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(115, 92, 0, 0.08)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(115, 92, 0, 0.5)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(115, 92, 0, 0.3)'; }}
               >
-                Login
+                {tr.login[language]}
               </button>
+              {/* Language toggle */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  backgroundColor: '#3d3a5c',
+                  borderRadius: '9999px',
+                  padding: '3px',
+                  flexShrink: 0,
+                }}
+              >
+                {(['en', 'ch'] as const).map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => setLanguage(lang)}
+                    style={{
+                      fontSize: '11px',
+                      fontFamily: 'Noto Serif, serif',
+                      fontWeight: 600,
+                      letterSpacing: '0.05em',
+                      padding: '3px 12px',
+                      borderRadius: '9999px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      backgroundColor: language === lang ? '#3d3a5c' : 'white',
+                      color: language === lang ? 'white' : '#3d3a5c',
+                      boxShadow: language === lang ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
+                    }}
+                  >
+                    {lang === 'en' ? 'EN' : '中文'}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </Sider>
@@ -371,7 +409,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Add Profile Modal */}
       <Modal
-        title="Create New Bazi Profile"
+        title={tr.modalTitle[language]}
         open={isModalOpen}
         onCancel={handleModalClose}
         footer={null}
@@ -379,7 +417,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         <Form layout="vertical" form={form} onFinish={handleFormSubmit} className="space-y-6">
           <Form.Item
-            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Profile Name</span>}
+            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelProfileName[language]}</span>}
             name="fullName"
             rules={[
               { required: true, message: 'Please enter your profile name' },
@@ -391,35 +429,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <Form.Item
-              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Date of Birth</span>}
+              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelDob[language]}</span>}
               name="dob"
               rules={[{ required: true, message: 'Please select your date of birth' }]}
             >
               <DatePicker className="w-full bazi-input h-10" suffixIcon={<Calendar className="w-4 h-4 text-bronze-muted/40" />} />
             </Form.Item>
             <Form.Item
-              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Time of Birth</span>}
+              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelTimeOfBirth[language]}</span>}
               name="time"
               rules={[{ required: true, message: 'Please select your birth time' }]}
             >
-              <TimePickerWithSolar />
+              <TimePickerWithSolar solarTimeLabel={tr.solarTime[language]} />
             </Form.Item>
           </div>
 
           <Form.Item
-            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Gender</span>}
+            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelGender[language]}</span>}
             name="gender"
             rules={[{ required: true, message: 'Please select your gender' }]}
             style={{ marginTop: '-12px' }}
           >
             <Radio.Group style={{ display: 'flex', gap: '24px' }}>
-              <Radio value="female"><span style={{ fontSize: '12px' }}>Female</span></Radio>
-              <Radio value="male"><span style={{ fontSize: '12px' }}>Male</span></Radio>
+              <Radio value="female"><span style={{ fontSize: '12px' }}>{tr.labelFemale[language]}</span></Radio>
+              <Radio value="male"><span style={{ fontSize: '12px' }}>{tr.labelMale[language]}</span></Radio>
             </Radio.Group>
           </Form.Item>
 
           <Form.Item
-            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Birth Location</span>}
+            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelBirthLocation[language]}</span>}
             name="location"
             rules={[{ required: true, message: 'Please enter your birth location' }]}
           >
@@ -435,7 +473,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <Form.Item
-              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Latitude</span>}
+              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelLatitude[language]}</span>}
               name="latitude"
               rules={[
                 { required: true, message: 'Required' },
@@ -454,7 +492,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Form.Item>
 
             <Form.Item
-              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Longitude</span>}
+              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelLongitude[language]}</span>}
               name="longitude"
               rules={[
                 { required: true, message: 'Required' },
@@ -480,7 +518,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             block
             style={{ backgroundColor: '#735c00', borderColor: '#735c00', height: '40px', marginTop: '24px' }}
           >
-            Generate My Bazi Chart
+            {tr.btnGenerate[language]}
           </Button>
         </Form>
       </Modal>

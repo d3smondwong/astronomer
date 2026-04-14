@@ -29,10 +29,12 @@ import TimelineOutlinedIcon from '@mui/icons-material/TimelineOutlined';
 import { saveProfile, calculateBazi, type BaziProfile } from '@/lib/baziOrchestrator';
 import { toast } from 'sonner';
 import PlacesAutocompleteInput from '@/components/PlacesAutocompleteInput';
+import { useLanguage } from '@/lib/languageContext';
+import { translations } from '@/lib/translations';
 
 // Wrapper so Ant Design can pass value/onChange to TimePicker while
 // rendering the Solar Time row inside the same Form.Item — error appears below both.
-const TimePickerWithSolar = ({ value, onChange }: { value?: any; onChange?: (val: any) => void }) => (
+const TimePickerWithSolar = ({ value, onChange, solarTimeLabel }: { value?: any; onChange?: (val: any) => void; solarTimeLabel?: string }) => (
   <div>
     <TimePicker
       value={value}
@@ -46,7 +48,7 @@ const TimePickerWithSolar = ({ value, onChange }: { value?: any; onChange?: (val
       <Form.Item name="solarCorrection" valuePropName="checked" noStyle initialValue={true}>
         <Switch size="small" />
       </Form.Item>
-      <span className="text-[10px] text-bronze-muted">Solar Time</span>
+      <span className="text-[10px] text-bronze-muted">{solarTimeLabel ?? 'Solar Time'}</span>
       <Tooltip title="Calculates exact solar noon for precision.">
         <Info className="w-3 h-3 text-bronze-muted/40 cursor-help" />
       </Tooltip>
@@ -54,7 +56,10 @@ const TimePickerWithSolar = ({ value, onChange }: { value?: any; onChange?: (val
   </div>
 );
 
-const Hero = () => (
+const Hero = () => {
+  const { language } = useLanguage();
+  const tr = translations.landing;
+  return (
   <div className="space-y-10 md:pt-12">
     <div className="space-y-4">
       <motion.h1
@@ -63,8 +68,8 @@ const Hero = () => (
         transition={{ duration: 0.8 }}
         className="font-serif text-gold-deep tracking-tight leading-tight text-4xl md:text-5xl font-normal text-center"
       >
-        Timeless Insights,<br />
-        <span className="mt-4 block">Modern Foresight</span>
+        {tr.heroLine1[language]}<br />
+        <span className="mt-4 block">{tr.heroLine2[language]}</span>
       </motion.h1>
       <motion.p
         initial={{ opacity: 0, y: 20 }}
@@ -72,7 +77,7 @@ const Hero = () => (
         transition={{ duration: 0.8, delay: 0.2 }}
         className="text-2xl md:text-3xl font-serif italic text-bronze-muted leading-snug text-center"
       >
-        Rooted in ancient wisdom, driven by AI
+        {tr.tagline[language]}
       </motion.p>
     </div>
 
@@ -92,12 +97,15 @@ const Hero = () => (
       </blockquote>
     </motion.div>
   </div>
-);
+  );
+};
 
 const BaziForm = () => {
   const router = useRouter();
   const [form] = Form.useForm();
   const [loading, setLoading] = React.useState(false);
+  const { language } = useLanguage();
+  const tr = translations.landing;
 
   const loadDemoProfile = () => {
     form.setFieldsValue({
@@ -178,13 +186,13 @@ const BaziForm = () => {
       <div className="relative z-10">
         <div className="mb-8 text-center">
           <Stars className="text-gold-deep w-8 h-8 mx-auto mb-3" />
-          <h2 className="text-2xl font-serif text-bronze-muted mb-2">Initialize Your Reading</h2>
-          <p className="text-xs text-bronze-muted/60">Provide your birth details to reveal your energetic signature.</p>
+          <h2 className="text-2xl font-serif text-bronze-muted mb-2">{tr.formHeading[language]}</h2>
+          <p className="text-xs text-bronze-muted/60">{tr.formSubHeading[language]}</p>
         </div>
 
         <Form layout="vertical" form={form} onFinish={onFinish} className="space-y-6">
           <Form.Item
-            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Profile Name</span>}
+            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelProfileName[language]}</span>}
             name="fullName"
             rules={[
               { required: true, message: 'Please enter your profile name' },
@@ -196,35 +204,35 @@ const BaziForm = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <Form.Item
-              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Date of Birth</span>}
+              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelDob[language]}</span>}
               name="dob"
               rules={[{ required: true, message: 'Please select your date of birth' }]}
             >
               <DatePicker className="w-full bazi-input h-10" suffixIcon={<Calendar className="w-4 h-4 text-bronze-muted/40" />} />
             </Form.Item>
             <Form.Item
-              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Time of Birth</span>}
+              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelTimeOfBirth[language]}</span>}
               name="time"
               rules={[{ required: true, message: 'Please select your birth time' }]}
             >
-              <TimePickerWithSolar />
+              <TimePickerWithSolar solarTimeLabel={tr.solarTime[language]} />
             </Form.Item>
           </div>
 
           <Form.Item
-            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Gender</span>}
+            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelGender[language]}</span>}
             name="gender"
             rules={[{ required: true, message: 'Please select your gender' }]}
             style={{ marginTop: '-12px' }}
           >
             <Radio.Group className="flex gap-6">
-              <Radio value="female"><span className="text-xs">Female</span></Radio>
-              <Radio value="male"><span className="text-xs">Male</span></Radio>
+              <Radio value="female"><span className="text-xs">{tr.labelFemale[language]}</span></Radio>
+              <Radio value="male"><span className="text-xs">{tr.labelMale[language]}</span></Radio>
             </Radio.Group>
           </Form.Item>
 
           <Form.Item
-            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">Birth Location</span>}
+            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelBirthLocation[language]}</span>}
             name="location"
             rules={[{ required: true, message: 'Please enter your birth location' }]}
           >
@@ -247,12 +255,12 @@ const BaziForm = () => {
             loading={loading}
             className="gold-gradient w-full h-12 text-white font-serif text-base tracking-wide border-none shadow-lg hover:opacity-90 transition-all active:scale-95"
           >
-            Generate My Bazi Chart
+            {tr.btnGenerate[language]}
           </Button>
 
           <div className="flex items-center gap-3 pt-4">
             <div className="flex-1 h-px bg-gold-deep/10"></div>
-            <span className="text-xs text-bronze-muted/50 uppercase tracking-wider">New?</span>
+            <span className="text-xs text-bronze-muted/50 uppercase tracking-wider">{tr.newLabel[language]}</span>
             <div className="flex-1 h-px bg-gold-deep/10"></div>
           </div>
 
@@ -260,7 +268,7 @@ const BaziForm = () => {
             onClick={loadDemoProfile}
             className="w-full h-10 border border-gold-deep/30 text-gold-deep hover:bg-gold-deep/5 font-serif tracking-wide text-sm"
           >
-            Try Demo (Desmond's Profile)
+            {tr.btnDemo[language]}
           </Button>
         </Form>
       </div>
@@ -291,6 +299,9 @@ const FeatureCard = ({ icon: Icon, title, description, label, iconSrc }: any) =>
 
 
 export default function Home() {
+  const { language } = useLanguage();
+  const tr = translations.landing;
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -308,21 +319,21 @@ export default function Home() {
         <section className="max-w-7xl mx-auto px-8 grid grid-cols-1 md:grid-cols-3 gap-8">
           <FeatureCard
             icon={TempleBuddhistIcon}
-            title="Ancient Accuracy"
-            description="A repository of thousand-year-old manuscripts digitized into a precise logic engine. We maintain the original intent of the Imperial masters."
-            label="Authentic Lineage"
+            title={tr.featureAncientTitle[language]}
+            description={tr.featureAncientDesc[language]}
+            label={tr.featureAncientLabel[language]}
           />
           <FeatureCard
             icon={Trees}
-            title="Five Element Balance"
-            description="Visualize the distribution of Wood, Fire, Earth, Metal, and Water. Discover your flow and identify elemental deficiencies that shape your path."
-            label="Dynamic Equilibrium"
+            title={tr.featureFiveTitle[language]}
+            description={tr.featureFiveDesc[language]}
+            label={tr.featureFiveLabel[language]}
           />
           <FeatureCard
             icon={TimelineOutlinedIcon}
-            title="Luck Pillars"
-            description="Decipher the decade-long cycles of your life. Anticipate the changing tides of fortune to act when the cosmos is in your favor."
-            label="Cyclical Foresight"
+            title={tr.featureLuckTitle[language]}
+            description={tr.featureLuckDesc[language]}
+            label={tr.featureLuckLabel[language]}
           />
         </section>
       </main>
