@@ -1,8 +1,10 @@
 /// <reference types="google.maps" />
 'use client';
 
-import { FC, useEffect, useRef } from 'react';
-import { initGoogleMapsAPI } from '@/lib/google-loader';
+import { FC, useEffect, useRef, useState } from 'react';
+import { AutoComplete, Input } from 'antd';
+import type { DefaultOptionType } from 'antd/es/select';
+import { importLibrary } from '@/lib/google-loader';
 
 interface PlacesAutocompleteInputProps {
   value?: string;
@@ -23,91 +25,102 @@ const PlacesAutocompleteInput: FC<PlacesAutocompleteInputProps> = ({
   className,
   disabled,
 }) => {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [inputValue, setInputValue] = useState(value ?? '');
+  const [options, setOptions] = useState<DefaultOptionType[]>([]);
+  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Initialise session token on mount
   useEffect(() => {
-    let isMounted = true;
-
-    if (autocompleteRef.current || !inputRef.current) return;
-
-    const init = async () => {
-      try {
-        if (!initGoogleMapsAPI()) return;
-        await google.maps.importLibrary('places');
-
-        if (!isMounted || !inputRef.current) return;
-
-        const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-          fields: ['geometry', 'formatted_address', 'name'],
-          bounds: new google.maps.LatLngBounds(
-            { lat: -11.0, lng: 95.0 },  // SW: Southern Indonesia / Western Sumatra
-            { lat: 20.0,  lng: 141.0 }, // NE: Northern Thailand / Indonesia-Papua border
-          ),
-          strictBounds: false,
-        });
-
-        autocompleteRef.current = autocomplete;
-
-        autocomplete.addListener('place_changed', () => {
-          const place = autocomplete.getPlace();
-          if (!place.geometry?.location) return;
-
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          const address = place.formatted_address ?? place.name ?? '';
-
-          onPlaceSelect(lat, lng, address);
-          onChange?.(address);
-
-          // Reflect the chosen address back into the input
-          if (inputRef.current) inputRef.current.value = address;
-        });
-
-      } catch (err) {
-        console.error('Autocomplete init error:', err);
-      }
-    };
-
-    init();
-
+    importLibrary('places').then((lib) => {
+      const { AutocompleteSessionToken } = lib as google.maps.PlacesLibrary;
+      sessionTokenRef.current = new AutocompleteSessionToken();
+    });
     return () => {
-      isMounted = false;
-      if (autocompleteRef.current) {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current);
-        autocompleteRef.current = null;
-      }
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Sync placeholder and disabled dynamically
+  // Sync controlled value from outside (form reset / pre-fill)
   useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.placeholder = placeholder;
-      inputRef.current.disabled = !!disabled;
-    }
-  }, [placeholder, disabled]);
-
-  // Sync controlled value from outside (e.g. Form reset / pre-fill)
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.value = value ?? '';
-    }
+    setInputValue(value ?? '');
   }, [value]);
 
+  const handleSearch = (text: string) => {
+    setInputValue(text);
+    onChange?.(text);
+
+    if (!text) {
+      setOptions([]);
+      onClear?.();
+      return;
+    }
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    debounceRef.current = setTimeout(async () => {
+      const { AutocompleteSuggestion } = await importLibrary('places') as google.maps.PlacesLibrary;
+      try {
+        const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: text,
+          sessionToken: sessionTokenRef.current!,
+          locationBias: {
+            west:  95.0,   // SW longitude — Western Sumatra
+            south: -11.0,  // SW latitude  — Southern Indonesia
+            east:  141.0,  // NE longitude — Indonesia-Papua border
+            north: 20.0,   // NE latitude  — Northern Thailand
+          },
+        });
+
+        setOptions(suggestions.map(s => ({
+          value: s.placePrediction.text.text,
+          label: (
+            <div className="flex flex-col">
+              <span className="font-serif text-bronze-muted">{s.placePrediction.mainText.text}</span>
+              <span className="text-xs opacity-50">{s.placePrediction.secondaryText?.text}</span>
+            </div>
+          ),
+          suggestion: s,
+        })));
+      } catch (err) {
+        console.error('Google Places error:', err);
+      }
+    }, 300);
+  };
+
+  const handleSelect = async (_: string, option: DefaultOptionType) => {
+    const place = (option as DefaultOptionType & { suggestion: google.maps.places.AutocompleteSuggestion }).suggestion.placePrediction.toPlace();
+    await place.fetchFields({ fields: ['location', 'formattedAddress', 'displayName'] });
+
+    const lat     = place.location!.lat();
+    const lng     = place.location!.lng();
+    const address = place.formattedAddress ?? place.displayName ?? '';
+
+    setInputValue(address);
+    onChange?.(address);
+    onPlaceSelect(lat, lng, address);
+
+    // Reset session token — one token covers all predictions + one fetchFields (billing requirement)
+    const { AutocompleteSessionToken } = await importLibrary('places') as google.maps.PlacesLibrary;
+    sessionTokenRef.current = new AutocompleteSessionToken();
+  };
+
   return (
-    <input
-      ref={inputRef}
-      type="text"
-      defaultValue={value ?? ''}
-      placeholder={placeholder}
-      disabled={!!disabled}
-      className={`gmp-autocomplete-input ${className ?? ''}`}
-      onChange={(e) => {
-        onChange?.(e.target.value);
-        if (!e.target.value && onClear) onClear();
-      }}
-    />
+    <AutoComplete
+      value={inputValue}
+      options={options}
+      onSearch={handleSearch}
+      onSelect={handleSelect}
+      style={{ width: '100%' }}
+      disabled={disabled}
+    >
+      <Input
+        placeholder={placeholder}
+        className={`bazi-input ${className ?? ''}`}
+        allowClear
+        onClear={onClear}
+      />
+    </AutoComplete>
   );
 };
 

@@ -12,8 +12,8 @@
  *                     Used on the landing form, dashboard modal, and AI chat input.
  *   .feature-card   — Hover lift animation for landing page feature cards.
  *
- * Note: .pac-container (Google Places dropdown) is intentionally outside @layer
- * because it targets a third-party element injected by the Google Maps SDK.
+ * AntD AutoComplete overrides are below the @layer block — they need to sit outside
+ * the layer to reliably override AntD's own high-specificity component styles.
  */
 
 @layer components {
@@ -52,7 +52,13 @@
   }
 }
 
-/* Third-party dropdown — cannot use @layer components since we don't control the class */
-.pac-container {
-  z-index: 9999;
+/* AntD AutoComplete — override default blue focus ring and hover highlight */
+.ant-select-auto-complete .ant-input:focus,
+.ant-select-auto-complete .ant-input-focused {
+  border-color: var(--color-gold-deep) !important;
+  box-shadow: 0 0 0 2px rgba(115, 92, 0, 0.1) !important;
+}
+
+.ant-select-dropdown .ant-select-item-option-active {
+  background-color: var(--color-surface-container) !important;
 }
