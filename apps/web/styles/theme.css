@@ -1,6 +1,12 @@
-/* Celestial Dawn Theme */
+/* Celestial Dawn Theme — unified variables for landing + dashboard */
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── Brand tokens (static, always available as Tailwind utilities) ── */
 @theme {
   --font-serif: "Noto Serif", serif;
+  --font-zh: "Ma Shan Zheng", cursive;
+
   --color-parchment: #fbf9f4;
   --color-gold-deep: #735c00;
   --color-gold-light: #d4af37;
@@ -10,16 +16,13 @@
   --color-surface-lowest: #ffffff;
   --color-outline-variant: rgba(127, 118, 99, 0.15);
 
-  --radius-lg: 0.25rem;
-  --radius-xl: 0.5rem;
   --radius-full: 0.75rem;
 }
 
-/* Legacy color system (for dashboard) */
-@custom-variant dark (&:is(.dark *));
-
+/* ── Functional tokens (light mode defaults) ── */
 :root {
   --font-size: 16px;
+
   --background: #ffffff;
   --foreground: oklch(0.145 0 0);
   --card: #ffffff;
@@ -40,15 +43,16 @@
   --input: transparent;
   --input-background: #f3f3f5;
   --switch-background: #cbced4;
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
   --ring: oklch(0.708 0 0);
+
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+
   --radius: 0.625rem;
+
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: #030213;
@@ -57,8 +61,12 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
 }
 
+/* ── Dark mode overrides ── */
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -79,13 +87,13 @@
   --border: oklch(0.269 0 0);
   --input: oklch(0.269 0 0);
   --ring: oklch(0.439 0 0);
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
+
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
+
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -94,8 +102,12 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
 }
 
+/* ── Tailwind utility mappings (CSS vars → utility classes) ── */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -123,10 +135,15 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -137,9 +154,15 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* ── Base element defaults ── */
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+
+  html {
+    font-size: var(--font-size);
+    @apply font-sans;
   }
 
   body {
@@ -147,13 +170,9 @@
   }
 
   /**
-  * Default typography styles for HTML elements (h1-h4, p, label, button, input).
-  * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.
-  */
-
-  html {
-    font-size: var(--font-size);
-  }
+   * Default typography for HTML elements.
+   * Tailwind utility classes (text-sm, text-lg, etc.) override these automatically.
+   */
 
   h1 {
     font-size: var(--text-2xl);

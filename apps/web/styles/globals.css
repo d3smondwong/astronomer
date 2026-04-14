@@ -1,0 +1,62 @@
+/**
+ * globals.css — Entry point for all styles.
+ *
+ * This is the only CSS file imported in layout.tsx. It is responsible for:
+ *   - Loading Google Fonts (Noto Serif, Ma Shan Zheng)
+ *   - Initialising Tailwind v4 and tw-animate-css (must appear exactly once)
+ *   - Importing the three project style modules (theme, components, dashboard)
+ *   - Applying the body base style (parchment background, bronze text, serif font)
+ *   - Styling third-party elements that cannot go inside @layer (Google Places autocomplete)
+ *
+ * Import order in layout.tsx:
+ *   antd/dist/reset.css  →  globals.css  →  react-day-picker/dist/style.css
+ */
+
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
+
+/* Tailwind v4 + animation utilities (must appear exactly once) */
+@import 'tailwindcss';
+@source '../**/*.{js,ts,jsx,tsx}';
+@import 'tw-animate-css';
+
+/* Project layers */
+@import "./theme.css";
+@import "./components.css";
+@import "./dashboard.css";
+
+/* Global base overrides */
+@layer base {
+  body {
+    @apply bg-parchment text-bronze-muted font-serif antialiased;
+  }
+}
+
+/* Google Places Autocomplete — plain input styled to match Ant Design */
+.gmp-autocomplete-input {
+  width: 100%;
+  height: 40px;
+  padding: 4px 11px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  color: rgba(0, 0, 0, 0.88);
+  background-color: #ffffff;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.gmp-autocomplete-input:hover {
+  border-color: #735c00;
+}
+.gmp-autocomplete-input:focus {
+  border-color: #735c00;
+  box-shadow: 0 0 0 2px rgba(115, 92, 0, 0.1);
+}
+.gmp-autocomplete-input:disabled {
+  background-color: rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.25);
+  cursor: not-allowed;
+}

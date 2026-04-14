@@ -1,3 +1,18 @@
+/**
+ * dashboard.css — Dashboard layout and sidebar responsive behaviour.
+ *
+ * Handles the structural math of the dashboard shell: sidebar width, content offset,
+ * and the breakpoint at which the sidebar collapses from full labels to icon-only mode.
+ *
+ * Breakpoints:
+ *   ≥ 1024px  — Expanded sidebar (12% width). Section labels, nav text, and user profile visible.
+ *   < 1024px  — Collapsed sidebar (~85px, controlled by JavaScript). Labels hidden,
+ *               nav items centred, profile name abbreviated via data-short attribute.
+ *
+ * This file contains layout concerns only (widths, margins, flex direction, visibility).
+ * Colours, fonts, and component styles live in theme.css and components.css respectively.
+ */
+
 /* Dashboard responsive layout using CSS media queries */
 
 /* Default: Expanded sidebar (12%) */
@@ -8,7 +23,6 @@
 .dashboard-content {
   margin-left: 12%;
 }
-
 
 .sidebar-section-label,
 .sidebar-nav-label,
@@ -37,7 +51,6 @@
 
 /* Collapsed: Small screens (< 1024px) - 85px sidebar - handled by JavaScript */
 @media (max-width: 1023px) {
-
   /* Hide section labels */
   .sidebar-section-label {
     display: none;

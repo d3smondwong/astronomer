@@ -1,6 +1,7 @@
 import 'antd/dist/reset.css';
 import type { Metadata } from "next";
-import "@/styles/index.css";
+import "@/styles/globals.css";
+import "react-day-picker/dist/style.css";
 import { ConfigProvider } from 'antd';
 import { LanguageProvider } from '@/lib/languageContext';
 

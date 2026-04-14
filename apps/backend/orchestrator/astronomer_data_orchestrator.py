@@ -1,0 +1,90 @@
+"""
+Astronomer Data Orchestrator
+
+Accepts raw birth input, runs the True Solar Time conversion, then calls
+each astronomer_logic module in the correct sequence and assembles the
+complete chart dict.
+
+Output is organised by pillar under the top-level key 四柱实体:
+
+  {
+    "四柱实体": {
+      "年柱": { heavenly_stem, earthly_branch, primary_qi, middle_qi, residual_qi,
+                life_stage, void, ten_gods, na_yin },
+      "月柱": { ... },
+      "日柱": { ... },
+      "时柱": { ... },
+    }
+  }
+"""
+
+import json
+from datetime import datetime
+
+from apps.backend.astronomer_logic.solar_lunar_time import get_true_solar_time
+from apps.backend.astronomer_logic.bazi_pillars import get_bazi_pillars
+from apps.backend.astronomer_logic.twelve_life_stages import get_twelve_life_stages
+from apps.backend.astronomer_logic.void_xun_kong import get_void_xun_kong
+from apps.backend.astronomer_logic.ten_gods import get_ten_gods
+from apps.backend.astronomer_logic.na_yin import get_na_yin
+
+_PILLAR_KEYS = ["年柱", "月柱", "日柱", "时柱"]
+
+
+def calculate_natal_chart(
+    birth_datetime: datetime,
+    latitude: float,
+    longitude: float,
+    gender: int,
+) -> dict:
+    """
+    Run the full Phase 1 natal chart calculation.
+
+    Args:
+        birth_datetime: Wall-clock birth datetime (naive).
+        latitude:       Birth location latitude in decimal degrees.
+        longitude:      Birth location longitude in decimal degrees.
+        gender:         1 = male, 0 = female.
+
+    Returns:
+        Dict with top-level key 四柱实体 containing 年柱, 月柱, 日柱, 时柱.
+        Each pillar contains all Phase 1 data for that pillar.
+    """
+    # Step 1: True Solar Time → Lunar object
+    tst_solar = get_true_solar_time(birth_datetime, latitude, longitude)
+    lunar_birthday = tst_solar.getLunar()
+    bazi = lunar_birthday.getEightChar()
+
+    # Step 2: Run all logic modules (all keyed by 年柱/月柱/日柱/时柱)
+    pillars     = get_bazi_pillars(bazi)
+    life_stages = get_twelve_life_stages(bazi, pillars)
+    void        = get_void_xun_kong(bazi)
+    ten_gods    = get_ten_gods(bazi)
+    na_yin      = get_na_yin(bazi)
+
+    # Step 3: Merge all module outputs per pillar
+    si_zhu = {
+        key: {
+            **pillars[key],
+            "life_stage": life_stages[key],
+            "void":       void[key],
+            "ten_gods":   ten_gods[key],
+            "na_yin":     na_yin[key],
+        }
+        for key in _PILLAR_KEYS
+    }
+
+    return {"四柱实体": si_zhu}
+
+
+# --- Verification ---
+
+if __name__ == "__main__":
+    # python -m apps.backend.orchestrator.astronomer_data_orchestrator
+    # Cross-check output against the TypeScript baziOrchestrator for the same birth date.
+
+    birth = datetime(1985, 11, 25, 17, 7, 0)
+    lat, lng = 1.3253, 103.8080
+
+    chart = calculate_natal_chart(birth, lat, lng, gender=1)
+    print(json.dumps(chart, ensure_ascii=False, indent=2))
