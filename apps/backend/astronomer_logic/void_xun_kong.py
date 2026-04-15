@@ -8,8 +8,8 @@ Returns the raw two-character void-pair string from the lunar-python library
 for each of the Four Pillars (年柱, 月柱, 日柱, 时柱). Example: "戌亥".
 
 Two void conditions are checked by check_pillar_void_status():
-  主空 Primary Void  — Day pillar's pair voids 年柱, 月柱, 时柱.
-  倒空 Reverse Void  — Year pillar's pair voids 日柱 (roots not supporting the flower).
+  日柱空亡 Primary Void  — Day pillar's pair voids 年柱, 月柱, 时柱.
+  互换空亡 Reverse Void  — Year pillar's pair voids 日柱 (roots not supporting the flower).
 """
 
 
@@ -36,8 +36,8 @@ def check_pillar_void_status(void_pairs: dict, pillars: dict) -> dict:
     """
     Check three void conditions for each of the Four Pillars.
 
-    主空 Primary Void  — Day pillar's xun kong pair voids 年柱, 月柱, 时柱.
-    倒空 Reverse Void  — Year pillar's xun kong pair voids 日柱 specifically
+    日柱空亡 Primary Void  — Day pillar's xun kong pair voids 年柱, 月柱, 时柱.
+    互换空亡 Reverse Void  — Year pillar's xun kong pair voids 日柱 specifically
                          ("roots not supporting the flower").
 
     Args:
@@ -46,8 +46,8 @@ def check_pillar_void_status(void_pairs: dict, pillars: dict) -> dict:
 
     Returns:
         dict keyed by 年柱, 月柱, 日柱, 时柱. Each value contains:
-          "主空": True/False, or None for 日柱 (not self-checked).
-          "倒空": True/False for 日柱 only; None for all other pillars.
+          "日柱空亡": True/False, or None for 日柱 (not self-checked).
+          "互换空亡": True/False for 日柱 only; None for all other pillars.
     """
     day_void  = void_pairs["日柱"]
     year_void = void_pairs["年柱"]
@@ -57,19 +57,19 @@ def check_pillar_void_status(void_pairs: dict, pillars: dict) -> dict:
 
     return {
         "年柱": {
-            "主空": branch("年柱") in day_void,
-            "倒空": None,
+            "日柱空亡": branch("年柱") in day_void,
+            "互换空亡": None,
         },
         "月柱": {
-            "主空": branch("月柱") in day_void,
-            "倒空": None,
+            "日柱空亡": branch("月柱") in day_void,
+            "互换空亡": None,
         },
         "日柱": {
-            "主空": None,
-            "倒空": branch("日柱") in year_void,
+            "日柱空亡": None,
+            "互换空亡": branch("日柱") in year_void,
         },
         "时柱": {
-            "主空": branch("时柱") in day_void,
-            "倒空": None,
+            "日柱空亡": branch("时柱") in day_void,
+            "互换空亡": None,
         },
     }
