@@ -21,7 +21,7 @@ Output is organised by pillar under the top-level key 四柱实体:
 import json
 from datetime import datetime
 
-from apps.backend.astronomer_logic.solar_lunar_time import get_true_solar_time
+from apps.backend.astronomer_logic.true_solar_time import get_true_solar_time
 from apps.backend.astronomer_logic.bazi_pillars import get_bazi_pillars
 from apps.backend.astronomer_logic.twelve_life_stages import get_twelve_life_stages
 from apps.backend.astronomer_logic.void_xun_kong import get_void_xun_kong, check_pillar_void_status
