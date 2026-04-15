@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { getProfile, getProfiles, deleteProfile, type BaziProfile } from '@/lib/baziOrchestrator';
 import { type LifeStageInfo } from '@/lib/twelveLifeStages';
 import { type NaYinInfo } from '@/lib/naYin';
-import { type VoidInfo } from '@/lib/void';
+import { type VoidInfo, type VoidStatus, computeVoidStatus } from '@/lib/void';
 import { Card, Tag, Tabs, Button, Popconfirm } from 'antd';
 import { format } from 'date-fns';
 import { Calendar, Clock, MapPin, User, Trash2 } from 'lucide-react';
@@ -124,8 +124,8 @@ export default function ProfilePage() {
     lifeStages,
     naYin,
     xunKong,
-    showVoidSection = true,
-    voidCheckPair,
+    voidStatus,
+    maxVoidCount,
   }: {
     pillarLabel: string;
     pillar: any;
@@ -133,14 +133,15 @@ export default function ProfilePage() {
     lifeStages?: { xingYun: LifeStageInfo | null; ziZuo: LifeStageInfo | null } | null;
     naYin?: NaYinInfo | null;
     xunKong?: VoidInfo | null;
-    showVoidSection?: boolean;
-    voidCheckPair?: VoidInfo | null;  // Day Pillar's void pair, used to check this pillar's earthly branch
+    voidStatus: VoidStatus;
+    maxVoidCount: number;
   }) => {
     const heavenlyChar = pillar.heavenlyStem;
     const earthlyChar = pillar.earthlyBranch;
     const heavenlyName = GAN_LABELS[heavenlyChar] || heavenlyChar;
     const earthlyName = ZHI_LABELS[earthlyChar] || earthlyChar;
-    const isVoid = voidCheckPair != null && voidCheckPair.chinese.includes(earthlyChar);
+    const isAnyVoid = voidStatus.primaryVoid === true || voidStatus.reverseVoid === true;
+    const activeVoidCount = [voidStatus.primaryVoid === true, voidStatus.reverseVoid === true].filter(Boolean).length;
 
     const hiddenStemPairs = [
       { stem: pillar.primaryQi, tenGod: pillar.primaryQiTenGod },
@@ -333,23 +334,22 @@ export default function ProfilePage() {
           >
             {language === 'en' ? earthlyName : (ZHI_LABELS_CH[earthlyChar] ?? earthlyChar)}
           </p>
-          <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '8px' }}>
-            <div
-              style={{
-                borderLeft: `3px solid ${isVoid ? '#8C2F2F' : 'transparent'}`,
-                background: isVoid ? 'rgba(140, 47, 47, 0.08)' : 'transparent',
-                padding: '4px 12px',
-                width: '60%',
-                boxSizing: 'border-box',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <span style={{ fontSize: '11px', color: '#8C2F2F', fontFamily: 'Noto Serif, serif', fontStyle: 'italic', visibility: isVoid ? 'visible' : 'hidden' }}>
-                {tr.voidLabel[language]}
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '8px', gap: '3px' }}>
+            {voidStatus.primaryVoid === true && (
+              <span style={{ fontSize: '11px', color: '#8C2F2F', fontFamily: 'Noto Serif, serif', fontStyle: 'italic',
+                             borderLeft: '3px solid #8C2F2F', background: 'rgba(140, 47, 47, 0.08)', padding: '2px 10px' }}>
+                {tr.primaryVoid[language]}
               </span>
-            </div>
+            )}
+            {voidStatus.reverseVoid === true && (
+              <span style={{ fontSize: '11px', color: '#8C2F2F', fontFamily: 'Noto Serif, serif', fontStyle: 'italic',
+                             borderLeft: '3px solid #8C2F2F', background: 'rgba(140, 47, 47, 0.08)', padding: '2px 10px' }}>
+                {tr.reverseVoid[language]}
+              </span>
+            )}
+            {Array.from({ length: maxVoidCount - activeVoidCount }).map((_, i) => (
+              <span key={i} style={{ fontSize: '11px', padding: '2px 10px', visibility: 'hidden' }}>–</span>
+            ))}
           </div>
         </div>
 
@@ -502,7 +502,7 @@ export default function ProfilePage() {
             {tr.voidBranchPairs[language]}
           </label>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', margin: 0 }}>
-            {xunKong && showVoidSection ? (
+            {xunKong ? (
               <>
                 <div
                   style={{
@@ -793,45 +793,24 @@ export default function ProfilePage() {
               label: tr.tabFourPillars[language],
               children: (
                 <div className="space-y-4" style={{ overflowX: 'hidden' }}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" style={{ position: 'relative', paddingTop: '20px', minWidth: 0 }}>
-                    <PillarCard
-                      pillarLabel={tr.yearPillar[language]}
-                      pillar={baziChart.yearPillar}
-                      isDayMaster={false}
-                      lifeStages={baziChart.lifeStages?.year}
-                      naYin={baziChart.naYin?.year}
-                      xunKong={baziChart.xunKong?.year}
-                      voidCheckPair={baziChart.xunKong?.day}
-                    />
-                    <PillarCard
-                      pillarLabel={tr.monthPillar[language]}
-                      pillar={baziChart.monthPillar}
-                      isDayMaster={false}
-                      lifeStages={baziChart.lifeStages?.month}
-                      naYin={baziChart.naYin?.month}
-                      xunKong={baziChart.xunKong?.month}
-                      showVoidSection={false}
-                      voidCheckPair={baziChart.xunKong?.day}
-                    />
-                    <PillarCard
-                      pillarLabel={tr.dayPillar[language]}
-                      pillar={baziChart.dayPillar}
-                      isDayMaster={true}
-                      lifeStages={baziChart.lifeStages?.day}
-                      naYin={baziChart.naYin?.day}
-                      xunKong={baziChart.xunKong?.day}
-                    />
-                    <PillarCard
-                      pillarLabel={tr.hourPillar[language]}
-                      pillar={baziChart.hourPillar}
-                      isDayMaster={false}
-                      lifeStages={baziChart.lifeStages?.hour}
-                      naYin={baziChart.naYin?.hour}
-                      xunKong={baziChart.xunKong?.hour}
-                      showVoidSection={false}
-                      voidCheckPair={baziChart.xunKong?.day}
-                    />
-                  </div>
+                  {(() => {
+                    const dayVoid  = baziChart.xunKong?.day  ?? null;
+                    const yearVoid = baziChart.xunKong?.year ?? null;
+                    const yearVS  = computeVoidStatus({ pillarType: 'year',  branch: baziChart.yearPillar.earthlyBranch,  dayVoidPair: dayVoid,  yearVoidPair: null });
+                    const monthVS = computeVoidStatus({ pillarType: 'month', branch: baziChart.monthPillar.earthlyBranch, dayVoidPair: dayVoid,  yearVoidPair: null });
+                    const dayVS   = computeVoidStatus({ pillarType: 'day',   branch: baziChart.dayPillar.earthlyBranch,   dayVoidPair: null,     yearVoidPair: yearVoid });
+                    const hourVS  = computeVoidStatus({ pillarType: 'hour',  branch: baziChart.hourPillar.earthlyBranch,  dayVoidPair: dayVoid,  yearVoidPair: null });
+                    const countVoids = (vs: VoidStatus) => [vs.primaryVoid === true, vs.reverseVoid === true].filter(Boolean).length;
+                    const maxVoidCount = Math.max(countVoids(yearVS), countVoids(monthVS), countVoids(dayVS), countVoids(hourVS));
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" style={{ position: 'relative', paddingTop: '20px', minWidth: 0 }}>
+                        <PillarCard pillarLabel={tr.yearPillar[language]}  pillar={baziChart.yearPillar}  isDayMaster={false} lifeStages={baziChart.lifeStages?.year}  naYin={baziChart.naYin?.year}  xunKong={baziChart.xunKong?.year}  voidStatus={yearVS}  maxVoidCount={maxVoidCount} />
+                        <PillarCard pillarLabel={tr.monthPillar[language]} pillar={baziChart.monthPillar} isDayMaster={false} lifeStages={baziChart.lifeStages?.month} naYin={baziChart.naYin?.month} xunKong={baziChart.xunKong?.month} voidStatus={monthVS} maxVoidCount={maxVoidCount} />
+                        <PillarCard pillarLabel={tr.dayPillar[language]}   pillar={baziChart.dayPillar}   isDayMaster={true}  lifeStages={baziChart.lifeStages?.day}   naYin={baziChart.naYin?.day}   xunKong={baziChart.xunKong?.day}   voidStatus={dayVS}   maxVoidCount={maxVoidCount} />
+                        <PillarCard pillarLabel={tr.hourPillar[language]}  pillar={baziChart.hourPillar}  isDayMaster={false} lifeStages={baziChart.lifeStages?.hour}  naYin={baziChart.naYin?.hour}  xunKong={baziChart.xunKong?.hour}  voidStatus={hourVS}  maxVoidCount={maxVoidCount} />
+                      </div>
+                    );
+                  })()}
                 </div>
               ),
             },

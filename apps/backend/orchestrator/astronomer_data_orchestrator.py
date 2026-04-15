@@ -24,7 +24,7 @@ from datetime import datetime
 from apps.backend.astronomer_logic.solar_lunar_time import get_true_solar_time
 from apps.backend.astronomer_logic.bazi_pillars import get_bazi_pillars
 from apps.backend.astronomer_logic.twelve_life_stages import get_twelve_life_stages
-from apps.backend.astronomer_logic.void_xun_kong import get_void_xun_kong
+from apps.backend.astronomer_logic.void_xun_kong import get_void_xun_kong, check_pillar_void_status
 from apps.backend.astronomer_logic.ten_gods import get_ten_gods
 from apps.backend.astronomer_logic.na_yin import get_na_yin
 
@@ -59,6 +59,7 @@ def calculate_natal_chart(
     pillars     = get_bazi_pillars(bazi)
     life_stages = get_twelve_life_stages(bazi, pillars)
     void        = get_void_xun_kong(bazi)
+    pillar_void = check_pillar_void_status(void, pillars)
     ten_gods    = get_ten_gods(bazi)
     na_yin      = get_na_yin(bazi)
 
@@ -68,6 +69,7 @@ def calculate_natal_chart(
             **pillars[key],
             "life_stage": life_stages[key],
             "void":       void[key],
+            **pillar_void[key],
             "ten_gods":   ten_gods[key],
             "na_yin":     na_yin[key],
         }

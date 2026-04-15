@@ -20,6 +20,13 @@ export interface VoidInfo {
   english: string;    // e.g. "Dog & Pig"
 }
 
+export interface VoidStatus {
+  /** 空亡 — branch falls in the Day pillar's void pair. null for the Day pillar itself. */
+  primaryVoid: boolean | null;
+  /** 倒空 — Day pillar's branch falls in the Year pillar's void pair. null for non-Day pillars. */
+  reverseVoid: boolean | null;
+}
+
 // All 6 possible void branch pairs across the 6 Xun cycles
 const VOID_ENGLISH: Record<string, string> = {
   '戌亥': 'Dog & Pig',
@@ -40,4 +47,35 @@ export function getVoidInfo(chinese: string): VoidInfo | null {
   const english = VOID_ENGLISH[chinese];
   if (!english) return null;
   return { chinese, english };
+}
+
+/**
+ * Compute the three 空亡 void conditions for a single pillar.
+ *
+ * 空亡 Primary Void  — Day pillar's pair voids this pillar (year / month / hour only).
+ * 倒空 Reverse Void  — Year pillar's pair voids the Day pillar (day pillar only).
+ */
+export function computeVoidStatus(params: {
+  pillarType: 'year' | 'month' | 'day' | 'hour';
+  branch: string;
+  dayVoidPair: VoidInfo | null;
+  yearVoidPair: VoidInfo | null;
+}): VoidStatus {
+  const { pillarType, branch, dayVoidPair, yearVoidPair } = params;
+
+  const primaryVoid =
+    pillarType === 'day'
+      ? null
+      : dayVoidPair != null
+        ? dayVoidPair.chinese.includes(branch)
+        : false;
+
+  const reverseVoid =
+    pillarType === 'day'
+      ? yearVoidPair != null
+        ? yearVoidPair.chinese.includes(branch)
+        : false
+      : null;
+
+  return { primaryVoid, reverseVoid };
 }
