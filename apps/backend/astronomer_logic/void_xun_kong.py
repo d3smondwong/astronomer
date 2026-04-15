@@ -13,6 +13,14 @@ Two void conditions are checked by check_pillar_void_status():
 """
 
 
+_VOID_INTERPRETATIONS: dict[tuple[str, str], str] = {
+    ("年柱", "日柱空亡"): "年柱落于空亡。祖基薄弱，早年与父母缘分较淡，先天福泽不足。",
+    ("月柱", "日柱空亡"): "月柱落于空亡。事业根基不稳，兄弟姊妹情缘疏离，中年发展易逢瓶颈。",
+    ("时柱", "日柱空亡"): "时柱落于空亡。与子女缘薄，晚年少人扶持，个人志向难以完全实现。",
+    ("日柱", "互换空亡"): "日柱与年柱互换空亡。根不养花——自身缺乏祖荫庇护，性格趋向离散与精神追求。",
+}
+
+
 def get_void_xun_kong(bazi) -> dict:
     """
     Return the 空亡 void-branch pair for each of the Four Pillars.
@@ -46,8 +54,8 @@ def check_pillar_void_status(void_pairs: dict, pillars: dict) -> dict:
 
     Returns:
         dict keyed by 年柱, 月柱, 日柱, 时柱. Each value contains:
-          "日柱空亡": True/False, or None for 日柱 (not self-checked).
-          "互换空亡": True/False for 日柱 only; None for all other pillars.
+          "日柱空亡": Descriptive Chinese string when void applies; "无" otherwise.
+          "互换空亡": Descriptive Chinese string when void applies; "无" otherwise.
     """
     day_void  = void_pairs["日柱"]
     year_void = void_pairs["年柱"]
@@ -55,21 +63,27 @@ def check_pillar_void_status(void_pairs: dict, pillars: dict) -> dict:
     def branch(key: str) -> str:
         return pillars[key]["地支"]
 
+    def _void_value(condition: bool, pillar: str, void_type: str) -> str:
+        """Return descriptive string when condition met, else '无'."""
+        if not condition:
+            return "无"
+        return _VOID_INTERPRETATIONS.get((pillar, void_type), "无")
+
     return {
         "年柱": {
-            "日柱空亡": branch("年柱") in day_void,
-            "互换空亡": None,
+            "日柱空亡": _void_value(branch("年柱") in day_void, "年柱", "日柱空亡"),
+            "互换空亡": "无",
         },
         "月柱": {
-            "日柱空亡": branch("月柱") in day_void,
-            "互换空亡": None,
+            "日柱空亡": _void_value(branch("月柱") in day_void, "月柱", "日柱空亡"),
+            "互换空亡": "无",
         },
         "日柱": {
-            "日柱空亡": None,
-            "互换空亡": branch("日柱") in year_void,
+            "日柱空亡": "无",
+            "互换空亡": _void_value(branch("日柱") in year_void, "日柱", "互换空亡"),
         },
         "时柱": {
-            "日柱空亡": branch("时柱") in day_void,
-            "互换空亡": None,
+            "日柱空亡": _void_value(branch("时柱") in day_void, "时柱", "日柱空亡"),
+            "互换空亡": "无",
         },
     }
