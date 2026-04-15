@@ -1,53 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import dayjs from 'dayjs';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Button, Divider, Layout, Popconfirm, Modal, Form, Input, DatePicker, TimePicker, Radio, Switch, Tooltip } from 'antd';
-import { Plus, Users, MessageSquare, User, Trash2, Calendar, Clock, Info } from 'lucide-react';
-import PlacesAutocompleteInput from '@/components/PlacesAutocompleteInput';
-import { getProfiles, deleteProfile, saveProfile, calculateBazi, type BaziProfile } from '@/lib/baziOrchestrator';
+import { Button, Divider, Layout, Popconfirm, Modal } from 'antd';
+import { Plus, Users, MessageSquare, User, Trash2 } from 'lucide-react';
+import BaziProfileForm, { type BaziProfileFormRef } from '@/components/BaziProfileForm';
+import { getProfiles, deleteProfile, type BaziProfile } from '@/lib/baziOrchestrator';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
 
 const { Sider, Content } = Layout;
 
-const TimePickerWithSolar = ({ value, onChange, solarTimeLabel }: { value?: any; onChange?: (val: any) => void; solarTimeLabel?: string }) => (
-  <div>
-    <TimePicker
-      value={value}
-      onChange={onChange}
-      className="w-full bazi-input h-10"
-      format="HH:mm"
-      showNow={false}
-      suffixIcon={<Clock className="w-4 h-4 text-bronze-muted/40" />}
-    />
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-      <Form.Item name="solarCorrection" valuePropName="checked" noStyle initialValue={true}>
-        <Switch size="small" />
-      </Form.Item>
-      <span style={{ fontSize: '10px', color: '#4d4635' }}>{solarTimeLabel ?? 'Solar Time'}</span>
-      <Tooltip title="Calculates exact solar noon for precision.">
-        <Info className="w-3 h-3 text-bronze-muted/40 cursor-help" />
-      </Tooltip>
-    </div>
-  </div>
-);
-
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [profiles, setProfiles] = useState<BaziProfile[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { language, setLanguage } = useLanguage();
   const tr = translations.sidebar;
+  const formRef = useRef<BaziProfileFormRef>(null);
 
   useEffect(() => {
     loadProfiles();
@@ -69,75 +45,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setProfiles(loadedProfiles);
   };
 
-  const onPlaceSelect = (lat: number, lng: number, address: string) => {
-    form.setFieldsValue({ location: address, latitude: String(lat), longitude: String(lng) });
-  };
-
-  const handleAddProfile = () => {
-    form.setFieldsValue({
-      fullName: 'Desmond',
-      dob: dayjs('1985-11-25'),
-      time: dayjs('17:07', 'HH:mm'),
-      location: 'Singapore',
-      gender: 'male',
-      latitude: '1.3253',
-      longitude: '103.808053',
-    });
-    setIsModalOpen(true);
-  };
+  const handleAddProfile = () => setIsModalOpen(true);
 
   const handleModalClose = () => {
     setIsModalOpen(false);
-    form.resetFields();
+    formRef.current?.reset();
   };
 
-  const handleFormSubmit = async (values: any) => {
-    setLoading(true);
-    try {
-      const profileId = `profile_${Date.now()}`;
-
-      const profile: BaziProfile = {
-        id: profileId,
-        name: values.fullName,
-        birthDate: values.dob.toDate(),
-        birthTime: values.time.format('HH:mm'),
-        birthLocation: values.location,
-        gender: values.gender,
-        latitude: parseFloat(values.latitude),
-        longitude: parseFloat(values.longitude),
-      };
-
-      // Calculate Bazi chart (async)
-      const baziChart = await calculateBazi({
-        name: profile.name,
-        birthDate: profile.birthDate,
-        birthTime: profile.birthTime,
-        birthLocation: profile.birthLocation,
-        gender: profile.gender,
-        latitude: profile.latitude,
-        longitude: profile.longitude,
-      });
-
-      // Save profile with Bazi chart
-      const profileWithChart: BaziProfile = {
-        ...profile,
-        baziChart,
-      };
-
-      saveProfile(profileWithChart);
-      toast.success(tr.successGenerated[language]);
-
-      handleModalClose();
-      loadProfiles();
-
-      // Navigate to the new profile
-      router.push(`/profile/${profileId}`);
-    } catch (error) {
-      console.error('Error generating Bazi chart:', error);
-      toast.error(tr.errorGenerated[language]);
-    } finally {
-      setLoading(false);
-    }
+  const handleFormSuccess = (profileId: string) => {
+    setIsModalOpen(false);
+    loadProfiles();
+    router.push(`/profile/${profileId}`);
   };
 
   const handleDeleteProfile = (id: string) => {
@@ -415,112 +333,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         footer={null}
         width={500}
       >
-        <Form layout="vertical" form={form} onFinish={handleFormSubmit} className="space-y-6">
-          <Form.Item
-            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelProfileName[language]}</span>}
-            name="fullName"
-            rules={[
-              { required: true, message: 'Please enter your profile name' },
-              { min: 2, message: 'Profile name must be at least 2 characters' }
-            ]}
-          >
-            <Input placeholder="Enter your profile name" className="bazi-input h-10" />
-          </Form.Item>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <Form.Item
-              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelDob[language]}</span>}
-              name="dob"
-              rules={[{ required: true, message: 'Please select your date of birth' }]}
-            >
-              <DatePicker className="w-full bazi-input h-10" suffixIcon={<Calendar className="w-4 h-4 text-bronze-muted/40" />} />
-            </Form.Item>
-            <Form.Item
-              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelTimeOfBirth[language]}</span>}
-              name="time"
-              rules={[{ required: true, message: 'Please select your birth time' }]}
-            >
-              <TimePickerWithSolar solarTimeLabel={tr.solarTime[language]} />
-            </Form.Item>
-          </div>
-
-          <Form.Item
-            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelGender[language]}</span>}
-            name="gender"
-            rules={[{ required: true, message: 'Please select your gender' }]}
-            style={{ marginTop: '-12px' }}
-          >
-            <Radio.Group style={{ display: 'flex', gap: '24px' }}>
-              <Radio value="female"><span style={{ fontSize: '12px' }}>{tr.labelFemale[language]}</span></Radio>
-              <Radio value="male"><span style={{ fontSize: '12px' }}>{tr.labelMale[language]}</span></Radio>
-            </Radio.Group>
-          </Form.Item>
-
-          <Form.Item
-            label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelBirthLocation[language]}</span>}
-            name="location"
-            rules={[{ required: true, message: 'Please enter your birth location' }]}
-          >
-            <PlacesAutocompleteInput
-                placeholder="Hospital, Country"
-                className="bazi-input h-10"
-                onPlaceSelect={onPlaceSelect}
-                onClear={() => {
-                  form.setFieldsValue({ latitude: '', longitude: '' });
-                }}
-              />
-          </Form.Item>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <Form.Item
-              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelLatitude[language]}</span>}
-              name="latitude"
-              rules={[
-                { required: true, message: 'Required' },
-                {
-                  pattern: /^-?([0-8]?[0-9]|90)(\.[0-9]{1,6})?$/,
-                  message: 'Valid latitude -90 to 90'
-                }
-              ]}
-            >
-              <Input
-                placeholder="e.g., 1.3253"
-                type="number"
-                step="0.0001"
-                className="bazi-input h-10"
-              />
-            </Form.Item>
-
-            <Form.Item
-              label={<span className="text-sm uppercase tracking-widest font-serif text-bronze-muted/60">{tr.labelLongitude[language]}</span>}
-              name="longitude"
-              rules={[
-                { required: true, message: 'Required' },
-                {
-                  pattern: /^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]{1,6})?$/,
-                  message: 'Valid longitude -180 to 180'
-                }
-              ]}
-            >
-              <Input
-                placeholder="e.g., 103.8415"
-                type="number"
-                step="0.0001"
-                className="bazi-input h-10"
-              />
-            </Form.Item>
-          </div>
-
-          <Button
-            type="primary"
-            htmlType="submit"
-            loading={loading}
-            block
-            style={{ backgroundColor: '#735c00', borderColor: '#735c00', height: '40px', marginTop: '24px' }}
-          >
-            {tr.btnGenerate[language]}
-          </Button>
-        </Form>
+        <BaziProfileForm
+          ref={formRef}
+          onSuccess={handleFormSuccess}
+          submitClassName="gold-gradient w-full h-10 text-white font-serif tracking-wide border-none mt-6"
+        />
       </Modal>
     </div>
   );
