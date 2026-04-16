@@ -28,6 +28,7 @@ export interface BaziProfile {
   gender: 'male' | 'female';
   latitude: number;
   longitude: number;
+  usedSolarTime?: boolean;
   baziChart?: BaziChart;
 }
 
@@ -70,26 +71,42 @@ function attachTenGods(pillar: Pillar, shiShenGan: string, shiShenZhi: string[])
 /**
  * Main Bazi calculation function
  *
- * Converts birth date/time to True Solar Time, calculates the four pillars,
+ * Optionally converts birth date/time to True Solar Time, calculates the four pillars,
  * determines element balance, lucky elements, and personality traits.
  */
 export async function calculateBazi(
-  profile: Omit<BaziProfile, 'id' | 'baziChart'>
+  profile: Omit<BaziProfile, 'id' | 'baziChart'>,
+  useSolarTimeCorrection: boolean = false
 ): Promise<BaziChart> {
   // Combine birth date and time into a single datetime
   const [hours, minutes] = profile.birthTime.split(':').map(Number);
   const birthDateTime = new Date(profile.birthDate);
   birthDateTime.setHours(hours, minutes, 0, 0);
 
-  // Convert to True Solar Time using lunar library
-  const result = await getTrueSolarTime(
-    birthDateTime,
-    profile.latitude,
-    profile.longitude
-  );
+  // Get the lunar date - either via TST conversion or directly from standard time
+  let bazi: any;
 
-  // Get bazi object from the TST-adjusted lunar date, then extract pillars
-  const bazi = result.lunarDate.getEightChar();
+  if (useSolarTimeCorrection) {
+    // Convert to True Solar Time using lunar library
+    const result = await getTrueSolarTime(
+      birthDateTime,
+      profile.latitude,
+      profile.longitude
+    );
+    bazi = result.lunarDate.getEightChar();
+  } else {
+    // Use standard clock time directly
+    const Solar = (await import('lunar-javascript/index.js')).Solar;
+    const lunarDate = Solar.fromYmdHms(
+      birthDateTime.getFullYear(),
+      birthDateTime.getMonth() + 1,
+      birthDateTime.getDate(),
+      birthDateTime.getHours(),
+      birthDateTime.getMinutes(),
+      0
+    );
+    bazi = lunarDate.getLunar().getEightChar();
+  }
   const pillars = extractPillars(bazi);
 
   // Extract 12 Life Stages — two sub-categories per pillar:

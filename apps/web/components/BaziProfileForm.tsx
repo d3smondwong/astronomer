@@ -96,17 +96,21 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
           gender: values.gender,
           latitude: parseFloat(values.latitude),
           longitude: parseFloat(values.longitude),
+          usedSolarTime: values.solarCorrection ?? false,
         };
 
-        const baziChart = await calculateBazi({
-          name: profile.name,
-          birthDate: profile.birthDate,
-          birthTime: profile.birthTime,
-          birthLocation: profile.birthLocation,
-          gender: profile.gender,
-          latitude: profile.latitude,
-          longitude: profile.longitude,
-        });
+        const baziChart = await calculateBazi(
+          {
+            name: profile.name,
+            birthDate: profile.birthDate,
+            birthTime: profile.birthTime,
+            birthLocation: profile.birthLocation,
+            gender: profile.gender,
+            latitude: profile.latitude,
+            longitude: profile.longitude,
+          },
+          values.solarCorrection ?? false
+        );
 
         saveProfile({ ...profile, baziChart });
         toast.success(tr.successGenerated[language]);

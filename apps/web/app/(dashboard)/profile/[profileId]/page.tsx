@@ -7,7 +7,7 @@ import { getProfile, getProfiles, deleteProfile } from '@/lib/baziStorage';
 import { type LifeStageInfo } from '@/lib/twelveLifeStages';
 import { type NaYinInfo } from '@/lib/naYin';
 import { type VoidInfo, type VoidStatus, computeVoidStatus } from '@/lib/void';
-import { Card, Tag, Tabs, Button, Popconfirm } from 'antd';
+import { Card, Tag, Tabs, Button, Popconfirm, Tooltip } from 'antd';
 import { format } from 'date-fns';
 import { Calendar, Clock, MapPin, User, Trash2 } from 'lucide-react';
 import { VictoryPie, VictoryChart, VictoryBar, VictoryTheme, VictoryAxis } from 'victory';
@@ -739,37 +739,112 @@ export default function ProfilePage() {
     <div className="h-full overflow-auto" style={{ overflowX: 'hidden' }}>
       <div className="max-w-7xl mx-auto p-6 space-y-6" style={{ overflowX: 'hidden' }}>
         {/* Profile Header */}
-        <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+        <Card style={{
+          borderColor: 'rgba(115, 92, 0, 0.1)',
+          background: 'linear-gradient(180deg, #243447 0%, #1B263B 100%)',
+          position: 'relative'
+        }}>
           <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold mb-4 font-serif text-gold-deep">{profile.name}</h1>
-              <div className="space-y-2">
-                <div className="flex items-center gap-6 text-sm text-bronze-muted">
-                  <span className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
+            {/* Name + Info Grid */}
+            <div className="flex-1 min-w-0">
+              <h1 className="text-3xl font-semibold mb-3 font-serif" style={{ color: '#E8F4F8' }}>{profile.name}</h1>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* Date of Birth */}
+                <div className="flex flex-col gap-0.5">
+                  <span style={{
+                    fontSize: 10,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    color: '#A8BCC9',
+                    fontWeight: 500
+                  }}>
+                    Date of Birth
+                  </span>
+                  <span className="flex items-center gap-1.5 text-sm" style={{ color: '#D4DFE6' }}>
+                    <Calendar className="w-3.5 h-3.5 shrink-0" />
                     {format(profile.birthDate, 'PPP')}
                   </span>
-                  <span className="flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
+                </div>
+
+                {/* Birth Time */}
+                <div className="flex flex-col gap-0.5">
+                  <span style={{
+                    fontSize: 10,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    color: '#A8BCC9',
+                    fontWeight: 500
+                  }}>
+                    Birth Time
+                  </span>
+                  <span className="flex items-center gap-1.5 text-sm" style={{ color: '#D4DFE6' }}>
+                    <Clock className="w-3.5 h-3.5 shrink-0" />
                     {profile.birthTime}
+                    {profile.usedSolarTime && (
+                      <Tooltip title="True Solar Time conversion is utilised for this chart">
+                        <span style={{
+                          display: 'inline-block',
+                          backgroundColor: '#A8BCC9',
+                          color: '#1B263B',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          cursor: 'help',
+                          marginLeft: '4px'
+                        }}>
+                          TST
+                        </span>
+                      </Tooltip>
+                    )}
                   </span>
-                  <span className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    {profile.birthLocation}
+                </div>
+
+                {/* Birth Location */}
+                <div className="flex flex-col gap-0.5">
+                  <span style={{
+                    fontSize: 10,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    color: '#A8BCC9',
+                    fontWeight: 500
+                  }}>
+                    Birth Location
                   </span>
-                  <span className="flex items-center gap-2">
-                    <User className="w-4 h-4" />
+                  <span className="flex items-center gap-1.5 text-sm" style={{ color: '#D4DFE6' }}>
+                    <MapPin className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{profile.birthLocation}</span>
+                  </span>
+                </div>
+
+                {/* Gender */}
+                <div className="flex flex-col gap-0.5">
+                  <span style={{
+                    fontSize: 10,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    color: '#A8BCC9',
+                    fontWeight: 500
+                  }}>
+                    Gender
+                  </span>
+                  <span className="flex items-center gap-1.5 text-sm" style={{ color: '#D4DFE6' }}>
+                    <User className="w-3.5 h-3.5 shrink-0" />
                     {profile.gender === 'male' ? tr.male[language] : tr.female[language]}
                   </span>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {(profile.latitude != null && profile.longitude != null) && (
-                <Tag color="blue">
-                  {profile.latitude.toFixed(4)}° / {profile.longitude.toFixed(4)}°
-                </Tag>
-              )}
+
+          </div>
+
+          {/* Delete Button - Top Right Corner */}
+          <div style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px'
+          }}>
+            <Tooltip title={tr.deleteBtn[language]}>
               <Popconfirm
                 title={tr.deleteTitle[language]}
                 description={`Are you sure you want to delete "${profile.name}"? This action cannot be undone.`}
@@ -778,11 +853,26 @@ export default function ProfilePage() {
                 cancelText={tr.deleteCancel[language]}
                 okButtonProps={{ danger: true }}
               >
-                <Button danger type="text" size="small" icon={<Trash2 className="w-4 h-4" />}>
-                  {tr.deleteBtn[language]}
-                </Button>
+                <Button
+                  danger
+                  type="text"
+                  size="small"
+                  icon={<Trash2 className="w-4 h-4" />}
+                  style={{
+                    color: '#D4DFE6',
+                    borderColor: 'transparent'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#E8F4F8';
+                    e.currentTarget.style.backgroundColor = 'rgba(232, 244, 248, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#D4DFE6';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                />
               </Popconfirm>
-            </div>
+            </Tooltip>
           </div>
         </Card>
 
