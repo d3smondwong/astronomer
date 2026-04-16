@@ -31,7 +31,6 @@ from apps.backend.astronomer_logic.tai_ming_shen import get_san_yuan
 
 _PILLAR_KEYS = ["年柱", "月柱", "日柱", "时柱"]
 
-
 def calculate_natal_chart(
     birth_datetime: datetime,
     latitude: float,
@@ -51,21 +50,21 @@ def calculate_natal_chart(
         Dict with top-level key 四柱实体 containing 年柱, 月柱, 日柱, 时柱.
         Each pillar contains all Phase 1 data for that pillar.
     """
-    # Step 1: True Solar Time → Lunar object
+    # True Solar Time → Lunar object
     tst_solar = get_true_solar_time(birth_datetime, latitude, longitude)
     lunar_birthday = tst_solar.getLunar()
+    lunar_time = lunar_birthday.getTime()
     bazi = lunar_birthday.getEightChar()
 
-    # Step 2: Run all logic modules (all keyed by 年柱/月柱/日柱/时柱)
+    # Modules keyed by 年柱/月柱/日柱/时柱
     pillars     = get_bazi_pillars(bazi)
     life_stages = get_twelve_life_stages(bazi, pillars)
     void        = get_void_xun_kong(bazi)
     pillar_void = check_pillar_void_status(void, pillars)
     ten_gods    = get_ten_gods(bazi)
     na_yin      = get_na_yin(bazi)
-    tai_ming_shen = get_san_yuan(lunar_birthday)
 
-    # Step 3: Merge all module outputs per pillar
+    # Merge all module outputs per pillar
     si_zhu = {
         key: {
             "天干":     pillars[key]["天干"],
@@ -81,7 +80,13 @@ def calculate_natal_chart(
         for key in _PILLAR_KEYS
     }
 
+    # Individual Modules
+    tai_ming_shen = get_san_yuan(lunar_birthday)
+
     return {
+        "农历生日": lunar_birthday.toString() + f" {birth_datetime.hour:02d}:{birth_datetime.minute:02d} ({lunar_time})",
+        "性别": "男" if gender == 1 else "女",
+        "生肖": lunar_birthday.getYearShengXiao(),
         "四柱实体": si_zhu,
         **tai_ming_shen,
     }
