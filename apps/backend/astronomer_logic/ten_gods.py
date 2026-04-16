@@ -35,9 +35,11 @@ def get_ten_gods(bazi) -> dict:
         primary_qi_ten_god, middle_qi_ten_god, residual_qi_ten_god = _hidden_ten_gods(zhi_gods_fn())
         return {
             "天干十神": heavenly_stem_ten_god,
-            "本气十神": primary_qi_ten_god,
-            "中气十神": middle_qi_ten_god,
-            "余气十神": residual_qi_ten_god,
+            "藏干十神": {
+                "本气十神": primary_qi_ten_god,
+                "中气十神": middle_qi_ten_god,
+                "余气十神": residual_qi_ten_god,
+            },
         }
 
     return {
