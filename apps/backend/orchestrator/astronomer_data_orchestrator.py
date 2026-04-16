@@ -66,12 +66,15 @@ def calculate_natal_chart(
     # Step 3: Merge all module outputs per pillar
     si_zhu = {
         key: {
-            **pillars[key],
-            "life_stage": life_stages[key],
-            "void":       void[key],
+            "天干":     pillars[key]["天干"],
+            "天干十神": ten_gods[key]["天干十神"],
+            "地支":     pillars[key]["地支"],
+            "藏干":     pillars[key]["藏干"],
+            "藏干十神": ten_gods[key]["藏干十神"],
+            "十二长生": life_stages[key],
+            "空亡地支": void[key],
             **pillar_void[key],
-            "ten_gods":   ten_gods[key],
-            "na_yin":     na_yin[key],
+            "纳音":     na_yin[key],
         }
         for key in _PILLAR_KEYS
     }
