@@ -21,6 +21,7 @@ Output is organised by pillar under the top-level key 四柱实体:
 import json
 from datetime import datetime
 
+from lunar_python import Solar
 from apps.backend.astronomer_logic.true_solar_time import get_true_solar_time
 from apps.backend.astronomer_logic.bazi_pillars import get_bazi_pillars
 from apps.backend.astronomer_logic.twelve_life_stages import get_twelve_life_stages
@@ -36,23 +37,40 @@ def calculate_natal_chart(
     latitude: float,
     longitude: float,
     gender: int,
+    use_solar_time_correction: bool = False,
 ) -> dict:
     """
     Run the full Phase 1 natal chart calculation.
 
     Args:
-        birth_datetime: Wall-clock birth datetime (naive).
-        latitude:       Birth location latitude in decimal degrees.
-        longitude:      Birth location longitude in decimal degrees.
-        gender:         1 = male, 0 = female.
+        birth_datetime:          Wall-clock birth datetime (naive).
+        latitude:                Birth location latitude in decimal degrees.
+        longitude:               Birth location longitude in decimal degrees.
+        gender:                  1 = male, 0 = female.
+        use_solar_time_correction: If True, applies True Solar Time conversion.
+                                  If False, uses standard clock time directly.
 
     Returns:
         Dict with top-level key 四柱实体 containing 年柱, 月柱, 日柱, 时柱.
         Each pillar contains all Phase 1 data for that pillar.
     """
-    # True Solar Time → Lunar object
-    tst_solar = get_true_solar_time(birth_datetime, latitude, longitude)
-    lunar_birthday = tst_solar.getLunar()
+    # Get lunar date - either via TST conversion or directly from standard time
+    if use_solar_time_correction:
+        # Convert to True Solar Time
+        tst_solar = get_true_solar_time(birth_datetime, latitude, longitude)
+        lunar_birthday = tst_solar.getLunar()
+    else:
+        # Use standard clock time directly
+        solar_date = Solar.fromYmdHms(
+            birth_datetime.year,
+            birth_datetime.month,
+            birth_datetime.day,
+            birth_datetime.hour,
+            birth_datetime.minute,
+            birth_datetime.second,
+        )
+        lunar_birthday = solar_date.getLunar()
+
     lunar_time = lunar_birthday.getTime()
     bazi = lunar_birthday.getEightChar()
 

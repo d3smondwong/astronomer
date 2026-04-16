@@ -4,11 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Button, Divider, Layout, Popconfirm, Modal } from 'antd';
+import { Divider, Layout, Popconfirm, Modal } from 'antd';
 import { Plus, Users, MessageSquare, User, Trash2 } from 'lucide-react';
 import BaziProfileForm, { type BaziProfileFormRef } from '@/components/BaziProfileForm';
-import type { BaziProfile } from '@/lib/baziOrchestrator';
-import { getProfiles, deleteProfile } from '@/lib/baziStorage';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
@@ -18,7 +16,7 @@ const { Sider, Content } = Layout;
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [profiles, setProfiles] = useState<BaziProfile[]>([]);
+  const [profiles, setProfiles] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -28,7 +26,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     loadProfiles();
-  }, [pathname]);
+  }, []);
 
   useEffect(() => {
     // Set mounted flag and initial state
@@ -41,9 +39,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const loadProfiles = () => {
-    const loadedProfiles = getProfiles();
-    setProfiles(loadedProfiles);
+  const loadProfiles = async () => {
+    try {
+      const res = await fetch('/api/profiles');
+      if (res.ok) {
+        const loadedProfiles = await res.json();
+        setProfiles(loadedProfiles);
+      }
+    } catch (error) {
+      console.error('Error loading profiles:', error);
+    }
   };
 
   const handleAddProfile = () => setIsModalOpen(true);
@@ -59,20 +64,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push(`/profile/${profileId}`);
   };
 
-  const handleDeleteProfile = (id: string) => {
-    const remaining = profiles.filter((p) => p.id !== id);
-    deleteProfile(id);
-    setProfiles(remaining);
-    toast.success(tr.successDeleted[language]);
+  const handleDeleteProfile = async (id: string) => {
+    try {
+      await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
+      const remaining = profiles.filter((p: any) => p.id !== id);
+      setProfiles(remaining);
+      toast.success(tr.successDeleted[language]);
 
-    if (pathname.includes(id)) {
-      if (remaining.length > 0) {
-        const deletedIndex = profiles.findIndex((p) => p.id === id);
+      if (pathname.includes(id)) {
+        if (remaining.length > 0) {
+        const deletedIndex = profiles.findIndex((p: any) => p.id === id);
         const next = remaining[deletedIndex] ?? remaining[deletedIndex - 1];
         router.push(`/profile/${next.id}`);
       } else {
         handleAddProfile();
       }
+    }
+    } catch (error) {
+      console.error('Error deleting profile:', error);
+      toast.error('Failed to delete profile');
     }
   };
 

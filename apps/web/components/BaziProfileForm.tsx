@@ -5,8 +5,6 @@ import dayjs from 'dayjs';
 import { Form, Input, DatePicker, TimePicker, Radio, Switch, Button, Tooltip } from 'antd';
 import { Calendar, Clock, Info } from 'lucide-react';
 import PlacesAutocompleteInput from '@/components/PlacesAutocompleteInput';
-import { calculateBazi, type BaziProfile } from '@/lib/baziOrchestrator';
-import { saveProfile } from '@/lib/baziStorage';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
@@ -85,34 +83,34 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
     const onFinish = async (values: any) => {
       setLoading(true);
       try {
-        const profileId = `profile_${Date.now()}`;
-
-        const profile: BaziProfile = {
-          id: profileId,
-          name: values.fullName,
-          birthDate: values.dob.toDate(),
-          birthTime: values.time.format('HH:mm'),
-          birthLocation: values.location,
-          gender: values.gender,
+        // Build birth input for FastAPI
+        const birthInput = {
+          year: values.dob.year(),
+          month: values.dob.month() + 1, // dayjs months are 0-indexed
+          day: values.dob.date(),
+          hour: values.time.hour(),
+          minute: values.time.minute(),
+          gender: values.gender === 'male' ? 1 : 0,
           latitude: parseFloat(values.latitude),
           longitude: parseFloat(values.longitude),
-          usedSolarTime: values.solarCorrection ?? false,
+          use_solar_time_correction: values.solarCorrection ?? true,
+          profileName: values.fullName,
+          birthLocation: values.location,
         };
 
-        const baziChart = await calculateBazi(
-          {
-            name: profile.name,
-            birthDate: profile.birthDate,
-            birthTime: profile.birthTime,
-            birthLocation: profile.birthLocation,
-            gender: profile.gender,
-            latitude: profile.latitude,
-            longitude: profile.longitude,
-          },
-          values.solarCorrection ?? false
-        );
+        // POST to /api/chart (Next.js Route Handler)
+        const response = await fetch('/api/chart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(birthInput),
+        });
 
-        saveProfile({ ...profile, baziChart });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const { profileId } = await response.json();
         toast.success(tr.successGenerated[language]);
         form.resetFields();
         setLoading(false);

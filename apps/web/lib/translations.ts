@@ -76,6 +76,7 @@ export const translations = {
     deleteOk:         { en: 'Delete',           ch: '删除' },
     profileNotFound:  { en: 'Profile not found', ch: '找不到命盘' },
     loadingProfile:   { en: 'Loading profile...', ch: '加载中...' },
+    tdLabel:          { en: 'Coming Soon',      ch: '敬请期待' },
     male:             { en: 'Male',             ch: '男' },
     female:           { en: 'Female',           ch: '女' },
   },

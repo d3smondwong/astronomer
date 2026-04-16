@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Card, Select, Tag } from 'antd';
-import type { BaziProfile } from '@/lib/baziOrchestrator';
-import { getProfiles } from '@/lib/baziStorage';
+import type { BaziProfile } from '@/types/baziLibraryTypes';
+// import { getProfiles } from '@/lib/baziStorage';
 import { Heart, Zap } from 'lucide-react';
 import { VictoryChart, VictoryBar, VictoryTheme, VictoryAxis, VictoryGroup } from 'victory';
 
@@ -13,8 +13,9 @@ export default function CompatibilityPage() {
   const [profile2, setProfile2] = useState<string>('');
 
   useEffect(() => {
-    const loadedProfiles = getProfiles();
-    setProfiles(loadedProfiles);
+    // TODO: Migrate to backend API call in future phase
+    // const loadedProfiles = getProfiles();
+    // setProfiles(loadedProfiles);
   }, []);
 
   const selectedProfile1 = profiles.find(p => p.id === profile1);
