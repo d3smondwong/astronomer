@@ -27,6 +27,7 @@ from apps.backend.astronomer_logic.twelve_life_stages import get_twelve_life_sta
 from apps.backend.astronomer_logic.void_xun_kong import get_void_xun_kong, check_pillar_void_status
 from apps.backend.astronomer_logic.ten_gods import get_ten_gods
 from apps.backend.astronomer_logic.na_yin import get_na_yin
+from apps.backend.astronomer_logic.tai_ming_shen import get_san_yuan
 
 _PILLAR_KEYS = ["年柱", "月柱", "日柱", "时柱"]
 
@@ -62,6 +63,7 @@ def calculate_natal_chart(
     pillar_void = check_pillar_void_status(void, pillars)
     ten_gods    = get_ten_gods(bazi)
     na_yin      = get_na_yin(bazi)
+    tai_ming_shen = get_san_yuan(lunar_birthday)
 
     # Step 3: Merge all module outputs per pillar
     si_zhu = {
@@ -79,7 +81,10 @@ def calculate_natal_chart(
         for key in _PILLAR_KEYS
     }
 
-    return {"四柱实体": si_zhu}
+    return {
+        "四柱实体": si_zhu,
+        **tai_ming_shen,
+    }
 
 
 # --- Verification ---
