@@ -222,3 +222,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Local profile database (Phase 1)
+apps/web/.profiles.json
