@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Card, Select, Tag } from 'antd';
-import { getProfiles, type BaziProfile } from '@/lib/baziOrchestrator';
+import type { BaziProfile } from '@/lib/baziOrchestrator';
+import { getProfiles } from '@/lib/baziStorage';
 import { Heart, Zap } from 'lucide-react';
 import { VictoryChart, VictoryBar, VictoryTheme, VictoryAxis, VictoryGroup } from 'victory';
 

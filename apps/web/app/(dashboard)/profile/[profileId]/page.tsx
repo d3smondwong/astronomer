@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getProfile, getProfiles, deleteProfile, type BaziProfile } from '@/lib/baziOrchestrator';
+import type { BaziProfile } from '@/lib/baziOrchestrator';
+import { getProfile, getProfiles, deleteProfile } from '@/lib/baziStorage';
 import { type LifeStageInfo } from '@/lib/twelveLifeStages';
 import { type NaYinInfo } from '@/lib/naYin';
 import { type VoidInfo, type VoidStatus, computeVoidStatus } from '@/lib/void';
