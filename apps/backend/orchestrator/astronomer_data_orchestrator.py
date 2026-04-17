@@ -29,6 +29,7 @@ from apps.backend.astronomer_logic.void_xun_kong import get_void_xun_kong, check
 from apps.backend.astronomer_logic.ten_gods import get_ten_gods
 from apps.backend.astronomer_logic.na_yin import get_na_yin
 from apps.backend.astronomer_logic.tai_ming_shen import get_san_yuan
+from apps.backend.astronomer_logic.classical_texts import get_classical_texts
 
 _PILLAR_KEYS = ["年柱", "月柱", "日柱", "时柱"]
 
@@ -75,12 +76,13 @@ def calculate_natal_chart(
     bazi = lunar_birthday.getEightChar()
 
     # Modules keyed by 年柱/月柱/日柱/时柱
-    pillars     = get_bazi_pillars(bazi)
-    life_stages = get_twelve_life_stages(bazi, pillars)
-    void        = get_void_xun_kong(bazi)
-    pillar_void = check_pillar_void_status(void, pillars)
-    ten_gods    = get_ten_gods(bazi)
-    na_yin      = get_na_yin(bazi)
+    pillars        = get_bazi_pillars(bazi)
+    life_stages    = get_twelve_life_stages(bazi, pillars)
+    void           = get_void_xun_kong(bazi)
+    pillar_void    = check_pillar_void_status(void, pillars)
+    ten_gods       = get_ten_gods(bazi)
+    na_yin         = get_na_yin(bazi)
+    classical_texts_data = get_classical_texts(pillars)
 
     # Merge all module outputs per pillar
     si_zhu = {
@@ -105,8 +107,10 @@ def calculate_natal_chart(
         "农历生日": lunar_birthday.toString() + f" {birth_datetime.hour:02d}:{birth_datetime.minute:02d} ({lunar_time})",
         "性别": "男" if gender == 1 else "女",
         "生肖": lunar_birthday.getYearShengXiao(),
+        "生时节气": lunar_birthday.getJieQi(),
         "四柱实体": si_zhu,
         **tai_ming_shen,
+        **classical_texts_data,
     }
 
 
