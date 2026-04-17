@@ -1,14 +1,14 @@
 /**
  * Next.js Route Handler: POST /api/chart
  *
- * Accepts birth data from the client, calls FastAPI /v1/chart/full,
+ * Accepts birth data from the client, calls FastAPI /v1/chart/natal,
  * and returns the chart JSON with appropriate cache headers.
  *
  * In Phase 2, this will verify Firebase ID tokens and cache results in Firestore.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchFullChart, BirthInputPayload, ChartResponse } from '@/lib/fastApiClient';
+import { fetchNatalChart, BirthInputPayload, ChartResponse } from '@/lib/fastApiClient';
 import { createProfile, type ProfileRecord } from '@/lib/profilesDb';
 
 interface ChartRequestBody {
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     };
 
     // Call FastAPI backend
-    const baziChart = await fetchFullChart(birthInput);
+    const baziChart = await fetchNatalChart(birthInput);
 
     // Generate profile ID (in Phase 2, this will be a Firestore doc ID)
     const profileId = `profile_${Date.now()}`;
