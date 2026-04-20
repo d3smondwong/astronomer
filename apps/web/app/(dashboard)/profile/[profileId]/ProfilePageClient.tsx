@@ -78,6 +78,54 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     '正印': 'Direct Resource', '我': 'Self',
   };
 
+  const SHEN_SHA_LABELS: Record<string, string> = {
+    // Year branch stars
+    '龙德': 'Dragon Virtue', '红鸾': 'Red Luan', '天喜': 'Heavenly Joy',
+    '桃花': 'Peach Blossom', '墙内桃花': 'Inner Peach Blossom', '墙外桃花': 'Outer Peach Blossom',
+    '孤辰': 'Lonely Star', '寡宿': "Widow's Lodge",
+    '大耗': 'Great Drain', '病符': 'Illness Star', '吊客': 'Mourning Guest',
+    '丧门': 'Messenger of Death', '白虎': 'White Tiger', '卷舌': 'Curled Tongue',
+    '披麻': 'Mourning Attire', '披头': 'Disheveled Head',
+    '吟呻': 'Groaning Malefic', '破碎': 'Shattering Malefic', '白衣': 'White Garment Malefic',
+    '元辰': 'Primary Star', '六厄': 'Six Adversities',
+    // Month branch stars
+    '天德贵人': 'Heavenly Virtue Noble', '月德贵人': 'Monthly Virtue Noble', '天医': 'Heavenly Doctor',
+    '月空': 'Monthly Void', '血刃': 'Blood Blade', '天赦': 'Heavenly Pardon',
+    '天转': 'Heavenly Turn', '地转': 'Earthly Turn', '季节性退神': 'Seasonal Retreating Spirit',
+    '天德合': 'Heavenly Virtue Combination', '月德合': 'Monthly Virtue Combination',
+    '天月德合': 'Heavenly & Monthly Virtue Combination',
+    // Day/year branch stars
+    '将星': 'Commanding Star', '华盖': 'Canopy Star', '驿马': 'Travel Horse',
+    '劫煞': 'Robbery Sha', '亡神': 'Perishing God', '灾煞': 'Calamity Sha',
+    '沐浴桃花': 'Peach Blossom Bath',
+    // Day/year stem stars
+    '昼天乙贵人': 'Day Heavenly Noble', '夜天乙贵人': 'Night Heavenly Noble',
+    '文昌': 'Literary Star', '学堂': 'Academy Star', '太极贵人': 'Tai Ji Noble',
+    '禄神': 'Prosperity Star', '金舆': 'Golden Carriage', '国印': 'National Seal',
+    '福星': 'Fortune Star', '真词馆': 'True Literary Academy', '正词馆': 'Standard Literary Academy',
+    '红艳': 'Red Charm', '天厨贵人': 'Heavenly Kitchen Noble', '飞刃': 'Flying Blade',
+    '天官贵人': 'Heavenly Officer Noble', '羊刃': 'Sheep Blade', '流霞': 'Blood Disaster Star',
+    '勾煞': 'Hook Disaster', '绞煞': 'Twist Disaster',
+    // Derived & special
+    '福禄双美': 'Double Fortune & Prosperity',
+    '天上三奇': "Heaven's Three Wonders", '地下三奇': "Earth's Three Wonders",
+    '人中三奇': "Human's Three Wonders",
+    '寅命自禄': 'Yin Self-Lu', '卯命自禄': 'Mao Self-Lu',
+    '申命自禄': 'Shen Self-Lu', '酉命自禄': 'You Self-Lu',
+    '巳中藏丙': 'Si Hidden Bing', '亥中藏壬': 'Hai Hidden Ren',
+    // Pillar formations
+    '阴阳差错': 'Yin-Yang Discord', '十恶大败': 'Ten Great Failures',
+    '魁罡': 'Kui Gang',
+    '进神': 'Advancing Spirit', '六秀': 'Six Elegance', '八专': 'Eight Specialty',
+    '九丑': 'Nine Ugly', '孤鸾': 'Lone Phoenix', '退气神煞': 'Retreating Qi Sha',
+    '四废': 'Four Wastes', '金神': 'Golden Deity', '十灵': 'Ten Spirits',
+    '天罗': 'Heavenly Net', '地网': 'Earthly Net', '童子煞': 'Child Sha',
+    '隔角煞': 'Separated Corner Sha',
+    // Relational stars (can appear on pillars)
+    '禄元互换': 'Lu-Yuan Exchange', '进真禄': 'Advancing True Lu',
+    '退真禄': 'Retreating True Lu', '德秀贵人': 'Virtue & Elegance Noble', '暗禄': 'Hidden Lu',
+  };
+
   const PillarCard = ({
     pillarLabel,
     pillar,
@@ -87,6 +135,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     xunKong,
     voidStatus,
     maxVoidCount,
+    shenSha,
   }: {
     pillarLabel: string;
     pillar: any;
@@ -96,6 +145,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     xunKong?: VoidInfo | null;
     voidStatus: VoidStatus;
     maxVoidCount: number;
+    shenSha?: { 名称: string; 来源: string; 解读?: string }[];
   }) => {
     const heavenlyChar = pillar.天干;
     const earthlyChar = pillar.地支;
@@ -181,10 +231,10 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
           </label>
           <div
             style={{
-              fontSize: '56px',
-              fontWeight: '700',
+              fontSize: '48px',
+              fontWeight: '600',
               color: isDayMaster ? '#735c00' : '#4d4635',
-              margin: '12px 0 12px 0',
+              margin: '6px 0 12px 0',
               lineHeight: 1,
               fontFamily: 'Ma Shan Zheng, serif',
             }}
@@ -272,7 +322,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
           </label>
           <div
             style={{
-              fontSize: '56px',
+              fontSize: '48px',
               fontWeight: '700',
               color: '#4d4635',
               opacity: 0.8,
@@ -466,17 +516,12 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
               <>
                 <div
                   style={{
-                    height: '56px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '56px',
-                    fontWeight: '700',
+                    fontSize: '48px',
+                    fontWeight: '600',
                     color: '#4d4635',
-                    opacity: 1.0,
+                    margin: '6px 0 12px 0',
                     lineHeight: 1,
                     fontFamily: 'Ma Shan Zheng, serif',
-                    marginBottom: '12px',
                   }}
                 >
                   {xunKong.chinese}
@@ -500,12 +545,12 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
               <>
                 <div
                   style={{
-                    height: '56px',
+                    height: '48px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '20px',
-                    fontWeight: '700',
+                    fontWeight: '600',
                     color: '#4d4635',
                     opacity: 0.45,
                     marginBottom: '12px',
@@ -565,8 +610,8 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                 <>
                   <div
                     style={{
-                      fontSize: '56px',
-                      fontWeight: '700',
+                      fontSize: '48px',
+                      fontWeight: '600',
                       color: '#4d4635',
                       margin: '6px 0 12px 0',
                       lineHeight: 1,
@@ -604,8 +649,8 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                 <>
                   <div
                     style={{
-                      fontSize: '56px',
-                      fontWeight: '700',
+                      fontSize: '48px',
+                      fontWeight: '600',
                       color: '#4d4635',
                       margin: '6px 0 12px 0',
                       lineHeight: 1,
@@ -657,8 +702,8 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
             <>
               <div
                 style={{
-                  fontSize: '56px',
-                  fontWeight: '700',
+                  fontSize: '48px',
+                  fontWeight: '600',
                   color: '#4d4635',
                   opacity: 1.0,
                   margin: '12px 0 12px 0',
@@ -690,6 +735,87 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
             </div>
           )}
         </div>
+
+        {/* SHEN SHA Section */}
+        {shenSha && shenSha.length > 0 && (
+          <>
+            <div
+              style={{
+                width: '80%',
+                height: '1px',
+                background: 'rgba(115, 92, 0, 0.12)',
+                margin: '16px 0',
+              }}
+            />
+            <div style={{ width: '100%' }}>
+              <label
+                style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: 'rgba(115, 92, 0, 0.45)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.12em',
+                  fontFamily: 'Noto Serif, serif',
+                  display: 'block',
+                  marginBottom: '10px',
+                }}
+              >
+                {tr.shenSha[language]}
+              </label>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '6px',
+                  justifyContent: 'center',
+                }}
+              >
+                {shenSha
+                  .filter((star, idx, arr) => arr.findIndex(s => s.名称 === star.名称) === idx)
+                  .map((star, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      background: 'rgba(30, 90, 200, 0.07)',
+                      border: '1px solid rgba(30, 90, 200, 0.28)',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '24px',
+                        fontWeight: '400',
+                        fontFamily: 'Ma Shan Zheng, serif',
+                        color: '#4d4635',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {star.名称}
+                    </span>
+                    {language === 'en' && SHEN_SHA_LABELS[star.名称] && (
+                      <span
+                        style={{
+                          fontSize: '13px',
+                          fontFamily: 'Noto Serif, serif',
+                          color: 'rgba(77, 70, 53, 0.55)',
+                          lineHeight: 1.3,
+                          marginTop: '4px',
+                        }}
+                      >
+                        {SHEN_SHA_LABELS[star.名称]}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     );
   };
@@ -903,12 +1029,14 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                     const buildNaYin = (naYinValue: any) => naYinValue ? { chinese: naYinValue, english: '', element: extractElementFromNaYin(naYinValue) } : null;
                     const buildXunKong = (voidValue: any) => voidValue && voidValue !== '无' ? { chinese: voidValue, english: '' } : null;
 
+                    const pillarShenSha = chartData?.神煞 ?? {};
+
                     return (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" style={{ position: 'relative', paddingTop: '20px', minWidth: 0 }}>
-                        <PillarCard pillarLabel={tr.yearPillar[language]}  pillar={siZhu.年柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.年柱?.十二长生)}  naYin={buildNaYin(siZhu.年柱?.纳音)}  xunKong={buildXunKong(siZhu.年柱?.空亡地支)}  voidStatus={yearVS}  maxVoidCount={maxVoidCount} />
-                        <PillarCard pillarLabel={tr.monthPillar[language]} pillar={siZhu.月柱} isDayMaster={false} lifeStages={buildLifeStage(siZhu.月柱?.十二长生)} naYin={buildNaYin(siZhu.月柱?.纳音)} xunKong={buildXunKong(siZhu.月柱?.空亡地支)} voidStatus={monthVS} maxVoidCount={maxVoidCount} />
-                        <PillarCard pillarLabel={tr.dayPillar[language]}   pillar={siZhu.日柱}   isDayMaster={true}  lifeStages={buildLifeStage(siZhu.日柱?.十二长生)}   naYin={buildNaYin(siZhu.日柱?.纳音)}   xunKong={buildXunKong(siZhu.日柱?.空亡地支)}   voidStatus={dayVS}   maxVoidCount={maxVoidCount} />
-                        <PillarCard pillarLabel={tr.hourPillar[language]}  pillar={siZhu.时柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.时柱?.十二长生)}  naYin={buildNaYin(siZhu.时柱?.纳音)}  xunKong={buildXunKong(siZhu.时柱?.空亡地支)}  voidStatus={hourVS}  maxVoidCount={maxVoidCount} />
+                        <PillarCard pillarLabel={tr.yearPillar[language]}  pillar={siZhu.年柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.年柱?.十二长生)}  naYin={buildNaYin(siZhu.年柱?.纳音)}  xunKong={buildXunKong(siZhu.年柱?.空亡地支)}  voidStatus={yearVS}  maxVoidCount={maxVoidCount} shenSha={pillarShenSha.年柱} />
+                        <PillarCard pillarLabel={tr.monthPillar[language]} pillar={siZhu.月柱} isDayMaster={false} lifeStages={buildLifeStage(siZhu.月柱?.十二长生)} naYin={buildNaYin(siZhu.月柱?.纳音)} xunKong={buildXunKong(siZhu.月柱?.空亡地支)} voidStatus={monthVS} maxVoidCount={maxVoidCount} shenSha={pillarShenSha.月柱} />
+                        <PillarCard pillarLabel={tr.dayPillar[language]}   pillar={siZhu.日柱}   isDayMaster={true}  lifeStages={buildLifeStage(siZhu.日柱?.十二长生)}   naYin={buildNaYin(siZhu.日柱?.纳音)}   xunKong={buildXunKong(siZhu.日柱?.空亡地支)}   voidStatus={dayVS}   maxVoidCount={maxVoidCount} shenSha={pillarShenSha.日柱} />
+                        <PillarCard pillarLabel={tr.hourPillar[language]}  pillar={siZhu.时柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.时柱?.十二长生)}  naYin={buildNaYin(siZhu.时柱?.纳音)}  xunKong={buildXunKong(siZhu.时柱?.空亡地支)}  voidStatus={hourVS}  maxVoidCount={maxVoidCount} shenSha={pillarShenSha.时柱} />
                       </div>
                     );
                   })()}

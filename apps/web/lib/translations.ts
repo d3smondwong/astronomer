@@ -23,7 +23,8 @@ export const translations = {
     twelveLifeStages: { en: '12 Life Stages',    ch: '十二长生' },
     dayMasterRef:     { en: 'Day Master',        ch: '日主' },
     pillarStemRef:    { en: "Pillar's Stem",     ch: '柱干' },
-    naYin:            { en: 'NaYin',             ch: '纳音' },
+    naYin:            { en: 'Na Yin',            ch: '纳音' },
+    shenSha:          { en: 'Shen Sha',          ch: '神煞' },
     // Tab labels
     tabFourPillars:   { en: 'Four Pillars',      ch: '四柱' },
     tabElements:      { en: 'Elements',          ch: '五行' },

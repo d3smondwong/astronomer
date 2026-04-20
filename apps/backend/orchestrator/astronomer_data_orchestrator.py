@@ -30,6 +30,8 @@ from apps.backend.astronomer_logic.ten_gods import get_ten_gods
 from apps.backend.astronomer_logic.na_yin import get_na_yin
 from apps.backend.astronomer_logic.tai_ming_shen import get_san_yuan
 from apps.backend.astronomer_logic.classical_texts import get_classical_texts
+from apps.backend.astronomer_logic.natal_shen_sha import get_shen_sha
+from apps.backend.astronomer_logic.interpretation_shen_sha import get_shen_sha_interpretations
 
 _PILLAR_KEYS = ["年柱", "月柱", "日柱", "时柱"]
 
@@ -102,6 +104,8 @@ def calculate_natal_chart(
 
     # Individual Modules
     tai_ming_shen = get_san_yuan(lunar_birthday)
+    shen_sha = get_shen_sha(bazi, na_yin, gender)
+    shen_sha_with_interpretations = get_shen_sha_interpretations(shen_sha)
 
     return {
         "农历生日": lunar_birthday.toString() + f" {birth_datetime.hour:02d}:{birth_datetime.minute:02d} ({lunar_time})",
@@ -109,8 +113,10 @@ def calculate_natal_chart(
         "生肖": lunar_birthday.getYearShengXiao(),
         "生时节气": lunar_birthday.getJieQi(),
         "四柱实体": si_zhu,
+        **shen_sha_with_interpretations,
         **tai_ming_shen,
         **classical_texts_data,
+
     }
 
 
