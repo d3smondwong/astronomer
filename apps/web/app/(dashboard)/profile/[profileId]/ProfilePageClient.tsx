@@ -292,6 +292,24 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
               </div>
             );
           })()}
+          {pillar.根基强度 && (() => {
+            const rootingMap: Record<string, { trKey: keyof typeof tr; color: string; bg: string }> = {
+              '深根': { trKey: 'rootingDeep',     color: '#2d6a2d', bg: 'rgba(45, 106, 45, 0.08)'  },
+              '中根': { trKey: 'rootingModerate', color: '#3d5a80', bg: 'rgba(61, 90, 128, 0.08)'  },
+              '浅根': { trKey: 'rootingLight',    color: '#8a5200', bg: 'rgba(138, 82, 0, 0.08)'   },
+              '无根': { trKey: 'rootingNone',     color: '#7a4040', bg: 'rgba(122, 64, 64, 0.08)'  },
+            };
+            const cfg = rootingMap[pillar.根基强度];
+            if (!cfg) return null;
+            return (
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '12px' }}>
+                <span style={{ fontSize: '11px', color: cfg.color, fontFamily: 'Noto Serif, serif', fontStyle: 'italic',
+                               borderLeft: `3px solid ${cfg.color}`, background: cfg.bg, padding: '2px 10px' }}>
+                  {language === 'en' ? tr[cfg.trKey][language] : pillar.根基强度}
+                </span>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Divider */}
@@ -995,10 +1013,10 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                   {(() => {
                     const siZhu = chartData?.四柱实体 || {};
 
-                    // Void status computed from Python data (日柱空亡 and 互换空亡)
+                    // Void status computed from Python data (空亡, 年日互换空亡, 日时互换空亡)
                     const buildVoidStatus = (pillarData: any) => ({
-                      primaryVoid: pillarData?.日柱空亡 !== '无' && pillarData?.日柱空亡 !== undefined,
-                      reverseVoid: pillarData?.互换空亡 !== '无' && pillarData?.互换空亡 !== undefined,
+                      primaryVoid: pillarData?.空亡 !== '无' && pillarData?.空亡 !== undefined,
+                      reverseVoid: pillarData?.年日互换空亡 !== '无' && pillarData?.年日互换空亡 !== undefined,
                     });
 
                     const yearVS  = buildVoidStatus(siZhu.年柱);
