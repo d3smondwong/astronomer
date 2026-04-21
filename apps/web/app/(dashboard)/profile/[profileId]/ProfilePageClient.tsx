@@ -151,7 +151,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     const earthlyChar = pillar.地支;
     const heavenlyName = GAN_LABELS[heavenlyChar] || heavenlyChar;
     const earthlyName = ZHI_LABELS[earthlyChar] || earthlyChar;
-    const activeVoidCount = [voidStatus.primaryVoid === true, voidStatus.reverseVoid === true].filter(Boolean).length;
+    const activeVoidCount = (voidStatus.primaryVoid === true ? 1 : 0) + voidStatus.mutualVoid;
 
     const hiddenStemPairs = [
       { stem: pillar.藏干?.本气, tenGod: pillar.藏干十神?.本气十神 },
@@ -369,12 +369,12 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                 {tr.primaryVoid[language]}
               </span>
             )}
-            {voidStatus.reverseVoid === true && (
-              <span style={{ fontSize: '11px', color: '#8C2F2F', fontFamily: 'Noto Serif, serif', fontStyle: 'italic',
+            {Array.from({ length: voidStatus.mutualVoid }).map((_, i) => (
+              <span key={i} style={{ fontSize: '11px', color: '#8C2F2F', fontFamily: 'Noto Serif, serif', fontStyle: 'italic',
                              borderLeft: '3px solid #8C2F2F', background: 'rgba(140, 47, 47, 0.08)', padding: '2px 10px' }}>
-                {tr.reverseVoid[language]}
+                {tr.mutualVoid[language]}
               </span>
-            )}
+            ))}
             {Array.from({ length: maxVoidCount - activeVoidCount }).map((_, i) => (
               <span key={i} style={{ fontSize: '11px', padding: '2px 10px', visibility: 'hidden' }}>–</span>
             ))}
@@ -1013,17 +1013,18 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                   {(() => {
                     const siZhu = chartData?.四柱实体 || {};
 
-                    // Void status computed from Python data (空亡, 年日互换空亡, 日时互换空亡)
+                    // Void status computed from Python data (空亡, 年日互换空亡, 月日互换空亡, 日时互换空亡)
                     const buildVoidStatus = (pillarData: any) => ({
                       primaryVoid: pillarData?.空亡 !== '无' && pillarData?.空亡 !== undefined,
-                      reverseVoid: pillarData?.年日互换空亡 !== '无' && pillarData?.年日互换空亡 !== undefined,
+                      mutualVoid: [pillarData?.年日互换空亡, pillarData?.月日互换空亡, pillarData?.日时互换空亡]
+                        .filter(v => v !== undefined && v !== '无').length,
                     });
 
                     const yearVS  = buildVoidStatus(siZhu.年柱);
                     const monthVS = buildVoidStatus(siZhu.月柱);
                     const dayVS   = buildVoidStatus(siZhu.日柱);
                     const hourVS  = buildVoidStatus(siZhu.时柱);
-                    const countVoids = (vs: VoidStatus) => [vs.primaryVoid === true, vs.reverseVoid === true].filter(Boolean).length;
+                    const countVoids = (vs: VoidStatus) => (vs.primaryVoid === true ? 1 : 0) + vs.mutualVoid;
                     const maxVoidCount = Math.max(countVoids(yearVS), countVoids(monthVS), countVoids(dayVS), countVoids(hourVS));
 
                     // Helper to extract element from naYin phrase (last character typically contains the element)

@@ -13,7 +13,7 @@ export const translations = {
     earthlyBranch:    { en: 'Earthly Branch',    ch: '地支' },
     voidLabel:        { en: 'Void',              ch: '空亡' },
     primaryVoid:      { en: 'Primary Void',     ch: '空亡' },
-    reverseVoid:      { en: 'Reverse Void',     ch: '倒空' },
+    mutualVoid:       { en: 'Mutual Void',      ch: '互换空亡' },
     rootingDeep:      { en: 'Deeply Rooted',    ch: '深根' },
     rootingModerate:  { en: 'Moderately Rooted', ch: '中根' },
     rootingLight:     { en: 'Lightly Rooted',   ch: '浅根' },
