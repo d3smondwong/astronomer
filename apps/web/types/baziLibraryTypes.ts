@@ -68,13 +68,13 @@ export interface VoidInfo {
 }
 
 /**
- * Void Status - Primary and Reverse Void indicators
+ * Void Status - Primary and Mutual Void indicators
  */
 export interface VoidStatus {
   /** 空亡 — branch falls in the Day pillar's void pair. null for the Day pillar itself. */
   primaryVoid: boolean | null;
-  /** 倒空 — Day pillar's branch falls in the Year pillar's void pair. null for non-Day pillars. */
-  reverseVoid: boolean | null;
+  /** 互换空亡 — count of active mutual voids (年日, 月日, 日时). 0–3. */
+  mutualVoid: number;
 }
 
 /**
