@@ -29,50 +29,118 @@ The project is a secure, hybrid server-side rendering model to protect IP and en
 
 ## 🧠 BaZi Logic Boundaries (Critical)
 
-We use the `lunar-python` library, but it does not cover all of our advanced calculation needs. **Do not hallucinate capabilities for `lunar-python`.** Follow these strict boundaries:
-
-### 🟢 Use `lunar-python` For:
-* **Stem/Branch → Element Mappings:** Use `LunarUtil.WU_XING_GAN` and `LunarUtil.WU_XING_ZHI`.
-* **Hidden Stems (藏干):** Use `eight_char.getYearHideGan()`, etc.
-* **Xun / XunKong (旬 / 旬空):** Use `LunarUtil.getXun()` and `LunarUtil.getXunKong()`.
-* **Nayin (纳音):** Use `LunarUtil.NAYIN` or `eight_char.getYearNaYin()`.
-* **Basic ShiShen (十神) Lookups:** Use `LunarUtil.SHI_SHEN` table.
-
-### 🔴 KEEP CUSTOM (Do NOT delegate to `lunar-python`):
-* **Di Shi / 12 Life Stages (地势):** Keep our custom implementation in `cycle_di_shi.py` (it is more flexible than the library's default).
-* **Seasonal Strength States (旺/相/囚/休/死):** `lunar-python` has **zero** support for this. Maintain our custom implementation utilizing month branches and custom state multipliers.
-* **Wu Xing Dynamics & Qi Weighting:** All scoring, climate needs, and interaction weighing must remain custom-built in our engine.
-* **Complex Ten God Synthesis:** Any derivation of Ten Gods stemming from complex branch interactions must be handled by our custom logic.
+Use the `lunar-python` library if a mapping or function is available.
 
 ---
 
 ## 📡 API Schema & Response Contract
 
-When building endpoints in FastAPI (`apps/backend/routers/chart.py`), adhere to the following clean contract boundary between English metadata and Chinese calculation payloads:
+### Endpoint: POST `/v1/chart/natal`
 
+**Request (BirthInput):**
 ```python
-class NatalChartResponse(BaseModel):
-    lunar_date: str        # English metadata
-    gender: str            # English metadata
-    zodiac: str            # English metadata
-    data: dict             # ALL Chinese-keyed BaZi calculation output goes here!
-                           # Example: data["四柱实体"]["年柱"]["天干"]
+class BirthInput(BaseModel):
+    year: int                           # Gregorian year
+    month: int                          # 1-12
+    day: int                            # 1-31
+    hour: int                           # 0-23 (wall-clock time)
+    minute: int                         # 0-59
+    gender: int                         # 1 = male, 0 = female
+    latitude: float                     # Birth location (decimal degrees)
+    longitude: float                    # Birth location (decimal degrees)
+    use_solar_time_correction: bool     # Default True — apply TST conversion
 ```
 
-Rule: Frontend components directly read from response.data.* (using Chinese keys mapped in TypeScript interfaces at apps/web/types/baziChart.ts). Do not build complex TypeScript transformers to turn Chinese keys into English camelCase on the frontend.
+**Response (NatalChartResponse):**
+```python
+class NatalChartResponse(BaseModel):
+    data: Dict[str, Any]  # Complete Chinese-keyed chart output (see below)
+```
+
+**Response Structure** — all Chinese-keyed fields from orchestrator:
+```json
+{
+  "农历生日": "农历日期 HH:MM (时辰)",
+  "性别": "男 | 女",
+  "生肖": "鼠 | 牛 | ... 猪",
+  "生时节气": "节气名称",
+  "四柱实体": {
+    "年柱": { "天干", "地支", "藏干", "藏干十神", "天干十神", "根基强度", "通根于", "十二长生", "空亡地支", "纳音" },
+    "月柱": { ... },
+    "日柱": { ... },
+    "时柱": { ... }
+  },
+  "日坐十神纳音": { ... },
+  "胎命身": { "胎": "...", "命": "...", "身": "..." },
+  "六亲": { ... },
+  "古籍文献": { ... },
+  "相互作用": { ... },
+  "神煞": { ... }
+}
+```
+
+**Rule:** Frontend reads directly from the `data` object using Chinese keys. Map these to TypeScript interfaces at `apps/web/types/baziChart.ts` but preserve the Chinese structure—do not transform keys to camelCase. Chinese keys maintain domain accuracy and bridge backend-frontend seamlessly.
 
 ## 📂 Project Structure
 Maintain strict boundary separation between frontend and backend in the monorepo:
 
-- apps/backend/ — FastAPI application.
-    - main.py — App entry point.
-    - routers/ — API endpoints (e.g., chart.py).
-    - models/ — Pydantic schemas.
-    - astronomer_logic/ — All production calculation logic goes here. (Ignore standard src/ folders from preliminary tests).
-
-- apps/web/ — Next.js application.
-    - app/api/chart/route.ts — Route handler interfacing with FastAPI.
-    - lib/fastApiClient.ts — Server-only fetch wrappers.
+```
+apps/
+├── backend/ — FastAPI application
+│   ├── main.py — App entry point
+│   ├── routers/
+│   │   └── chart.py — Chart calculation endpoint
+│   ├── data_models/
+│   │   └── birth_input.py — Input validation schemas
+│   ├── astronomer_logic/ — All production BaZi calculation modules
+│   │   ├── bazi_pillars.py — Four pillars extraction
+│   │   ├── wu_xing.py — Five elements calculations
+│   │   ├── ten_gods.py — Ten gods mappings
+│   │   ├── twelve_life_stages.py — Di Shi / Life stages
+│   │   ├── day_master_strength.py — Seasonal strength states
+│   │   ├── void_xun_kong.py — Void/XunKong logic
+│   │   ├── natal_interactions.py — Pillar interactions & dynamics
+│   │   ├── natal_shen_sha.py — Spiritual stars calculations
+│   │   ├── na_yin.py — Nayin element mappings
+│   │   ├── true_solar_time.py — TST calculations
+│   │   ├── tai_ming_shen.py — Six Relatives stars
+│   │   └── (other calculation modules)
+│   ├── orchestrator/
+│   │   └── astronomer_data_orchestrator.py — Orchestrates calculation pipeline
+│   └── data/ — Reference data files
+│       ├── qiong_tong_bao_jian.py
+│       ├── san_ming_tong_hui.py
+│       └── sixty_days_classification.py
+│
+└── web/ — Next.js application (SSR + client components)
+    ├── app/
+    │   ├── layout.tsx — Root layout
+    │   ├── page.tsx — Landing page
+    │   ├── api/
+    │   │   ├── chart/route.ts — Route handler calling FastAPI backend
+    │   │   └── profiles/[id]/route.ts — Profile API endpoints
+    │   └── (dashboard)/ — Protected dashboard routes
+    │       ├── layout.tsx — Dashboard layout
+    │       ├── profile/[profileId]/
+    │       │   ├── page.tsx — Profile page (Server Component)
+    │       │   ├── ProfilePageClient.tsx — Interactive elements
+    │       │   └── PillarInteractionsCard.tsx — Interaction display
+    │       ├── compatibility/page.tsx — Compatibility analysis
+    │       └── ai_oracle_chat/page.tsx — AI oracle feature
+    ├── components/
+    │   ├── ui/ — Shadcn UI components (button, card, tabs, etc.)
+    │   ├── Header.tsx
+    │   └── Footer.tsx
+    ├── lib/
+    │   ├── languageContext.tsx — i18n context provider
+    │   └── utils.ts — Utility functions
+    ├── types/
+    │   └── (TypeScript interfaces matching backend schemas)
+    ├── styles/
+    │   └── globals.css
+    ├── public/ — Static assets (logos, icons, SVGs)
+    └── profiles/ — User profile JSON data
+```
 
 ## 🛠️ Code Style & Guidelines
 
@@ -86,6 +154,56 @@ TypeScript (Frontend)
 - Use Server Components by default. Keep 'use client' strictly restricted to interactive forms or context providers.
 - No lunar-javascript imports allowed in frontend code.
 - Use strict TypeScript types matching the backend's JSON payload schemas.
+
+## 📚 Dependencies & Libraries
+
+### Backend (Python)
+| Library | Version | Purpose |
+|---------|---------|---------|
+| **FastAPI** | 0.135.3 | Web framework for API endpoints |
+| **Uvicorn** | 0.44.0 | ASGI server for FastAPI |
+| **Pydantic** | 2.41.5 | Data validation and JSON schemas |
+| **lunar-python** | 1.4.8 | Lunar calendar & BaZi pillar extraction |
+| **timezonefinder** | 6.4.4 | Timezone lookup from coordinates |
+| **bidict** | 0.23.1 | Bidirectional dictionary for mappings |
+| **anthropic** | 0.86.0 | Claude API client for AI oracle feature |
+| **openai** | 2.30.0 | OpenAI API client (future integration) |
+| **google-genai** | 1.68.0 | Google GenAI client (experimental) |
+| **huggingface_hub** | 1.7.2 | HuggingFace model access |
+| **hydra-core** | 1.3.2 | Configuration management |
+| **streamlit** | 1.54.0 | Prototyping & testing UI |
+| **python-dotenv** | 1.2.2 | Environment variable management |
+| **jinja2** | 3.1.6 | Template engine for rendering |
+| **json-repair** | 0.58.7 | JSON repair utility |
+
+### Frontend (Node.js)
+| Library | Version | Purpose |
+|---------|---------|---------|
+| **Next.js** | 16.2.3 | React SSR framework |
+| **React** | 19.2.5 | UI library |
+| **TypeScript** | 5.8.2 | Type safety for JS/TSX |
+| **Tailwind CSS** | 4.2.0 | Utility-first CSS framework |
+| **Ant Design (antd)** | 6.3.5 | Component library for complex UI |
+| **Material-UI (@mui)** | 9.0.0 | Material design components |
+| **Emotion** | 11.14.0/1 | CSS-in-JS styling |
+| **Lucide React** | 1.8.0 | Icon library |
+| **Victory** | 37.3.0 | Charting & visualization library |
+| **lunar-javascript** | 1.7.7 | (NOT used in production) — client-side reference only |
+| **next-themes** | 0.4.6 | Dark mode theme management |
+| **sonner** | 1.7.4 | Toast notifications |
+| **date-fns** | 4.1.0 | Date utility functions |
+| **dayjs** | 1.11.20 | Lightweight date library |
+| **tz-lookup** | 6.1.25 | Timezone lookup (browser-side) |
+| **@googlemaps/js-api-loader** | 2.0.2 | Google Maps API loader |
+| **motion** | 12.38.0 | Animation library |
+| **clsx** | 2.1.1 | Classname utility |
+| **class-variance-authority** | 0.7.1 | Component variant management |
+
+**Notes:**
+- Backend is Python-only; all BaZi calculations happen server-side.
+- Frontend imports `lunar-javascript` only for reference/testing—never in production.
+- Google Maps, Ant Design, and MUI provide flexible component systems for dashboard UI.
+- Victory is used for charting pillar interactions and compatibility analysis.
 
 ## Context Navigation:
 When you need to understand the codebase, docs, or any files in this project:
