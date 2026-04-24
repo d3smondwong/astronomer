@@ -3,6 +3,12 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Graphify
+graphify-out-ecosystem/
+graphify-out/
+
+.github
+
 # Node modules
 node_modules/
 
