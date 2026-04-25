@@ -102,18 +102,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {isMounted && isCollapsed ? (
                   <Image
                     src="/short_huat_life_logo.svg"
-                    alt="Celestial Dawn"
+                    alt="Huat Life"
                     width={40}
                     height={40}
                     style={{ width: 'auto', height: '40px' }}
+                    priority
                   />
                 ) : (
                   <Image
-                    src="/logo.png"
-                    alt="Celestial Dawn"
+                    src="/straight_huat_life_logo_svg.svg"
+                    alt="Huat Life"
                     width={180}
                     height={45}
                     style={{ width: 'auto', height: '56px' }}
+                    priority
                   />
                 )}
               </Link>
