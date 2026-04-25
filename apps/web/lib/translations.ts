@@ -84,6 +84,12 @@ export const translations = {
     tdLabel:          { en: 'Coming Soon',      ch: '敬请期待' },
     male:             { en: 'Male',             ch: '男' },
     female:           { en: 'Female',           ch: '女' },
+    // Pillar Interactions card
+    pillarInteractions: { en: 'Pillar Interactions', ch: '柱位动态' },
+    tier1Label:       { en: 'Structural',       ch: '纲领层' },
+    tier2Label:       { en: 'Operational',      ch: '气势层' },
+    tier3Label:       { en: 'Frictional',       ch: '琐碎层' },
+    noInteractions:   { en: 'No pillar interactions found', ch: '无柱位互动' },
   },
   sidebar: {
     profiles:         { en: 'Profiles',              ch: '命盘' },
