@@ -8,7 +8,7 @@ import { Heart, Zap } from 'lucide-react';
 import { VictoryChart, VictoryBar, VictoryTheme, VictoryAxis, VictoryGroup } from 'victory';
 
 export default function CompatibilityPage() {
-  const [profiles, setProfiles] = useState<BaziProfile[]>([]);
+  const [profiles] = useState<BaziProfile[]>([]);
   const [profile1, setProfile1] = useState<string>('');
   const [profile2, setProfile2] = useState<string>('');
 

@@ -32,6 +32,7 @@ from apps.backend.astronomer_logic.tai_ming_shen import get_san_yuan
 from apps.backend.astronomer_logic.classical_texts import get_classical_texts
 from apps.backend.astronomer_logic.natal_shen_sha import get_shen_sha
 from apps.backend.astronomer_logic.interpretation_shen_sha import get_shen_sha_interpretations
+from apps.backend.astronomer_logic.natal_interactions import get_natal_interactions
 
 _PILLAR_KEYS = ["年柱", "月柱", "日柱", "时柱"]
 
@@ -90,6 +91,8 @@ def calculate_natal_chart(
     si_zhu = {
         key: {
             "天干":     pillars[key]["天干"],
+            "根基强度": pillars[key]["根基强度"],
+            "通根于":     pillars[key]["通根于"],
             "天干十神": ten_gods[key]["天干十神"],
             "地支":     pillars[key]["地支"],
             "藏干":     pillars[key]["藏干"],
@@ -102,7 +105,12 @@ def calculate_natal_chart(
         for key in _PILLAR_KEYS
     }
 
+    # Merge 藏干十神 into pillars so natal_interactions can read ten gods without recomputing
+    for k in _PILLAR_KEYS:
+        pillars[k]["藏干十神"] = ten_gods[k]["藏干十神"]
+
     # Individual Modules
+    natal_interactions_data = get_natal_interactions(pillars, void)
     tai_ming_shen = get_san_yuan(lunar_birthday)
     shen_sha = get_shen_sha(bazi, na_yin, gender)
     shen_sha_with_interpretations = get_shen_sha_interpretations(shen_sha)
@@ -116,7 +124,7 @@ def calculate_natal_chart(
         **shen_sha_with_interpretations,
         **tai_ming_shen,
         **classical_texts_data,
-
+        **natal_interactions_data,
     }
 
 
@@ -126,8 +134,12 @@ if __name__ == "__main__":
     # python -m apps.backend.orchestrator.astronomer_data_orchestrator
     # Cross-check output against the TypeScript baziOrchestrator for the same birth date.
 
+    from src.utils.logging import configure_logging
+
+    logger = configure_logging()
+
     birth = datetime(1985, 11, 25, 17, 7, 0)
     lat, lng = 1.3253, 103.8080
 
     chart = calculate_natal_chart(birth, lat, lng, gender=1)
-    print(json.dumps(chart, ensure_ascii=False, indent=2))
+    logger.info("Natal chart output:\n%s", json.dumps(chart, ensure_ascii=False, indent=2))

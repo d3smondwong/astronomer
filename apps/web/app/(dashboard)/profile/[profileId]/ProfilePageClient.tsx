@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import { type LifeStageInfo, type NaYinInfo, type VoidInfo, type VoidStatus } from '@/types/baziLibraryTypes';
 import { type ProfileRecord } from '@/lib/profilesDb';
-import { Card, Tag, Tabs, Button, Popconfirm, Tooltip } from 'antd';
+import { Card, Tabs, Button, Popconfirm, Tooltip } from 'antd';
 import { format } from 'date-fns';
 import { Calendar, Clock, MapPin, User, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
 import { deleteProfileAction } from './actions';
+import PillarInteractionsCard from './PillarInteractionsCard';
 
 interface ProfilePageClientProps {
   profileRecord: ProfileRecord;
@@ -1059,6 +1060,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                       </div>
                     );
                   })()}
+                  <PillarInteractionsCard chartData={chartData} language={language} />
                 </div>
               ),
             },
