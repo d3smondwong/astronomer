@@ -15,7 +15,8 @@
       "Bash(\"C:\\\\Users\\\\d3smo\\\\anaconda3\\\\envs\\\\astronomer\\\\python.exe\" -m src.astronomer_calculations.cycle_interactions)",
       "Bash(npm run:*)",
       "Bash(npm uninstall:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(graphify query *)"
     ]
   }
 }
