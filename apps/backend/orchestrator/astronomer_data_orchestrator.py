@@ -33,6 +33,7 @@ from apps.backend.astronomer_logic.classical_texts import get_classical_texts
 from apps.backend.astronomer_logic.natal_shen_sha import get_shen_sha
 from apps.backend.astronomer_logic.interpretation_shen_sha import get_shen_sha_interpretations
 from apps.backend.astronomer_logic.natal_interactions import get_natal_interactions
+from apps.backend.astronomer_logic.day_master_strength import get_day_master_strength
 
 _PILLAR_KEYS = ["年柱", "月柱", "日柱", "时柱"]
 
@@ -111,6 +112,7 @@ def calculate_natal_chart(
 
     # Individual Modules
     natal_interactions_data = get_natal_interactions(pillars, void)
+    day_master_data = get_day_master_strength(bazi, pillars, ten_gods, natal_interactions_data)
     tai_ming_shen = get_san_yuan(lunar_birthday)
     shen_sha = get_shen_sha(bazi, na_yin, gender)
     shen_sha_with_interpretations = get_shen_sha_interpretations(shen_sha)
@@ -121,6 +123,7 @@ def calculate_natal_chart(
         "生肖": lunar_birthday.getYearShengXiao(),
         "生时节气": lunar_birthday.getJieQi(),
         "四柱实体": si_zhu,
+        **day_master_data,
         **shen_sha_with_interpretations,
         **tai_ming_shen,
         **classical_texts_data,

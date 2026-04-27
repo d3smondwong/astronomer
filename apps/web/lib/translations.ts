@@ -90,6 +90,12 @@ export const translations = {
     tier2Label:       { en: 'Operational',      ch: '气势层' },
     tier3Label:       { en: 'Frictional',       ch: '琐碎层' },
     noInteractions:   { en: 'No pillar interactions found', ch: '无柱位互动' },
+    // Day Master Strength card
+    dayMasterStrength: { en: 'Day Master Strength', ch: '日主强弱' },
+    dmSeasonalAuth:   { en: 'Season Strength',             ch: '得令' },
+    dmRooting:        { en: 'Root Strength',              ch: '得地' },
+    dmSupport:        { en: 'Stem Strength',              ch: '得势' },
+    dmVerdictLabel:   { en: 'Verdict',              ch: '综合评判' },
   },
   sidebar: {
     profiles:         { en: 'Profiles',              ch: '命盘' },

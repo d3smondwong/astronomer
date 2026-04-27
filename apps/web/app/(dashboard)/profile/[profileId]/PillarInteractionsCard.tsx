@@ -84,6 +84,7 @@ function getPillarChar(ix: any, pillarIndex: number): string {
 }
 
 const MOBILE_BREAKPOINT = 640;
+const TABLET_BREAKPOINT = 1024;
 
 export default function PillarInteractionsCard({ chartData, language }: PillarInteractionsCardProps) {
   const tr = translations.profile;

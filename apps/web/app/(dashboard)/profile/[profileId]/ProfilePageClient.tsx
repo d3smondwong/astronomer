@@ -11,6 +11,7 @@ import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
 import { deleteProfileAction } from './actions';
 import PillarInteractionsCard from './PillarInteractionsCard';
+import DayMasterStrengthCard from './DayMasterStrengthCard';
 
 interface ProfilePageClientProps {
   profileRecord: ProfileRecord;
@@ -1061,6 +1062,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                     );
                   })()}
                   <PillarInteractionsCard chartData={chartData} language={language} />
+                  <DayMasterStrengthCard chartData={chartData} language={language} />
                 </div>
               ),
             },
