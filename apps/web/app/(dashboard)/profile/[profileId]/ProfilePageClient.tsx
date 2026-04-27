@@ -536,7 +536,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
               <>
                 <div
                   style={{
-                    fontSize: '48px',
+                    fontSize: '36px',
                     fontWeight: '600',
                     color: '#4d4635',
                     margin: '6px 0 12px 0',
@@ -565,7 +565,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
               <>
                 <div
                   style={{
-                    height: '48px',
+                    height: '36px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -576,7 +576,6 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                     marginBottom: '12px',
                   }}
                 >
-                  —
                 </div>
                 <p style={{ fontSize: '13px', margin: 0, visibility: 'hidden', height: language === 'en' ? 'auto' : 0, overflow: 'hidden' }}>–</p>
               </>
@@ -611,7 +610,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
             {tr.twelveLifeStages[language]}
           </label>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {/* Day Master reference */}
             <div style={{ flex: 1 }}>
               <span
@@ -630,7 +629,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                 <>
                   <div
                     style={{
-                      fontSize: '48px',
+                      fontSize: '36px',
                       fontWeight: '600',
                       color: '#4d4635',
                       margin: '6px 0 12px 0',
@@ -669,7 +668,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                 <>
                   <div
                     style={{
-                      fontSize: '48px',
+                      fontSize: '36px',
                       fontWeight: '600',
                       color: '#4d4635',
                       margin: '6px 0 12px 0',
@@ -722,7 +721,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
             <>
               <div
                 style={{
-                  fontSize: '48px',
+                  fontSize: '36px',
                   fontWeight: '600',
                   color: '#4d4635',
                   opacity: 1.0,
@@ -1053,7 +1052,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                     const pillarShenSha = chartData?.神煞 ?? {};
 
                     return (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" style={{ position: 'relative', paddingTop: '20px', minWidth: 0 }}>
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" style={{ position: 'relative', paddingTop: '20px', minWidth: 0 }}>
                         <PillarCard pillarLabel={tr.yearPillar[language]}  pillar={siZhu.年柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.年柱?.十二长生)}  naYin={buildNaYin(siZhu.年柱?.纳音)}  xunKong={buildXunKong(siZhu.年柱?.空亡地支)}  voidStatus={yearVS}  maxVoidCount={maxVoidCount} shenSha={pillarShenSha.年柱} />
                         <PillarCard pillarLabel={tr.monthPillar[language]} pillar={siZhu.月柱} isDayMaster={false} lifeStages={buildLifeStage(siZhu.月柱?.十二长生)} naYin={buildNaYin(siZhu.月柱?.纳音)} xunKong={buildXunKong(siZhu.月柱?.空亡地支)} voidStatus={monthVS} maxVoidCount={maxVoidCount} shenSha={pillarShenSha.月柱} />
                         <PillarCard pillarLabel={tr.dayPillar[language]}   pillar={siZhu.日柱}   isDayMaster={true}  lifeStages={buildLifeStage(siZhu.日柱?.十二长生)}   naYin={buildNaYin(siZhu.日柱?.纳音)}   xunKong={buildXunKong(siZhu.日柱?.空亡地支)}   voidStatus={dayVS}   maxVoidCount={maxVoidCount} shenSha={pillarShenSha.日柱} />
