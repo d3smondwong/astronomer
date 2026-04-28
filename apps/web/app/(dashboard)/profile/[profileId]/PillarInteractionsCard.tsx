@@ -88,7 +88,7 @@ const TABLET_BREAKPOINT = 1024;
 
 export default function PillarInteractionsCard({ chartData, language }: PillarInteractionsCardProps) {
   const tr = translations.profile;
-  const pillarDynamic = chartData?.作用?.柱位动态 ?? {};
+  const pillarDynamic = (chartData?.作用?.柱位动态 ?? []) as any[];
 
   const [isMobile, setIsMobile] = useState(
     typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT
@@ -99,25 +99,14 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  const seen = new Map<string, { interaction: any }>();
-  for (const pillarKey of PILLAR_ORDER) {
-    const items = (pillarDynamic as Record<string, any>)[pillarKey] ?? [];
-    for (const item of items as any[]) {
-      if (HIDDEN_STRENGTHS.has(item.强度)) continue;
-      const dedupeKey = `${Object.keys(item.组合明细 ?? {}).join('-')}_${item.类型}`;
-      if (!seen.has(dedupeKey)) {
-        seen.set(dedupeKey, { interaction: item });
-      }
-    }
-  }
-
-  const entries = [...seen.values()]
-    .map(e => {
-      const pillars = Object.keys(e.interaction.组合明细 ?? {})
+  const entries = pillarDynamic
+    .filter(item => !HIDDEN_STRENGTHS.has(item.强度))
+    .map(item => {
+      const pillars = Object.keys(item.组合明细 ?? {})
         .map((p: string) => PILLAR_INDEX[p])
         .filter((i): i is number => i !== undefined)
         .sort((a, b) => a - b);
-      return { ...e, pillars };
+      return { interaction: item, pillars };
     })
     .sort((a, b) => {
       const spanA = (a.pillars[a.pillars.length - 1] ?? 0) - (a.pillars[0] ?? 0);
