@@ -531,7 +531,7 @@ INTERACTION_TIER_ORDER = {
     "三会": 0,
     "三合": 1,
     "六冲": 2,
-    "天克地冲": 2, # treated as same tier as 六冲 for priority purposes. Combi of 六冲 and 天干冲
+    "天克地冲": 2,  # treated as same tier as 六冲 for priority purposes. Combi of 六冲 and 天干冲
     "六合": 3,
     "半合": 4,
     "残会": 5,
@@ -680,7 +680,10 @@ STRENGTH_REMARKS = {
     ("STEM_天干合", "天干克"): "天干合化锁定，克力被合化消融",
     ("STEM_天干合", "天干冲"): "天干合化锁定，冲力被合化消融",
     ("STEM_天干克", "天干冲"): "天干克在位，冲势被制化消融",
-    ("INTERACTION_STATE_天干合","binding"): "遥合绊定：虽有引力但距离阻隔，缺乏化神助力，合力虚浮流于表面",
+    (
+        "INTERACTION_STATE_天干合",
+        "binding",
+    ): "遥合绊定：虽有引力但距离阻隔，缺乏化神助力，合力虚浮流于表面",
     ("STEM_天干冲", "天干克"): "天干冲动场域，克力受震荡大幅衰减",
     ("STRUCTURAL_三会", "干支透合"): "三会方位场锁定地支，藏干不得透出，干支透合受压",
     ("STRUCTURAL_三合", "干支透合"): "三合局锁定地支，藏干不得透出，干支透合受压",
@@ -720,7 +723,10 @@ DEFAULT_STRENGTH = {
     ("三合", 2): "强势主流",
     ("六冲", 1): "强势主流",
     ("六冲", 2): "显著影响",
-    ("六冲", 3): "中等衰减",   # year-hour: further decay; remark applied via STRENGTH_REMARKS
+    (
+        "六冲",
+        3,
+    ): "中等衰减",  # year-hour: further decay; remark applied via STRENGTH_REMARKS
     ("六合", 1): "强势主流",
     ("六合", 2): "大幅衰减",
     ("六合", 3): "大幅衰减",
@@ -765,16 +771,16 @@ _PUNISHMENT_STRENGTH: dict[tuple, str] = {
     ("无恩之刑", "三刑全", 1): "强势主流",
     ("无恩之刑", "三刑全", 2): "强势主流",
     ("无恩之刑", "三刑全", 3): "强势主流",
-    ("无恩之刑", "半刑",   1): "显著影响",
-    ("无恩之刑", "半刑",   2): "中等衰减",
-    ("无恩之刑", "半刑",   3): "大幅衰减",
+    ("无恩之刑", "半刑 - 紧邻之刑", 1): "显著影响",
+    ("无恩之刑", "半刑 - 隔柱之刑", 2): "中等衰减",
+    ("无恩之刑", "刑 - 遥隔之刑",   3): "大幅衰减",
     # 恃势之刑 — same pattern as 无恩之刑
     ("恃势之刑", "三刑全", 1): "强势主流",
     ("恃势之刑", "三刑全", 2): "强势主流",
     ("恃势之刑", "三刑全", 3): "强势主流",
-    ("恃势之刑", "半刑",   1): "显著影响",
-    ("恃势之刑", "半刑",   2): "中等衰减",
-    ("恃势之刑", "半刑",   3): "大幅衰减",
+    ("恃势之刑", "半刑 - 紧邻之刑", 1): "显著影响",
+    ("恃势之刑", "半刑 - 隔柱之刑", 2): "中等衰减",
+    ("恃势之刑", "刑 - 遥隔之刑",   3): "大幅衰减",
     # 无礼之刑 — distance-only graduation (always two branches)
     ("无礼之刑", "正刑", 1): "显著影响",
     ("无礼之刑", "遥刑", 2): "中等衰减",
@@ -940,7 +946,6 @@ def _proximity_score(indices: tuple) -> int:
         for a in range(len(idxs))
         for b in range(a + 1, len(idxs))
     )
-
 
 
 def is_valid_punishment(
@@ -1641,10 +1646,9 @@ def _pass4_group(registry: InteractionRegistry) -> None:
                     )
                 else:
                     _dist = item.get("距离", 2)
-                    item["强度"] = (
-                        DEFAULT_STRENGTH.get((itype, _dist))
-                        or DEFAULT_STRENGTH.get((itype, 2), "显著影响")
-                    )
+                    item["强度"] = DEFAULT_STRENGTH.get(
+                        (itype, _dist)
+                    ) or DEFAULT_STRENGTH.get((itype, 2), "显著影响")
             continue
 
         if itype in {"拱合", "拱会"}:
@@ -1712,15 +1716,13 @@ def _pass5_defaults(registry: InteractionRegistry) -> None:
         distance = item.get("距离", 2)
         if itype in _XK_XING_TYPES:
             xing_form = item.get("形态", "")
-            item["强度"] = (
-                _PUNISHMENT_STRENGTH.get((itype, xing_form, distance))
-                or _PUNISHMENT_STRENGTH.get((itype, xing_form, 2), "显著影响")
-            )
+            item["强度"] = _PUNISHMENT_STRENGTH.get(
+                (itype, xing_form, distance)
+            ) or _PUNISHMENT_STRENGTH.get((itype, xing_form, 2), "显著影响")
         else:
-            item["强度"] = (
-                DEFAULT_STRENGTH.get((itype, distance))
-                or DEFAULT_STRENGTH.get((itype, 2), "强势主流")
-            )
+            item["强度"] = DEFAULT_STRENGTH.get(
+                (itype, distance)
+            ) or DEFAULT_STRENGTH.get((itype, 2), "强势主流")
         if distance == 3:
             d3_note = STRENGTH_REMARKS.get(("DISTANCE_3", itype))
             if d3_note:
@@ -1992,7 +1994,9 @@ def _detect_san_hui(zhis: list, registry: InteractionRegistry) -> None:
 
         if len(matched) == 3:
             indices_3h = tuple(sorted(matched.values()))
-            min_dist_3h = min(indices_3h[i + 1] - indices_3h[i] for i in range(len(indices_3h) - 1))
+            min_dist_3h = min(
+                indices_3h[i + 1] - indices_3h[i] for i in range(len(indices_3h) - 1)
+            )
             registry.register(
                 {
                     "类型": "三会",
@@ -2120,6 +2124,7 @@ def _detect_san_he(zhis: list, registry: InteractionRegistry) -> None:
 @dataclasses.dataclass(frozen=True)
 class _PairCtx:
     """Immutable context for one pillar pair (i, j) inside _detect_pairwise."""
+
     i: int
     j: int
     b_i: str
@@ -2127,14 +2132,15 @@ class _PairCtx:
     g_i: str
     g_j: str
     distance: int
-    is_adjacent: bool
     pn_i: str
     pn_j: str
     combo: str
     detail: dict
 
 
-def _detect_earthly_branch_relations(ctx: _PairCtx, registry: InteractionRegistry) -> None:
+def _detect_earthly_branch_relations(
+    ctx: _PairCtx, registry: InteractionRegistry
+) -> None:
     """
     Register pure branch-to-branch interactions: 六冲, 六合, 比和, 六害, 六破, 暗合.
 
@@ -2142,30 +2148,30 @@ def _detect_earthly_branch_relations(ctx: _PairCtx, registry: InteractionRegistr
     qualifies for multiple — suppression is a priority-filter question, not a
     detection question.
     六冲 guard excludes 天克地冲 pairs (stem_clashes.get(g_i) != g_j).
-    六合, 六害, 六破, 暗合 require adjacent pillars (is_adjacent).
+    六合, 六害, 六破, 暗合 register at any distance; 形态 reflects distance == 1 (正) vs farther (遥).
     """
     b_i, b_j = ctx.b_i, ctx.b_j
     g_i, g_j = ctx.g_i, ctx.g_j
-    distance, is_adjacent = ctx.distance, ctx.is_adjacent
+    distance = ctx.distance
     detail, combo = ctx.detail, ctx.combo
 
     if clash_map.get(b_i) == b_j and stem_clashes.get(g_i) != g_j:
         registry.register(
             {
                 "类型": "六冲",
-                "形态": "正冲" if is_adjacent else "遥冲",
+                "形态": "正冲" if distance == 1 else "遥冲",
                 "组合明细": detail,
                 "距离": distance,
                 "组合": combo,
             }
         )
-    if six_he_map.get(b_i) == b_j and is_adjacent:
+    if six_he_map.get(b_i) == b_j:
         pk: tuple[str, str] = (b_i, b_j) if b_i <= b_j else (b_j, b_i)
         elem = six_he_element_map.get(pk, {}).get("primary", "无")
         registry.register(
             {
                 "类型": "六合",
-                "形态": "正合" if is_adjacent else "遥合",
+                "形态": "正合" if distance == 1 else "遥合",
                 "组合明细": detail,
                 "距离": distance,
                 "元素": elem,
@@ -2183,21 +2189,21 @@ def _detect_earthly_branch_relations(ctx: _PairCtx, registry: InteractionRegistr
                 "组合": combo,
             }
         )
-    if harm_map.get(b_i) == b_j and is_adjacent:
+    if harm_map.get(b_i) == b_j:
         registry.register(
             {
                 "类型": "六害",
-                "形态": "正害" if is_adjacent else "遥害",
+                "形态": "正害" if distance == 1 else "遥害",
                 "组合明细": detail,
                 "距离": distance,
                 "组合": combo,
             }
         )
-    if break_map.get(b_i) == b_j and is_adjacent:
+    if break_map.get(b_i) == b_j:
         registry.register(
             {
                 "类型": "六破",
-                "形态": "正破" if is_adjacent else "遥破",
+                "形态": "正破" if distance == 1 else "遥破",
                 "组合明细": detail,
                 "距离": distance,
                 "组合": combo,
@@ -2205,7 +2211,7 @@ def _detect_earthly_branch_relations(ctx: _PairCtx, registry: InteractionRegistr
         )
     # hidden_stem_he pairs (寅丑, 卯申, 午亥) have no overlap with clash_map;
     # 六冲 suppression is handled by the priority filter, not at detection.
-    if b_j in hidden_stem_he.get(b_i, set()) and is_adjacent:
+    if b_j in hidden_stem_he.get(b_i, set()):
         registry.register(
             {
                 "类型": "暗合",
@@ -2225,19 +2231,25 @@ def _detect_earthly_branch_punishments(
     is_valid_punishment handles all four types:
       b_i == b_j → 自刑 (same branch repeated across two pillars)
       b_i != b_j → 无恩/恃势/无礼 where applicable
-    All types only register for adjacent pillars (is_adjacent).
     zhis (full 4-branch list) is required for the set-based 三刑全/半刑 check.
+    半刑 形态 is distance-graded: 紧邻之刑 (d=1), 隔柱之刑 (d=2), 遥隔之刑 (d=3).
+    无礼之刑/自刑 use 正刑 (d=1) or 遥刑 (d>1).
     """
-    if not ctx.is_adjacent:
-        return
     result = is_valid_punishment(ctx.b_i, ctx.b_j, natal_branches=zhis)
     if not result:
         return
     xing_type = result["type"]
     if xing_type in ("无恩之刑", "恃势之刑"):
-        xing_form = "三刑全" if result["branch_count"] == 3 else "半刑"
+        if result["branch_count"] == 3:
+            xing_form = "三刑全"
+        elif ctx.distance == 1:
+            xing_form = "半刑 - 紧邻之刑"
+        elif ctx.distance == 2:
+            xing_form = "半刑 - 隔柱之刑"
+        else:
+            xing_form = "刑 - 遥隔之刑"
     else:
-        xing_form = "正刑"
+        xing_form = "正刑" if ctx.distance == 1 else "遥刑"
     registry.register(
         {
             "类型": xing_type,
@@ -2267,7 +2279,7 @@ def _detect_pillar_interactions(ctx: _PairCtx, registry: InteractionRegistry) ->
         registry.register(
             {
                 "类型": "伏吟",
-                "形态": "正伏吟" if ctx.is_adjacent else "遥伏吟",
+                "形态": "正伏吟" if distance == 1 else "遥伏吟",
                 "组合明细": pillar_detail,
                 "距离": distance,
                 "组合": combo,
@@ -2302,55 +2314,34 @@ def _detect_stem_hidden_stem_bonds(
     """
     if ctx.distance >= 3:
         return
-    _hidden_labels = ("本气", "中气", "余气")
-    i, j = ctx.i, ctx.j
-    b_i, b_j = ctx.b_i, ctx.b_j
-    pn_i, pn_j = ctx.pn_i, ctx.pn_j
-    stem_i, stem_j = ctx.g_i, ctx.g_j
-    distance, combo = ctx.distance, ctx.combo
 
-    for _hi, _hs in enumerate(LunarUtil.ZHI_HIDE_GAN.get(b_j, [])):
-        if stem_combines.get(stem_i) == _hs:
-            registry.register(
-                {
+    _hidden_labels = ("本气", "中气", "余气")
+    directions = [
+        (ctx.i, ctx.j, ctx.pn_i, ctx.pn_j, ctx.g_i, ctx.b_j),
+        (ctx.j, ctx.i, ctx.pn_j, ctx.pn_i, ctx.g_j, ctx.b_i),
+    ]
+
+    for s_idx, b_idx, s_pn, b_pn, s_val, b_val in directions:
+        target_stem = stem_combines.get(s_val)
+        for h_idx, h_stem in enumerate(LunarUtil.ZHI_HIDE_GAN.get(b_val, [])):
+            if target_stem == h_stem:
+                label = _hidden_labels[h_idx]
+                registry.register({
                     "类型": "干支透合",
-                    "组合明细": {pn_i: stem_i, pn_j: b_j},
+                    "形态": "正透合" if ctx.distance == 1 else "遥透合",
+                    "组合明细": {s_pn: s_val, b_pn: b_val},
                     "藏干详情": {
-                        "藏干": _hs,
-                        "藏干层": _hidden_labels[_hi],
-                        "藏干十神": ten_gods_hidden[pn_j].get(
-                            f"{_hidden_labels[_hi]}十神", "无"
-                        ),
-                        "合化五行": _STEM_COMBINE_ELEMENT.get(stem_i, "无"),
+                        "藏干": h_stem,
+                        "藏干层": label,
+                        "藏干十神": ten_gods_hidden[b_pn].get(f"{label}十神", "无"),
+                        "合化五行": _STEM_COMBINE_ELEMENT.get(s_val, "无"),
                     },
-                    "距离": distance,
-                    "干柱索引": i,
-                    "支柱索引": j,
-                    "组合": combo,
-                }
-            )
-            break
-    for _hi, _hs in enumerate(LunarUtil.ZHI_HIDE_GAN.get(b_i, [])):
-        if stem_combines.get(stem_j) == _hs:
-            registry.register(
-                {
-                    "类型": "干支透合",
-                    "组合明细": {pn_j: stem_j, pn_i: b_i},
-                    "藏干详情": {
-                        "藏干": _hs,
-                        "藏干层": _hidden_labels[_hi],
-                        "藏干十神": ten_gods_hidden[pn_i].get(
-                            f"{_hidden_labels[_hi]}十神", "无"
-                        ),
-                        "合化五行": _STEM_COMBINE_ELEMENT.get(stem_j, "无"),
-                    },
-                    "距离": distance,
-                    "干柱索引": j,
-                    "支柱索引": i,
-                    "组合": combo,
-                }
-            )
-            break
+                    "距离": ctx.distance,
+                    "干柱索引": s_idx,
+                    "支柱索引": b_idx,
+                    "组合": ctx.combo,
+                })
+                break
 
 
 def _detect_heavenly_stem_interactions(
@@ -2381,7 +2372,7 @@ def _detect_heavenly_stem_interactions(
         registry.register(
             {
                 "类型": "天干合",
-                "形态": "合化" if ctx.is_adjacent else "合绊",
+                "形态": "合化" if distance == 1 else "合绊",
                 "组合明细": stem_detail,
                 "根基": root_detail,
                 "距离": distance,
@@ -2394,7 +2385,7 @@ def _detect_heavenly_stem_interactions(
         registry.register(
             {
                 "类型": "天干冲",
-                "形态": "正冲" if ctx.is_adjacent else "遥冲",
+                "形态": "正冲" if distance == 1 else "遥冲",
                 "组合明细": stem_detail,
                 "根基": root_detail,
                 "距离": distance,
@@ -2407,7 +2398,7 @@ def _detect_heavenly_stem_interactions(
         registry.register(
             {
                 "类型": "天干克",
-                "形态": "正克" if ctx.is_adjacent else "遥克",
+                "形态": "正克" if distance == 1 else "遥克",
                 "组合明细": stem_detail,
                 "根基": root_detail,
                 "距离": distance,
@@ -2457,7 +2448,6 @@ def _detect_pairwise(
                 g_i=gans[i],
                 g_j=gans[j],
                 distance=j - i,
-                is_adjacent=(j - i) == 1,
                 pn_i=_PILLAR_NAMES_CN[i],
                 pn_j=_PILLAR_NAMES_CN[j],
                 combo=f"{_PILLAR_NAMES_CN[i]}-{_PILLAR_NAMES_CN[j]}",
@@ -2481,39 +2471,30 @@ _DISTANCE_LABELS = {
     3: "远隔",
 }
 
-_OUTPUT_STRIP_KEYS = {"_iid", "_synthetic", "_layer", "干柱索引", "支柱索引", "组合", "混杂"}
+_OUTPUT_STRIP_KEYS = {
+    "_iid",
+    "_synthetic",
+    "_layer",
+    "干柱索引",
+    "支柱索引",
+    "组合",
+    "混杂",
+}
 
 
-def _build_pillar_dynamics(filtered: list) -> dict:
+def _build_pillar_dynamics(filtered: list) -> list:
     """
-    Distribute interactions into per-pillar flat lists.
-    Multi-pillar interactions appear in all affected pillars (same object reference).
-    Internal keys (_iid, _synthetic) are stripped from each item in-place on
-    first encounter — single pass, no extra iteration.
+    Strip internal keys from each interaction and return the list directly.
+    Each item in filtered is already unique — no per-pillar distribution needed.
     """
-    dynamics: dict[int, list] = {i: [] for i in range(4)}
-    stripped: set[int] = set()
-    added: set[tuple] = set()
     for item in filtered:
-        indices = extract_pillar_indices(item.get("组合", "无"))
-        if not indices:
-            continue
-        item_id = item["_iid"]
-        # Strip internal keys once per item, reusing item_id before it's gone
-        if item_id not in stripped:
-            for k in _OUTPUT_STRIP_KEYS:
-                item.pop(k, None)
-            # Convert numeric distance to descriptive label
-            if "距离" in item and isinstance(item["距离"], int):
-                item["距离"] = _DISTANCE_LABELS.get(item["距离"], f"未知距离 ({item['距离']})")
-            stripped.add(item_id)
-        for idx in indices:
-            key = (idx, item_id)
-            if key not in added:
-                dynamics[idx].append(item)
-                added.add(key)
-
-    return {_PILLAR_NAMES_CN[k]: dynamics[k] for k in range(4)}
+        for k in _OUTPUT_STRIP_KEYS:
+            item.pop(k, None)
+        if "距离" in item and isinstance(item["距离"], int):
+            item["距离"] = _DISTANCE_LABELS.get(
+                item["距离"], f"未知距离 ({item['距离']})"
+            )
+    return filtered
 
 
 def get_natal_interactions(pillars: dict, void: dict) -> dict:
