@@ -141,11 +141,11 @@ class SeasonalFactors:
     season: str
     states: Dict[str, str]
 
-    def mult(self, element: str) -> float:
+    def multiplier_hidden_stems(self, element: str) -> float:
         """Seasonal multiplier for hidden stems — full range 0.20 to 1.00."""
         return HIDDEN_STEM_MULTIPLIER.get(self.states.get(element, "囚"), 0.40)
 
-    def mult_visible(self, element: str) -> float:
+    def multiplier_visible_stems(self, element: str) -> float:
         """Seasonal multiplier for a visible (transparent) heavenly stem."""
         return VISIBLE_STEM_MULTIPLIER.get(self.states.get(element, "囚"), 0.50)
 
@@ -579,7 +579,7 @@ def compute_de_shi(
 
     # For 得势, supporting stems contribute positively, while opposing and draining stems detract.
     linear = round(max(w_sup - w_opp * 0.5 - w_drn * 0.3, 0.0), 2)
-    tier = next((name for thresh, name in _DE_SHI_TIERS if linear >= thresh), "失势")
+    tier = next((name for thresh, name in _DE_SHI_TIERS if linear >= thresh), "失")
     de_shi = tier in ("得势力强", "得势力中")
 
     return {
@@ -671,6 +671,10 @@ def get_day_master_strength(
         }
     }
 
+#################################################################################################
+# Execution Code
+ # python -m apps.backend.astronomer_logic.day_master_strength
+#################################################################################################
 
 if __name__ == "__main__":
     import json
@@ -682,8 +686,6 @@ if __name__ == "__main__":
     from src.utils.logging import configure_logging, get_logger
     from datetime import datetime as dt
     from apps.backend.astronomer_logic.true_solar_time import get_true_solar_time
-
-    # python -m apps.backend.astronomer_logic.day_master_strength
 
     configure_logging()
     logger = get_logger(__name__)
