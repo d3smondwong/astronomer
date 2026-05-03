@@ -133,37 +133,16 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
   };
 
   const tianGanHuaMap: Record<string, { 元素: string; label: string }> = {};
-  const ganZhiTouHeHiddenStemMap: Record<string, { hiddenStem: string; 合化五行: string; label: string }> = {};
-  const ganZhiTouHeVisibleStemMap: Record<string, { 合化五行: string; label: string }> = {};
   const pillarDynamic = (chartData?.作用?.柱位动态 ?? []) as any[];
   for (const ix of pillarDynamic) {
-    if (ix.类型 === '天干合' && ix.形态 === '合化' && ix.元素 && ix.强度 !== '消融吸收') {
+    if (ix.类型 === '天干合' && (ix.形态 === '合化' || ix.形态 === '化气格') && ix.元素) {
       for (const pillarName of Object.keys(ix.组合明细 ?? {})) {
-        tianGanHuaMap[pillarName] = { 元素: ix.元素, label: '天干合·合化' };
-      }
-    }
-    if (ix.类型 === '干支透合' && (ix.形态 === '正透合' || ix.形态 === '遥透合') && ix.藏干详情?.合化五行 && ix.强度 !== '消融吸收') {
-      for (const [pillarName, charVal] of Object.entries(ix.组合明细 ?? {})) {
-        if ((charVal as string) in GAN_LABELS) {
-          // Stem pillar — heavenly stem also transforms
-          ganZhiTouHeVisibleStemMap[pillarName] = {
-            合化五行: ix.藏干详情.合化五行,
-            label: `干支透合 (${ix.形态})`,
-          };
-        } else {
-          // Branch pillar — hidden stem transforms
-          ganZhiTouHeHiddenStemMap[pillarName] = {
-            hiddenStem: ix.藏干详情.藏干,
-            合化五行: ix.藏干详情.合化五行,
-            label: `干支透合 (${ix.形态})`,
-          };
-        }
+        tianGanHuaMap[pillarName] = { 元素: ix.元素, label: `天干合·${ix.形态}` };
       }
     }
   }
 
-  const anyHeavenlyStemBadge = Object.keys(tianGanHuaMap).length > 0 || Object.keys(ganZhiTouHeVisibleStemMap).length > 0;
-  const anyHiddenStemBadge = Object.keys(ganZhiTouHeHiddenStemMap).length > 0;
+  const anyHeavenlyStemBadge = Object.keys(tianGanHuaMap).length > 0;
 
   const PillarCard = ({
     pillarLabel,
@@ -176,8 +155,6 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     maxVoidCount,
     shenSha,
     tianGanHua,
-    ganZhiTouHeStem,
-    ganZhiTouHe,
   }: {
     pillarLabel: string;
     pillar: any;
@@ -189,8 +166,6 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     maxVoidCount: number;
     shenSha?: { 名称: string; 来源: string; 解读?: string }[];
     tianGanHua?: { 元素: string; label: string };
-    ganZhiTouHeStem?: { 合化五行: string; label: string };
-    ganZhiTouHe?: { hiddenStem: string; 合化五行: string; label: string };
   }) => {
     const heavenlyChar = pillar.天干;
     const earthlyChar = pillar.地支;
@@ -298,7 +273,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
             >
               {(() => {
                 const stemTransform: { 合化五行: string; label: string } | undefined =
-                  tianGanHua ? { 合化五行: tianGanHua.元素, label: tianGanHua.label } : ganZhiTouHeStem;
+                  tianGanHua ? { 合化五行: tianGanHua.元素, label: tianGanHua.label } : undefined;
                 const origLabel = language === 'en' ? heavenlyName : (GAN_LABELS_CH[heavenlyChar] ?? heavenlyChar);
                 if (!stemTransform) return origLabel;
                 let combinedLabel: string;
@@ -331,9 +306,9 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                 padding: '1px 7px',
                 whiteSpace: 'nowrap',
                 lineHeight: 1.6,
-                visibility: (tianGanHua ?? ganZhiTouHeStem) ? 'visible' : 'hidden',
+                visibility: tianGanHua ? 'visible' : 'hidden',
               }}>
-                {(tianGanHua ?? ganZhiTouHeStem)?.label ?? ' '}
+                {tianGanHua?.label ?? ' '}
               </span>
             )}
           </div>
@@ -539,39 +514,8 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                         lineHeight: 1.2,
                       }}
                     >
-                      {(() => {
-                        const origLabel = language === 'en' ? (GAN_LABELS[stem] || stem) : (GAN_LABELS_CH[stem] || stem);
-                        if (!ganZhiTouHe || ganZhiTouHe.hiddenStem !== stem) return origLabel;
-                        const combinedLabel = language === 'en'
-                          ? `${origLabel.split(' ')[0]} ${ELEMENT_EN[ganZhiTouHe.合化五行] ?? ganZhiTouHe.合化五行}`
-                          : `${origLabel[0]}${ganZhiTouHe.合化五行}`;
-                        return (
-                          <>
-                            <span style={{ opacity: 0.55 }}>{origLabel}</span>
-                            <span style={{ margin: '0 4px', opacity: 0.45 }}>→</span>
-                            <span>{combinedLabel}</span>
-                          </>
-                        );
-                      })()}
+                      {language === 'en' ? (GAN_LABELS[stem] || stem) : (GAN_LABELS_CH[stem] || stem)}
                     </p>
-                    {anyHiddenStemBadge && (
-                      <span style={{
-                        display: 'inline-block',
-                        fontSize: '11px',
-                        fontFamily: '"Noto Sans SC", sans-serif',
-                        fontStyle: 'normal',
-                        color: 'rgba(30, 90, 170, 0.85)',
-                        background: 'rgba(30, 90, 170, 0.08)',
-                        border: '1px dashed rgba(30, 90, 170, 0.5)',
-                        borderRadius: '20px',
-                        padding: '1px 6px',
-                        whiteSpace: 'nowrap',
-                        lineHeight: 1.6,
-                        visibility: ganZhiTouHe?.hiddenStem === stem ? 'visible' : 'hidden',
-                      }}>
-                        {ganZhiTouHe?.hiddenStem === stem ? ganZhiTouHe.label : ' '}
-                      </span>
-                    )}
                   </div>
                   {tenGod && (
                     <div
@@ -1169,10 +1113,10 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
 
                     return (
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" style={{ position: 'relative', paddingTop: '20px', minWidth: 0 }}>
-                        <PillarCard pillarLabel={tr.yearPillar[language]}  pillar={siZhu.年柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.年柱?.十二长生)}  naYin={buildNaYin(siZhu.年柱?.纳音)}  xunKong={buildXunKong(siZhu.年柱?.空亡地支)}  voidStatus={yearVS}  maxVoidCount={maxVoidCount} shenSha={pillarShenSha.年柱} tianGanHua={tianGanHuaMap['年柱']} ganZhiTouHeStem={ganZhiTouHeVisibleStemMap['年柱']} ganZhiTouHe={ganZhiTouHeHiddenStemMap['年柱']} />
-                        <PillarCard pillarLabel={tr.monthPillar[language]} pillar={siZhu.月柱} isDayMaster={false} lifeStages={buildLifeStage(siZhu.月柱?.十二长生)} naYin={buildNaYin(siZhu.月柱?.纳音)} xunKong={buildXunKong(siZhu.月柱?.空亡地支)} voidStatus={monthVS} maxVoidCount={maxVoidCount} shenSha={pillarShenSha.月柱} tianGanHua={tianGanHuaMap['月柱']} ganZhiTouHeStem={ganZhiTouHeVisibleStemMap['月柱']} ganZhiTouHe={ganZhiTouHeHiddenStemMap['月柱']} />
-                        <PillarCard pillarLabel={tr.dayPillar[language]}   pillar={siZhu.日柱}   isDayMaster={true}  lifeStages={buildLifeStage(siZhu.日柱?.十二长生)}   naYin={buildNaYin(siZhu.日柱?.纳音)}   xunKong={buildXunKong(siZhu.日柱?.空亡地支)}   voidStatus={dayVS}   maxVoidCount={maxVoidCount} shenSha={pillarShenSha.日柱} tianGanHua={tianGanHuaMap['日柱']} ganZhiTouHeStem={ganZhiTouHeVisibleStemMap['日柱']} ganZhiTouHe={ganZhiTouHeHiddenStemMap['日柱']} />
-                        <PillarCard pillarLabel={tr.hourPillar[language]}  pillar={siZhu.时柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.时柱?.十二长生)}  naYin={buildNaYin(siZhu.时柱?.纳音)}  xunKong={buildXunKong(siZhu.时柱?.空亡地支)}  voidStatus={hourVS}  maxVoidCount={maxVoidCount} shenSha={pillarShenSha.时柱} tianGanHua={tianGanHuaMap['时柱']} ganZhiTouHeStem={ganZhiTouHeVisibleStemMap['时柱']} ganZhiTouHe={ganZhiTouHeHiddenStemMap['时柱']} />
+                        <PillarCard pillarLabel={tr.yearPillar[language]}  pillar={siZhu.年柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.年柱?.十二长生)}  naYin={buildNaYin(siZhu.年柱?.纳音)}  xunKong={buildXunKong(siZhu.年柱?.空亡地支)}  voidStatus={yearVS}  maxVoidCount={maxVoidCount} shenSha={pillarShenSha.年柱} tianGanHua={tianGanHuaMap['年柱']} />
+                        <PillarCard pillarLabel={tr.monthPillar[language]} pillar={siZhu.月柱} isDayMaster={false} lifeStages={buildLifeStage(siZhu.月柱?.十二长生)} naYin={buildNaYin(siZhu.月柱?.纳音)} xunKong={buildXunKong(siZhu.月柱?.空亡地支)} voidStatus={monthVS} maxVoidCount={maxVoidCount} shenSha={pillarShenSha.月柱} tianGanHua={tianGanHuaMap['月柱']} />
+                        <PillarCard pillarLabel={tr.dayPillar[language]}   pillar={siZhu.日柱}   isDayMaster={true}  lifeStages={buildLifeStage(siZhu.日柱?.十二长生)}   naYin={buildNaYin(siZhu.日柱?.纳音)}   xunKong={buildXunKong(siZhu.日柱?.空亡地支)}   voidStatus={dayVS}   maxVoidCount={maxVoidCount} shenSha={pillarShenSha.日柱} tianGanHua={tianGanHuaMap['日柱']} />
+                        <PillarCard pillarLabel={tr.hourPillar[language]}  pillar={siZhu.时柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.时柱?.十二长生)}  naYin={buildNaYin(siZhu.时柱?.纳音)}  xunKong={buildXunKong(siZhu.时柱?.空亡地支)}  voidStatus={hourVS}  maxVoidCount={maxVoidCount} shenSha={pillarShenSha.时柱} tianGanHua={tianGanHuaMap['时柱']} />
                       </div>
                     );
                   })()}
