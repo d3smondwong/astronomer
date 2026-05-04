@@ -6,10 +6,10 @@ Also serves as the canonical source for shared BaZi constants imported by
 wu_xing.py and natal_interactions.py.
 
 Key Exports (shared constants):
-    HIDDEN_STEM_MULTIPLIER, VISIBLE_STEM_MULTIPLIER       — seasonal multiplier tables
-    SeasonalFactors, get_seasonal_factors() — seasonal strength system
-    BRANCH_HIDDEN_ROOTING               — hidden stem weight table (single source of truth)
-    get_stem_element()                  — delegates to LunarUtil.WU_XING_GAN
+    HIDDEN_STEM_MULTIPLIER, VISIBLE_STEM_MULTIPLIER  — seasonal multiplier tables
+    SeasonalFactors, get_seasonal_factors()          — seasonal strength system
+    BRANCH_HIDDEN_STEM_ROOTING                       — hidden stem weight table (single source of truth)
+    get_stem_element()                               — delegates to LunarUtil.WU_XING_GAN
 
 Main Function:
     get_day_master_strength(bazi, pillars, ten_gods, natal_interactions) → dict
@@ -17,54 +17,22 @@ Main Function:
 Output structure:
     {
         "日主": {
-            "天干": "戊", "五行": "土", "阴阳": "阳",
-            "十二长生": "帝旺",
-            "得令": { "得令": bool, "得生": bool, "状态": str, "分数": int },
-            "得地": {
-                "得地": bool,
-                "通根": "深根"|"中根"|"浅根"|"无根",
-                "加权分数": float,
-                "详情": { "年柱": {"根类": str, "贡献": float}, ... }
-            },
-            "得势": {
-                "得势": bool,
-                "支持天干": [{"天干": str, "十神": str}],
-                "反对天干": [...],
-                "耗泄天干": [...],
-                "中性天干": [...],
-            },
-            "互动调整": {
-                "组合加分": float,
-                "冲克消根支": list,
-                "月令降级": str | None,
-                "已合支": list,
-                "活跃互动": list,
-            },
-            "强弱分数": float,   # 0–12; each of 得令/得地/得势 contributes 0–4
+            "天干": "癸",
+            "五行": "火",        # transformed element if 化气格; original otherwise
+            "阴阳": "阴",
+            "十二长生": "墓",
+            "得令": { "状态": str, "分数": int },           # 分数: 0 | 2 | 4
+            "得地": { "通根": str, "分数": float },          # 分数: 0 | 1.0 | 2.0 | 4.0
+            "得势": { "得势层级": str, "分数": float },      # 分数: 0 | 1.0 | 2.0 | 4.0
+            "强弱分数": float,   # weighted 0–4: 得令×50% + 得地×25% + 得势×12.5% + combo×12.5%
             "强弱": "极旺"|"旺"|"中和"|"弱"|"极弱",
         }
     }
 """
-"""
-Does it Transform (化)?
-In Classical Bazi, for a combination to successfully transform into Fire, specific conditions must be met. Let's look at your chart's environment:
-
-The Season (Month Branch): You are born in the month of 巳 (Snake), which is the peak of Summer. This provides massive support for Fire.
-
-Supporting Branches: You also have 午 (Horse) in the Hour and 未 (Goat) in the Day. Together with the Month 巳, these form a Summer Seasonal Trio (巳-午-未 三会火局).
-
-The "Seed": The Year Stem is 丁 (Yin Fire), which acts as a "guiding" element to pull the energy toward Fire.
-
-Conclusion on Transformation:
-Because the surrounding environment is overwhelmingly Fire (Summer month + Fire trio), this is a textbook case of a True Transformation (真化) into Fire.
-"""
-
-
 
 from dataclasses import dataclass
 from typing import Dict, List
 from lunar_python.util import LunarUtil
-
 
 # ─────────────────────────────────────────────
 # Hidden stems — single source of truth
@@ -460,11 +428,8 @@ def compute_de_di(
     Branches clashed or consumed by combos (from natal_interactions_transformation) contribute 0 to raw rooting.
     Returns:
         {
-            "得地": bool,      # True if any root exists after exclusions
-            "通根": str,       # tier: 深根|中根|浅根|无根
-            "加权分数": float, # raw root weight sum
-            "分数": float,     # _ROOT_DEPTH_SCORES[tier] (rooting only; combo bonus added by caller)
-            "详情": dict       # per-pillar breakdown
+            "通根": str,   # tier: 深根|中根|浅根|无根
+            "分数": float, # 0 | 1.0 | 2.0 | 4.0 (rooting only; combo bonus added by caller)
         }
     """
     # 1. Derive exclusions from interaction adjustments.
@@ -541,11 +506,8 @@ def compute_de_shi(
 
     Returns:
         {
-            "得势": bool,
-            "支持天干": [{"天干": str, "十神": str, ...}, ...],
-            "反对天干": [...],
-            "耗泄天干": [...],
-            "分数": float,   # 0–4
+            "得势层级": str,  # "强"|"中"|"弱"|"失"
+            "分数": float,   # 0 | 1.0 | 2.0 | 4.0
         }
     """
     adj = natal_interactions_transformation.get("天干调整", {})
@@ -622,8 +584,11 @@ def get_day_master_strength(
     Args:
         bazi:               EightChar object from lunar_birthday.getEightChar()
         pillars:            Pre-computed pillar data from get_bazi_pillars()
-        ten_gods:           Pre-computed ten gods from get_ten_gods()
+        ten_gods:           Already-transformed ten gods from apply_heavenlystem_tranformation_tengods()
         natal_interactions: Pre-computed interactions from get_natal_interactions()
+
+    If 化气格 is detected in natal_interactions, the day master's effective element is
+    overridden to the transformed element before computing 得令, 得地, and 得势.
 
     Returns { "日主": { ... } } — see module docstring for full shape.
     """
