@@ -45,6 +45,21 @@ Output structure:
         }
     }
 """
+"""
+Does it Transform (化)?
+In Classical Bazi, for a combination to successfully transform into Fire, specific conditions must be met. Let's look at your chart's environment:
+
+The Season (Month Branch): You are born in the month of 巳 (Snake), which is the peak of Summer. This provides massive support for Fire.
+
+Supporting Branches: You also have 午 (Horse) in the Hour and 未 (Goat) in the Day. Together with the Month 巳, these form a Summer Seasonal Trio (巳-午-未 三会火局).
+
+The "Seed": The Year Stem is 丁 (Yin Fire), which acts as a "guiding" element to pull the energy toward Fire.
+
+Conclusion on Transformation:
+Because the surrounding environment is overwhelmingly Fire (Summer month + Fire trio), this is a textbook case of a True Transformation (真化) into Fire.
+"""
+
+
 
 from dataclasses import dataclass
 from typing import Dict, List
@@ -283,16 +298,7 @@ def apply_interactions(
             "活跃互动": list[str],    # human-readable summaries
         }
     """
-    # Deduplicate interactions across all four pillar lists
-    seen: set[tuple] = set()
-    unique: list[dict] = []
-    pillar_dynamics = natal_interactions.get("作用", {}).get("柱位动态", {})
-    for pillar_list in pillar_dynamics.values():
-        for ix in pillar_list:
-            key = (ix.get("类型", ""), ix.get("组合", ""))
-            if key not in seen:
-                seen.add(key)
-                unique.append(ix)
+    unique: list[dict] = natal_interactions.get("作用", {}).get("柱位动态", [])
 
     consumed: set[str] = (
         set()
@@ -305,6 +311,7 @@ def apply_interactions(
     stem_cancelled: set[str] = set()  # pillar labels whose stem is neutralised
     stem_weakened: set[str] = set()  # pillar labels whose stem contribution is halved
     stem_combined: dict = {}  # pillar label → {"合化元素": elem} for full 合化
+    dm_hua_qi_ge: dict | None = None  # set when 化气格 involves the day master
 
     # natal_interactions already de-conflicts overlapping interactions via apply_bazi_master_priority,
     # so we trust the output and assign scores directly without re-checking priority.
@@ -355,16 +362,21 @@ def apply_interactions(
                 summaries.append(f"半合{elem} (+1.0)")
 
         elif ix_type == "天干合":
-            if ix.get("强度") == "强势主流":
-                # Full 合化: both stems transform into the new element
+            forma = ix.get("形态", "")
+            if forma == "化气格":
+                dm_hua_qi_ge = {"合化元素": elem}
+                for pillar_label in ix.get("组合明细", {}).keys():
+                    stem_combined[pillar_label] = {"合化元素": elem}
+                summaries.append(f"化气格{elem} (日主化气)")
+            elif forma == "合化":
                 for pillar_label in ix.get("组合明细", {}).keys():
                     stem_combined[pillar_label] = {"合化元素": elem}
                 summaries.append(f"天干合化{elem} (合化)")
             else:
-                # 合而不化: stems are locked and neutralised but do not transform
+                # 假化 / 合绊 / 遥合 → stems neutralised, no element change
                 for pillar_label in ix.get("组合明细", {}).keys():
                     stem_cancelled.add(pillar_label)
-                summaries.append(f"天干合{elem} (合而不化，双干消效)")
+                summaries.append(f"天干合{elem} ({forma}，双干消效)")
 
         elif ix_type == "天干克":
             controller = ix.get("主动方", "")
@@ -395,6 +407,7 @@ def apply_interactions(
             "受克天干": sorted(stem_weakened),
             "合化天干": stem_combined,
         },
+        "日主化气格": dm_hua_qi_ge,
         "活跃互动": summaries,
     }
 
@@ -580,7 +593,7 @@ def compute_de_shi(
     # For 得势, supporting stems contribute positively, while opposing and draining stems detract.
     linear = round(max(w_sup - w_opp * 0.5 - w_drn * 0.3, 0.0), 2)
     tier = next((name for thresh, name in _DE_SHI_TIERS if linear >= thresh), "失")
-    de_shi = tier in ("得势力强", "得势力中")
+    de_shi = tier in ("强", "中")
 
     return {
         # "得势": de_shi,
@@ -632,6 +645,11 @@ def get_day_master_strength(
         day_elem, month_branch, natal_interactions
     )
 
+    # If 化气格 occurred, the day master's effective element changes to the transformed element.
+    dm_hua = natal_interactions_transformation.get("日主化气格")
+    if dm_hua:
+        day_elem = dm_hua["合化元素"]
+
     # ── Steps 2–4: each compute function owns its own scoring ────────────────
     de_ling = compute_de_ling(day_elem, month_branch, natal_interactions_transformation)
     de_di = compute_de_di(day_elem, all_branches, natal_interactions_transformation)
@@ -680,7 +698,7 @@ if __name__ == "__main__":
     import json
     from lunar_python import Solar
     from apps.backend.astronomer_logic.bazi_pillars import get_bazi_pillars
-    from apps.backend.astronomer_logic.ten_gods import get_ten_gods
+    from apps.backend.astronomer_logic.ten_gods import get_ten_gods, apply_heavenlystem_tranformation_tengods
     from apps.backend.astronomer_logic.void_xun_kong import get_void_xun_kong
     from apps.backend.astronomer_logic.natal_interactions import get_natal_interactions
     from src.utils.logging import configure_logging, get_logger
@@ -692,8 +710,8 @@ if __name__ == "__main__":
 
     # ── Subjects ──────────────────────────────────────────────────────────────
     subjects = {
-        "Desmond": (dt(1985, 11, 25, 17, 7, 0), 1.3253, 103.808053, 1),
-        # "Corinne": (dt(1987,  6,  3, 12, 6, 0),  1.4759,  103.808053, 0),
+        # "Desmond": (dt(1985, 11, 25, 17, 7, 0), 1.3253, 103.808053, 1),
+        "Corinne": (dt(1987,  6,  3, 12, 6, 0),  1.4759,  103.808053, 0),
         # "Lara":    (dt(2025,  7, 31,  9, 10, 0), 1.3253,  103.808053, 0),
     }
 
@@ -714,5 +732,8 @@ if __name__ == "__main__":
             _pillars[k]["藏干十神"] = _ten_gods[k]["藏干十神"]
 
         _interactions = get_natal_interactions(_pillars, _void)
+        _ten_gods, _ = apply_heavenlystem_tranformation_tengods(
+            _ten_gods, _pillars, _interactions, _bazi.getDayGan()
+        )
         result = get_day_master_strength(_bazi, _pillars, _ten_gods, _interactions)
         logger.info(json.dumps(result, ensure_ascii=False, indent=2))

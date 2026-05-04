@@ -194,7 +194,7 @@ export default function DayMasterStrengthCard({ chartData, language }: DayMaster
             alignItems: 'center',
             justifyContent: 'center',
             gap: '16px',
-            minWidth: '80px',
+            minWidth: '180px',
           }}>
             {/* Stem Character */}
             <div style={{
@@ -208,32 +208,49 @@ export default function DayMasterStrengthCard({ chartData, language }: DayMaster
               {天干}
             </div>
 
-            {/* Element with Icon */}
+            {/* Element with Icon (and optional 化气格 transformation) */}
             {(() => {
-              const IconComponent = ELEMENT_ICONS[五行];
-              return (
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}>
-                  {IconComponent && (
-                    <IconComponent
-                      sx={{
-                        fontSize: '24px',
-                        color: 'rgba(115,92,0,0.6)',
-                      }}
-                    />
-                  )}
-                  <div style={{
-                    fontSize: '18px',
-                    fontFamily: '"Noto Sans SC", sans-serif',
-                    color: 'rgba(115,92,0,0.7)',
-                    fontWeight: 600,
-                  }}>
-                    {五行}
+              const 化气格信息 = chartData?.["四柱实体"]?.["日柱"]?.["化气格信息"];
+              const 原五行 = 化气格信息?.["原五行"];
+              const hasTransform = 原五行 != null && 原五行 !== 五行;
+
+              const ElementRow = ({ elem, dimmed }: { elem: string; dimmed?: boolean }) => {
+                const Icon = ELEMENT_ICONS[elem];
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px', opacity: dimmed ? 0.5 : 1 }}>
+                    {Icon && <Icon sx={{ fontSize: '24px', color: 'rgba(115,92,0,0.6)' }} />}
+                    <div style={{ fontSize: '18px', fontFamily: '"Noto Sans SC", sans-serif', color: 'rgba(115,92,0,0.7)', fontWeight: 600 }}>
+                      {elem}
+                    </div>
                   </div>
+                );
+              };
+
+              if (!hasTransform) return <ElementRow elem={五行} />;
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                  <ElementRow elem={五行} />
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ opacity: 0.45, fontSize: '20px', color: '#4d4635' }}>↑</span>
+                    <span style={{
+                      position: 'absolute',
+                      left: '50%',
+                      marginLeft: '8px',
+                      fontSize: '12px',
+                      fontFamily: '"Noto Sans SC", sans-serif',
+                      color: 'rgba(30, 90, 170, 0.85)',
+                      background: 'rgba(30, 90, 170, 0.08)',
+                      border: '1px dashed rgba(30, 90, 170, 0.5)',
+                      borderRadius: '20px',
+                      padding: '1px 7px',
+                      whiteSpace: 'nowrap',
+                      lineHeight: 1.6,
+                    }}>
+                      天干合·化气格
+                    </span>
+                  </div>
+                  <ElementRow elem={原五行} dimmed />
                 </div>
               );
             })()}
