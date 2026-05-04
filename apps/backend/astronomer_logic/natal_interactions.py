@@ -86,11 +86,11 @@ KEY FEATURES:
        - 3 = 远隔 (year-hour) → DISTANT
        Applies to all interaction types; 三合/三会 use minimum pairwise distance.
 
-    7. Interaction Types (18 total):
+    7. Interaction Types (22 total):
        Tier 1 (Structural): 三会, 三合, 六冲, 六合, 天克地冲
        Tier 2 (Operational): 比和, 残会, 半合, 天干合, 干支透合, 天干克, 天干冲, 伏吟
-       Tier 4 (Virtual):    拱合, 拱会 (non-occupying; echo-only strength)
-       Tier 3 (Frictional): 三刑 (四种/full/partial), 六害, 六破, 暗合
+       Tier 3 (Virtual):    拱合, 拱会 (non-occupying; echo-only strength)
+       Tier 4 (Frictional): 三刑 (四种: 无恩之刑/恃势之刑/无礼之刑/自刑), 六害, 六破, 暗合
 
     8. Heavenly Stem Interactions:
        天干合 (Harmony) locks stems only when adjacent (distance == 1, 合绊 or 合化),
@@ -166,9 +166,9 @@ Main Functions:
         Parse pillar combination strings ("年柱-月柱-日柱") into sorted indices.
         Uses priority-based mapping (full names before abbreviations).
 
-    _build_pillar_dynamics(filtered) → dict:
-        Distribute interactions into per-pillar tier buckets (第一梯队/第二梯队/第三梯队).
-        Strips internal keys (_iid, _synthetic) on first encounter.
+    _build_pillar_dynamics(filtered) → list:
+        Strip internal keys (_iid, _synthetic, etc.) and convert 距离 int → label.
+        Returns the flat filtered list directly (no per-pillar distribution).
 
 Validators:
 
@@ -184,7 +184,7 @@ Interaction Maps (Declarative Configuration):
     break_map, hidden_stem_he, stem_combines, stem_clashes, stem_controls,
     six_he_element_map: All branch/stem relationships and element mappings.
 
-    INTERACTION_TIER_ORDER: 16 types mapped to tiers (0–14)
+    INTERACTION_TIER_ORDER: 22 types mapped to tiers (0–17)
     STRENGTH_LEVELS, STRENGTH_ORDER: Hierarchical strength definitions
 
 Dependencies:
@@ -198,10 +198,7 @@ Output Format:
     {
         "作用": {
             "关系总览": [status strings for strong/significant interactions],
-            "柱位动态": {
-                "年柱": {"第一梯队_纲领层": [...], "第二梯队_气势层": [...], "第三梯队_琐碎层": [...], "第四梯队_虚局层": [...]},
-                "月柱": {...}, "日柱": {...}, "时柱": {...}
-            },
+            "柱位动态": [...],   # Flat list of interaction dicts, sorted by INTERACTION_TIER_ORDER
         }
     }
 
@@ -2819,8 +2816,8 @@ def get_natal_interactions(pillars: dict, void: dict) -> dict:
 
     Returns:
         {"作用": {
-            "关系总览": [...],          # Relationship overview (high-strength interactions)
-            "柱位动态": {...},          # Per-pillar tier-organized interactions
+            "关系总览": [...],   # High-strength interactions (强势主流/显著影响 only)
+            "柱位动态": [...],   # Flat list of all interactions sorted by INTERACTION_TIER_ORDER
         }}
     """
     gans = [pillars[k]["天干"] for k in _PILLAR_NAMES_CN]
