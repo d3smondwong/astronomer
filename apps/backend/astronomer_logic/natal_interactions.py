@@ -316,7 +316,7 @@ six_he_element_map = {
     ("卯", "戌"): {"primary": "火"},
     ("辰", "酉"): {"primary": "金"},
     ("巳", "申"): {"primary": "水"},
-    ("午", "未"): {"primary": "土", "secondary": "火"},
+    ("午", "未"): {"primary": "土"},
 }
 
 # Triple Combination Map (Needs 2 out of 3 for a "Partial" or 3 for "Full")
@@ -1786,6 +1786,88 @@ def apply_bazi_master_priority(registry: InteractionRegistry) -> list:
     return result
 
 
+# ── Pass 7 — Reconcile 天干克 After Stem Transformation ──────────────────────
+
+
+def __reconcile_stemcontrol_after_stem_transformation(filtered: list) -> None:
+    """Neutralise 天干克 whose control no longer holds after 合化/化气格 transformation.
+
+    Dead Code. Kept here for reference in case future stem transformation rules changes.
+
+    Why Pass 2 already covers it completely:
+
+    1. 合化/化气格 always requires distance == 1 — non-adjacent pairs become 遥合 (line 772). So both forms are inherently adjacent.
+
+    2. Adjacent 天干合 always triggers STEM_天干合 lock — Pass 2 Phase 1 (line 1467) filters [h for h in he_items if h.get("距离") == 1], so every 合化/化气格 pair gets a lock on both of their stem actors.
+
+    3. Pass 2 Phase 2 (line 1492) neutralises ALL 天干克 on the locked actor:
+
+        for item in registry.get_stem_by_type(["天干克", "天干冲"], idx):
+            _apply_rule(item, lock_key)  # → 消融吸收
+            
+        This scopes to the actor (idx), which means every 天干克 where that stem is either controller OR target — not just the克 between the two 合 partners. So a third-party stem controlling the transformed stem is also neutralised here.
+
+    4. Pass 7 explicitly skips already-neutralised items — line 1817:
+
+        if item.get("强度") == "消融吸收":
+            continue
+
+        By the time Pass 7 runs, any 天干克 involving a 合化/化气格 stem is already at 消融吸收 from Pass 2. Pass 7 never finds anything to act on.
+        """
+
+    # Step 1 — build stem_combined: pillar → {element, 形态}
+    stem_combined: dict[str, dict] = {}
+    for item in filtered:
+        if item.get("类型") != "天干合":
+            continue
+        he_form = item.get("形态")
+        if he_form not in ("合化", "化气格"):
+            continue
+        transformed_element = item.get("元素")
+        if not transformed_element:
+            continue
+        for pillar in item.get("组合明细", {}):
+            if pillar not in stem_combined:  # first transformation wins
+                stem_combined[pillar] = {"element": transformed_element, "形态": he_form}
+
+    if not stem_combined:
+        return
+
+    # Step 2 — re-evaluate each 天干克
+    for item in filtered:
+        if item.get("类型") != "天干克":
+            continue
+        if item.get("强度") == "消融吸收":
+            continue
+
+        combo = item.get("组合明细", {})
+        pillars_in_ke = list(combo.keys())
+        if len(pillars_in_ke) != 2:
+            continue
+        p1, p2 = pillars_in_ke
+
+        if p1 not in stem_combined and p2 not in stem_combined:
+            continue  # neither stem transformed
+
+        eff1 = stem_combined[p1]["element"] if p1 in stem_combined else LunarUtil.WU_XING_GAN.get(combo[p1], "无")
+        eff2 = stem_combined[p2]["element"] if p2 in stem_combined else LunarUtil.WU_XING_GAN.get(combo[p2], "无")
+
+        controller_pillar = item.get("主动方")
+        ctrl_eff, tgt_eff = (eff1, eff2) if controller_pillar == p1 else (eff2, eff1)
+
+        # _ELEMENT_CONTROLS maps element → what controls that element (reverse direction)
+        # correct check: does ctrl_eff control tgt_eff? → _ELEMENT_CONTROLS[tgt_eff] == ctrl_eff
+        still_controls = _ELEMENT_CONTROLS.get(tgt_eff) == ctrl_eff
+
+        if not still_controls:
+            transformed_pillar = p1 if p1 in stem_combined else p2
+            he_form_label = stem_combined[transformed_pillar]["形态"]
+            item["强度"] = "消融吸收"
+            existing = item.get("备注", "")
+            remark = f"{he_form_label}后控制关系消失"
+            item["备注"] = f"{existing}；{remark}" if existing else remark
+
+
 # ── Pass 6 — Xun Kong (旬空) Post-Filter ─────────────────────────────────────
 
 
@@ -2764,6 +2846,9 @@ def get_natal_interactions(pillars: dict, void: dict) -> dict:
 
     # ── Pass S: Stem Rooting Modulation ──────────────────────────────────
     _pass_stem_rooting(filtered, tong_gen=pillars["日柱"]["根基强度"])
+
+    # ── Pass 7: Reconcile 天干克 after stem transformation ────────────────
+    __reconcile_stemcontrol_after_stem_transformation(filtered)
 
     # ── Pass 6: Xun Kong (旬空) post-filter ──────────────────────────────
     # Convert flat void format {"日柱": "戌亥"} to the nested format _pass6_xun_kong expects
