@@ -52,6 +52,24 @@ export interface Pillar {
   primary_void_status?: string;
   reverse_void_status?: string;
   纳音: string;
+  合化信息?: {
+    类型: string;
+    合化元素: string;
+    参与柱位: string[];
+    原天干十神: string;
+  };
+  化气格信息?: {
+    原五行: string;
+    现五行: string;
+  };
+  化气格变化?: {
+    原天干十神: string;
+    原藏干十神: {
+      本气十神: string;
+      中气十神: string;
+      余气十神: string;
+    };
+  };
 }
 
 /**

@@ -135,9 +135,10 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
   const tianGanHuaMap: Record<string, { 元素: string; label: string }> = {};
   const pillarDynamic = (chartData?.作用?.柱位动态 ?? []) as any[];
   for (const ix of pillarDynamic) {
-    if (ix.类型 === '天干合' && (ix.形态 === '合化' || ix.形态 === '化气格') && ix.元素) {
+    const huaElement = ix.合化条件?.合化元素;
+    if (ix.类型 === '天干合' && (ix.形态 === '合化' || ix.形态 === '化气格') && huaElement) {
       for (const pillarName of Object.keys(ix.组合明细 ?? {})) {
-        tianGanHuaMap[pillarName] = { 元素: ix.元素, label: `天干合·${ix.形态}` };
+        tianGanHuaMap[pillarName] = { 元素: huaElement, label: `天干合·${ix.形态}` };
       }
     }
   }
@@ -173,11 +174,12 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     const earthlyName = ZHI_LABELS[earthlyChar] || earthlyChar;
     const activeVoidCount = (voidStatus.primaryVoid === true ? 1 : 0) + voidStatus.mutualVoid;
 
+    const 化气格变化 = pillar.化气格变化;
     const hiddenStemPairs = [
-      { stem: pillar.藏干?.本气, tenGod: pillar.藏干十神?.本气十神 },
-      { stem: pillar.藏干?.中气, tenGod: pillar.藏干十神?.中气十神 },
-      { stem: pillar.藏干?.余气, tenGod: pillar.藏干十神?.余气十神 },
-    ].filter((pair) => pair.stem != null && pair.stem !== '无') as { stem: string; tenGod: string | null }[];
+      { stem: pillar.藏干?.本气, tenGod: pillar.藏干十神?.本气十神, oldTenGod: 化气格变化?.原藏干十神?.本气十神 },
+      { stem: pillar.藏干?.中气, tenGod: pillar.藏干十神?.中气十神, oldTenGod: 化气格变化?.原藏干十神?.中气十神 },
+      { stem: pillar.藏干?.余气, tenGod: pillar.藏干十神?.余气十神, oldTenGod: 化气格变化?.原藏干十神?.余气十神 },
+    ].filter((pair) => pair.stem != null && pair.stem !== '无') as { stem: string; tenGod: string | null; oldTenGod?: string }[];
 
     return (
       <div
@@ -313,39 +315,59 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
             )}
           </div>
           {pillar.天干十神 && (() => {
-            const displayChar = pillar.天干十神 === '日主' ? '我' : pillar.天干十神;
+            const displayChar  = pillar.天干十神 === '日主' ? '我' : pillar.天干十神;
             const displayLabel = pillar.天干十神 === '日主' ? 'Self' : (SHI_SHEN_LABELS[pillar.天干十神] ?? pillar.天干十神);
+            const oldTenGod    = pillar.合化信息?.原天干十神 ?? pillar.化气格变化?.原天干十神;
+            const pillboxLabel = pillar.合化信息
+              ? `天干合·${pillar.合化信息.类型}`
+              : pillar.化气格变化
+                ? '天干合·化气格'
+                : (tianGanHua?.label ?? '天干合');
+            const hasTransformation = oldTenGod != null && oldTenGod !== '' && oldTenGod !== pillar.天干十神;
+
+            const TenGodCard = ({ value, dimmed }: { value: string; dimmed?: boolean }) => {
+              const char  = value === '日主' ? '我' : value;
+              const label = value === '日主' ? 'Self' : (SHI_SHEN_LABELS[value] ?? value);
+              return (
+                <div style={{
+                  display: 'inline-flex', flexDirection: 'column', alignItems: 'center',
+                  border: '1px solid rgba(115, 92, 0, 0.25)', borderRadius: '8px',
+                  padding: '4px 10px', background: 'rgba(115, 92, 0, 0.06)',
+                  opacity: dimmed ? 0.55 : 1,
+                }}>
+                  <span style={{ fontSize: '13px', color: 'rgba(115, 92, 0, 0.75)', fontFamily: 'Ma Shan Zheng, serif' }}>
+                    {char}
+                  </span>
+                  {language === 'en' && (
+                    <span style={{ fontSize: '10px', color: 'rgba(115, 92, 0, 0.6)', fontFamily: 'Noto Serif, serif', marginTop: '2px' }}>
+                      {label}
+                    </span>
+                  )}
+                </div>
+              );
+            };
+
+            if (hasTransformation) {
+              return (
+                <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <TenGodCard value={oldTenGod!} dimmed />
+                  <span style={{ opacity: 0.45, fontSize: '13px', color: '#4d4635' }}>→</span>
+                  <TenGodCard value={pillar.天干十神} />
+                </div>
+              );
+            }
+
             return (
-              <div
-                style={{
-                  display: 'inline-flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  border: '1px solid rgba(115, 92, 0, 0.25)',
-                  borderRadius: '8px',
-                  padding: '4px 10px',
-                  background: 'rgba(115, 92, 0, 0.06)',
-                  marginTop: '8px',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '13px',
-                    color: 'rgba(115, 92, 0, 0.75)',
-                    fontFamily: 'Ma Shan Zheng, serif',
-                  }}
-                >
+              <div style={{
+                display: 'inline-flex', flexDirection: 'column', alignItems: 'center',
+                border: '1px solid rgba(115, 92, 0, 0.25)', borderRadius: '8px',
+                padding: '4px 10px', background: 'rgba(115, 92, 0, 0.06)', marginTop: '8px',
+              }}>
+                <span style={{ fontSize: '13px', color: 'rgba(115, 92, 0, 0.75)', fontFamily: 'Ma Shan Zheng, serif' }}>
                   {displayChar}
                 </span>
                 {language === 'en' && (
-                  <span
-                    style={{
-                      fontSize: '10px',
-                      color: 'rgba(115, 92, 0, 0.6)',
-                      fontFamily: 'Noto Serif, serif',
-                      marginTop: '2px',
-                    }}
-                  >
+                  <span style={{ fontSize: '10px', color: 'rgba(115, 92, 0, 0.6)', fontFamily: 'Noto Serif, serif', marginTop: '2px' }}>
                     {displayLabel}
                   </span>
                 )}
@@ -476,7 +498,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                 flexWrap: 'wrap',
               }}
             >
-              {hiddenStemPairs.map(({ stem, tenGod }, idx: number) => {
+              {hiddenStemPairs.map(({ stem, tenGod, oldTenGod }, idx: number) => {
                 const QI_LABELS = [tr.primaryQi[language], tr.middleQi[language], tr.residualQi[language]];
                 return (
                 <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -517,43 +539,36 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                       {language === 'en' ? (GAN_LABELS[stem] || stem) : (GAN_LABELS_CH[stem] || stem)}
                     </p>
                   </div>
-                  {tenGod && (
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        border: '1px solid rgba(115, 92, 0, 0.2)',
-                        borderRadius: '6px',
-                        padding: '3px 8px',
-                        background: 'rgba(115, 92, 0, 0.05)',
-                        marginTop: '8px',
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: '13px',
-                          color: 'rgba(115, 92, 0, 0.7)',
-                          fontFamily: 'Ma Shan Zheng, serif',
-                          marginBottom: '4px',
-                        }}
-                      >
-                        {tenGod}
-                      </span>
-                      {language === 'en' && (
-                        <span
-                          style={{
-                            fontSize: '9px',
-                            color: 'rgba(115, 92, 0, 0.55)',
-                            fontFamily: 'Noto Serif, serif',
-                            marginTop: '1px',
-                          }}
-                        >
-                          {SHI_SHEN_LABELS[tenGod] ?? tenGod}
+                  {tenGod && (() => {
+                    const hasHiddenTransformation = oldTenGod != null && oldTenGod !== '' && oldTenGod !== tenGod;
+                    const HiddenTenGodCard = ({ value, dimmed }: { value: string; dimmed?: boolean }) => (
+                      <div style={{
+                        display: 'inline-flex', flexDirection: 'column', alignItems: 'center',
+                        border: '1px solid rgba(115, 92, 0, 0.2)', borderRadius: '6px',
+                        padding: '3px 8px', background: 'rgba(115, 92, 0, 0.05)',
+                        opacity: dimmed ? 0.55 : 1,
+                      }}>
+                        <span style={{ fontSize: '13px', color: 'rgba(115, 92, 0, 0.7)', fontFamily: 'Ma Shan Zheng, serif', marginBottom: '4px' }}>
+                          {value}
                         </span>
-                      )}
-                    </div>
-                  )}
+                        {language === 'en' && (
+                          <span style={{ fontSize: '9px', color: 'rgba(115, 92, 0, 0.55)', fontFamily: 'Noto Serif, serif', marginTop: '1px' }}>
+                            {SHI_SHEN_LABELS[value] ?? value}
+                          </span>
+                        )}
+                      </div>
+                    );
+                    if (hasHiddenTransformation) {
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', marginTop: '8px' }}>
+                          <HiddenTenGodCard value={oldTenGod!} dimmed />
+                          <span style={{ opacity: 0.45, fontSize: '13px', color: '#4d4635' }}>↓</span>
+                          <HiddenTenGodCard value={tenGod} />
+                        </div>
+                      );
+                    }
+                    return <HiddenTenGodCard value={tenGod} />;
+                  })()}
                 </div>
                 );
               })}

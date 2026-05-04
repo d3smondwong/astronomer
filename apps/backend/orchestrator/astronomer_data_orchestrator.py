@@ -26,7 +26,7 @@ from apps.backend.astronomer_logic.true_solar_time import get_true_solar_time
 from apps.backend.astronomer_logic.bazi_pillars import get_bazi_pillars
 from apps.backend.astronomer_logic.twelve_life_stages import get_twelve_life_stages
 from apps.backend.astronomer_logic.void_xun_kong import get_void_xun_kong, check_pillar_void_status
-from apps.backend.astronomer_logic.ten_gods import get_ten_gods
+from apps.backend.astronomer_logic.ten_gods import get_ten_gods, apply_he_hua_overrides
 from apps.backend.astronomer_logic.na_yin import get_na_yin
 from apps.backend.astronomer_logic.tai_ming_shen import get_san_yuan
 from apps.backend.astronomer_logic.classical_texts import get_classical_texts
@@ -34,6 +34,7 @@ from apps.backend.astronomer_logic.natal_shen_sha import get_shen_sha
 from apps.backend.astronomer_logic.interpretation_shen_sha import get_shen_sha_interpretations
 from apps.backend.astronomer_logic.natal_interactions import get_natal_interactions
 from apps.backend.astronomer_logic.day_master_strength import get_day_master_strength
+from apps.backend.astronomer_logic.natal_five_elements import get_natal_five_elements
 
 _PILLAR_KEYS = ["年柱", "月柱", "日柱", "时柱"]
 
@@ -112,7 +113,9 @@ def calculate_natal_chart(
 
     # Individual Modules
     natal_interactions_data = get_natal_interactions(pillars, void)
+    ten_gods, si_zhu = apply_he_hua_overrides(ten_gods, si_zhu, natal_interactions_data, pillars["日柱"]["天干"])
     day_master_data = get_day_master_strength(bazi, pillars, ten_gods, natal_interactions_data)
+    five_elements_data = get_natal_five_elements(si_zhu, day_master_data, natal_interactions_data)
     tai_ming_shen = get_san_yuan(lunar_birthday)
     shen_sha = get_shen_sha(bazi, na_yin, gender)
     shen_sha_with_interpretations = get_shen_sha_interpretations(shen_sha)
@@ -124,6 +127,7 @@ def calculate_natal_chart(
         "生时节气": lunar_birthday.getJieQi(),
         "四柱实体": si_zhu,
         **day_master_data,
+        **five_elements_data,
         **shen_sha_with_interpretations,
         **tai_ming_shen,
         **classical_texts_data,
@@ -131,18 +135,29 @@ def calculate_natal_chart(
     }
 
 
-# --- Verification ---
-
+# ============================================================================
+# EXECUTION
+# python -m apps.backend.orchestrator.astronomer_data_orchestrator
+# ============================================================================
 if __name__ == "__main__":
-    # python -m apps.backend.orchestrator.astronomer_data_orchestrator
     # Cross-check output against the TypeScript baziOrchestrator for the same birth date.
 
-    from src.utils.logging import configure_logging
+    from src.utils.logging import configure_logging, get_logger
+    from datetime import datetime as dt
 
     logger = configure_logging()
+    logger = get_logger(__name__)
 
-    birth = datetime(1985, 11, 25, 17, 7, 0)
-    lat, lng = 1.3253, 103.8080
+    # ── Subjects ──────────────────────────────────────────────────────────────
+    subjects = {
+        # "Desmond": (dt(1985, 11, 25, 17, 7, 0), 1.3253, 103.808053, 1),
+        "Corinne": (dt(1987, 6, 3, 12, 6, 0), 1.4759, 103.808053, 0),
+        # "Lara":    (dt(2025,  7, 31,  9, 10, 0), 1.3253,  103.808053, 0),
+    }
 
-    chart = calculate_natal_chart(birth, lat, lng, gender=1)
-    logger.info("Natal chart output:\n%s", json.dumps(chart, ensure_ascii=False, indent=2))
+    for name, (birthday, lat, lon, gender) in subjects.items():
+        logger.info("=" * 60)
+        logger.info("Subject: %s  (%s)", name, birthday.strftime("%Y-%m-%d %H:%M"))
+
+        chart = calculate_natal_chart(birthday, lat, lon, gender=gender)
+        logger.info("Natal chart output:\n%s", json.dumps(chart, ensure_ascii=False, indent=2))
