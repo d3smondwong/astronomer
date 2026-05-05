@@ -372,11 +372,9 @@ break_map = {
 # Hidden Stem Combinations (An He) - Secret affairs or hidden wealth
 # Zi Ping (子平) methods
 hidden_stem_he: dict[str, set[str]] = {
-    "寅": {"丑"},  # Jia-Ji
+    "寅": {"丑"},  # 甲己合
     "丑": {"寅"},
-    "卯": {"申"},  # Yi-Geng
-    "申": {"卯"},
-    "午": {"亥"},  # Ding-Ren
+    "午": {"亥"},  # 丁壬合
     "亥": {"午"},
 }
 
