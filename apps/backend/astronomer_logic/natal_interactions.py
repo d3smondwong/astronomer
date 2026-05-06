@@ -2158,7 +2158,7 @@ class _PairCtx:
 
 
 def _detect_earthly_branch_relations(
-    ctx: _PairCtx, registry: InteractionRegistry
+    ctx: _PairCtx, registry: InteractionRegistry, rooting: dict
 ) -> None:
     """
     Register pure branch-to-branch interactions: 六冲, 六合, 比和, 六害, 六破, 暗合.
@@ -2168,18 +2168,25 @@ def _detect_earthly_branch_relations(
     detection question.
     六冲 guard excludes 天克地冲 pairs (stem_clashes.get(g_i) != g_j).
     六合, 六害, 六破, 暗合 register at any distance; 形态 reflects distance == 1 (正) vs farther (遥).
+    根基 is included for 六冲 to support weak/strong branch differentiation downstream.
     """
     b_i, b_j = ctx.b_i, ctx.b_j
     g_i, g_j = ctx.g_i, ctx.g_j
+    pn_i, pn_j = ctx.pn_i, ctx.pn_j
     distance = ctx.distance
     detail, combo = ctx.detail, ctx.combo
 
     if clash_map.get(b_i) == b_j and stem_clashes.get(g_i) != g_j:
+        root_detail = {
+            pn_i: rooting[pn_i]["根基强度"],
+            pn_j: rooting[pn_j]["根基强度"],
+        }
         registry.register(
             {
                 "类型": "六冲",
                 "形态": "正冲" if distance == 1 else "遥冲",
                 "组合明细": detail,
+                "根基": root_detail,
                 "距离": distance,
                 "组合": combo,
             }
@@ -2280,13 +2287,14 @@ def _detect_earthly_branch_punishments(
     )
 
 
-def _detect_pillar_interactions(ctx: _PairCtx, registry: InteractionRegistry) -> None:
+def _detect_pillar_interactions(ctx: _PairCtx, registry: InteractionRegistry, rooting: dict) -> None:
     """
     Register pillar-level interactions that require stem AND branch simultaneously:
     伏吟 (identical gan+zhi) and 天克地冲 (stem clash + branch clash).
 
     伏吟 is mutually exclusive with 天克地冲 — identical branches cannot also clash.
     组合明细 uses the combined "干支" label (e.g. "甲子") rather than branch alone.
+    根基 carries the 4-tier rooting depth for 天克地冲 (mirrors 天干合/克/冲).
     """
     pn_i, pn_j = ctx.pn_i, ctx.pn_j
     g_i, g_j = ctx.g_i, ctx.g_j
@@ -2306,10 +2314,15 @@ def _detect_pillar_interactions(ctx: _PairCtx, registry: InteractionRegistry) ->
         )
     # Guards on 六冲/天干冲 detection ensure no redundant output for this pair.
     if stem_clashes.get(g_i) == g_j and clash_map.get(b_i) == b_j:
+        root_detail = {
+            pn_i: rooting[pn_i]["根基强度"],
+            pn_j: rooting[pn_j]["根基强度"],
+        }
         registry.register(
             {
                 "类型": "天克地冲",
                 "组合明细": pillar_detail,
+                "根基": root_detail,
                 "距离": distance,
                 "组合": combo,
             }
@@ -2757,9 +2770,9 @@ def _detect_pairwise(
                 combo=f"{_PILLAR_NAMES_CN[i]}-{_PILLAR_NAMES_CN[j]}",
                 detail={_PILLAR_NAMES_CN[i]: zhis[i], _PILLAR_NAMES_CN[j]: zhis[j]},
             )
-            _detect_earthly_branch_relations(ctx, registry)
+            _detect_earthly_branch_relations(ctx, registry, rooting)
             _detect_earthly_branch_punishments(ctx, registry, zhis)
-            _detect_pillar_interactions(ctx, registry)
+            _detect_pillar_interactions(ctx, registry, rooting)
             _detect_stem_hidden_stem_bonds(ctx, registry, ten_gods_hidden)
             _detect_heavenly_stem_interactions(ctx, registry, rooting, gans, zhis)
 
