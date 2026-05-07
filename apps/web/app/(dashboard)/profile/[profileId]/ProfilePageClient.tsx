@@ -169,17 +169,17 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     shenSha?: { 名称: string; 来源: string; 解读?: string }[];
     tianGanHua?: { 元素: string; label: string };
   }) => {
-    const heavenlyChar = pillar.天干;
-    const earthlyChar = pillar.地支;
+    const heavenlyChar = pillar.天干?.天干;
+    const earthlyChar = pillar.地支?.地支;
     const heavenlyName = GAN_LABELS[heavenlyChar] || heavenlyChar;
     const earthlyName = ZHI_LABELS[earthlyChar] || earthlyChar;
     const activeVoidCount = (voidStatus.primaryVoid === true ? 1 : 0) + voidStatus.mutualVoid;
 
     const 化气格变化 = pillar.化气格变化;
     const hiddenStemPairs = [
-      { stem: pillar.藏干?.本气, tenGod: pillar.藏干十神?.本气十神, oldTenGod: 化气格变化?.原藏干十神?.本气十神 },
-      { stem: pillar.藏干?.中气, tenGod: pillar.藏干十神?.中气十神, oldTenGod: 化气格变化?.原藏干十神?.中气十神 },
-      { stem: pillar.藏干?.余气, tenGod: pillar.藏干十神?.余气十神, oldTenGod: 化气格变化?.原藏干十神?.余气十神 },
+      { stem: pillar.藏干?.本气?.天干, tenGod: pillar.藏干?.本气?.十神, oldTenGod: 化气格变化?.原藏干十神?.本气 },
+      { stem: pillar.藏干?.中气?.天干, tenGod: pillar.藏干?.中气?.十神, oldTenGod: 化气格变化?.原藏干十神?.中气 },
+      { stem: pillar.藏干?.余气?.天干, tenGod: pillar.藏干?.余气?.十神, oldTenGod: 化气格变化?.原藏干十神?.余气 },
     ].filter((pair) => pair.stem != null && pair.stem !== '无') as { stem: string; tenGod: string | null; oldTenGod?: string }[];
 
     return (
@@ -315,16 +315,16 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
               </span>
             )}
           </div>
-          {pillar.天干十神 && (() => {
-            const displayChar  = pillar.天干十神 === '日主' ? '我' : pillar.天干十神;
-            const displayLabel = pillar.天干十神 === '日主' ? 'Self' : (SHI_SHEN_LABELS[pillar.天干十神] ?? pillar.天干十神);
+          {pillar.天干?.十神 && (() => {
+            const displayChar  = pillar.天干.十神 === '日主' ? '我' : pillar.天干.十神;
+            const displayLabel = pillar.天干.十神 === '日主' ? 'Self' : (SHI_SHEN_LABELS[pillar.天干.十神] ?? pillar.天干.十神);
             const oldTenGod    = pillar.合化信息?.原天干十神 ?? pillar.化气格变化?.原天干十神;
             const pillboxLabel = pillar.合化信息
               ? `天干合·${pillar.合化信息.类型}`
               : pillar.化气格变化
                 ? '天干合·化气格'
                 : (tianGanHua?.label ?? '天干合');
-            const hasTransformation = oldTenGod != null && oldTenGod !== '' && oldTenGod !== pillar.天干十神;
+            const hasTransformation = oldTenGod != null && oldTenGod !== '' && oldTenGod !== pillar.天干.十神;
 
             const TenGodCard = ({ value, dimmed }: { value: string; dimmed?: boolean }) => {
               const char  = value === '日主' ? '我' : value;
@@ -353,7 +353,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                 <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
                   <TenGodCard value={oldTenGod!} dimmed />
                   <span style={{ opacity: 0.45, fontSize: '13px', color: '#4d4635' }}>→</span>
-                  <TenGodCard value={pillar.天干十神} />
+                  <TenGodCard value={pillar.天干.十神} />
                 </div>
               );
             }
@@ -375,20 +375,20 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
               </div>
             );
           })()}
-          {pillar.根基强度 && (() => {
+          {pillar.天干?.根基强度 && (() => {
             const rootingMap: Record<string, { trKey: keyof typeof tr; color: string; bg: string }> = {
               '深根': { trKey: 'rootingDeep',     color: '#2d6a2d', bg: 'rgba(45, 106, 45, 0.08)'  },
               '中根': { trKey: 'rootingModerate', color: '#3d5a80', bg: 'rgba(61, 90, 128, 0.08)'  },
               '浅根': { trKey: 'rootingLight',    color: '#8a5200', bg: 'rgba(138, 82, 0, 0.08)'   },
               '无根': { trKey: 'rootingNone',     color: '#7a4040', bg: 'rgba(122, 64, 64, 0.08)'  },
             };
-            const cfg = rootingMap[pillar.根基强度];
+            const cfg = rootingMap[pillar.天干.根基强度];
             if (!cfg) return null;
             return (
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '12px' }}>
                 <span style={{ fontSize: '11px', color: cfg.color, fontFamily: 'Noto Serif, serif', fontStyle: 'italic',
                                borderLeft: `3px solid ${cfg.color}`, background: cfg.bg, padding: '2px 10px' }}>
-                  {language === 'en' ? tr[cfg.trKey][language] : pillar.根基强度}
+                  {language === 'en' ? tr[cfg.trKey][language] : pillar.天干.根基强度}
                 </span>
               </div>
             );

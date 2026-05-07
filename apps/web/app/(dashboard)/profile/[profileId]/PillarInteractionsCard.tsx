@@ -300,10 +300,10 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '2px' }}>
                   <span style={{ fontFamily: '"Ma Shan Zheng", cursive', fontSize: '20px', color: '#4d4635', lineHeight: 1 }}>
-                    {pillarData?.天干 ?? '—'}
+                    {pillarData?.天干?.天干 ?? '—'}
                   </span>
                   <span style={{ fontFamily: '"Ma Shan Zheng", cursive', fontSize: '20px', color: '#4d4635', lineHeight: 1 }}>
-                    {pillarData?.地支 ?? '—'}
+                    {pillarData?.地支?.地支 ?? '—'}
                   </span>
                 </div>
               </div>

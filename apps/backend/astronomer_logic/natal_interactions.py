@@ -2366,7 +2366,7 @@ def _detect_stem_hidden_stem_bonds(
                         "藏干详情": {
                             "藏干": h_stem,
                             "藏干层": label,
-                            "藏干十神": ten_gods_hidden[b_pn].get(f"{label}十神", "无"),
+                            "藏干十神": ten_gods_hidden[b_pn][label]["十神"],
                             "合化五行": _STEM_COMBINE_ELEMENT.get(s_val, "无"),
                         },
                         "距离": ctx.distance,
@@ -2836,7 +2836,7 @@ def get_natal_interactions(pillars: dict, void: dict) -> dict:
 
     # ── Rooting & ten gods — already in pillars (merged by orchestrator) ──
     rooting = {k: {"根基强度": pillars[k]["根基强度"]} for k in _PILLAR_NAMES_CN}
-    ten_gods_hidden = {k: pillars[k]["藏干十神"] for k in _PILLAR_NAMES_CN}
+    ten_gods_hidden = {k: pillars[k]["藏干"] for k in _PILLAR_NAMES_CN}
 
     # ── Initialise registry ────────────────────────────────────────────────
     registry = InteractionRegistry()
@@ -2918,9 +2918,10 @@ if __name__ == "__main__":
         void = get_void_xun_kong(bazi)
         ten_gods = get_ten_gods(bazi)
 
-        # Merge 藏干十神 into pillars so natal_interactions can read ten gods
+        # Enrich 藏干 with 十神 so natal_interactions can read ten gods
         for k in ["年柱", "月柱", "日柱", "时柱"]:
-            pillars[k]["藏干十神"] = ten_gods[k]["藏干十神"]
+            for tier, info in pillars[k]["藏干"].items():
+                info["十神"] = ten_gods[k]["藏干十神"][tier]
 
         interactions = get_natal_interactions(pillars, void)
         logger.info(json.dumps(interactions, ensure_ascii=False, indent=2))

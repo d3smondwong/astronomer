@@ -14,8 +14,7 @@ The 日柱 天干 is always "日主" (Day Master — the self reference).
 import copy
 
 from lunar_python.util import LunarUtil
-
-_YANG_STEMS = frozenset("甲丙戊庚壬")
+from apps.backend.astronomer_logic.bazi_pillars import _YANG_STEMS
 _ELEMENT_YANG_STEM: dict[str, str] = {"木": "甲", "火": "丙", "土": "戊", "金": "庚", "水": "壬"}
 _ELEMENT_YIN_STEM:  dict[str, str] = {"木": "乙", "火": "丁", "土": "己", "金": "辛", "水": "癸"}
 
@@ -58,9 +57,9 @@ def get_ten_gods(bazi) -> dict:
         return {
             "天干十神": heavenly_stem_ten_god,
             "藏干十神": {
-                "本气十神": primary_qi_ten_god,
-                "中气十神": middle_qi_ten_god,
-                "余气十神": residual_qi_ten_god,
+                "本气": primary_qi_ten_god,
+                "中气": middle_qi_ten_god,
+                "余气": residual_qi_ten_god,
             },
         }
 
@@ -113,17 +112,17 @@ def apply_heavenlystem_tranformation_tengods(
                 original_hidden_stem_tengod = dict(ten_gods[pillar]["藏干十神"])
 
                 if pillar != "日柱":
-                    stem = si_zhu[pillar]["天干"]
+                    stem = si_zhu[pillar]["天干"]["天干"]
                     new_visible_stem_tengod = LunarUtil.SHI_SHEN.get(new_dm_stem + stem, "无")
                     ten_gods[pillar]["天干十神"] = new_visible_stem_tengod
-                    si_zhu[pillar]["天干十神"]   = new_visible_stem_tengod
+                    si_zhu[pillar]["天干"]["十神"] = new_visible_stem_tengod
 
-                for tier in ("本气", "中气", "余气"):
-                    hidden_stem = si_zhu[pillar]["藏干"].get(tier, "无")
+                for tier, tier_info in si_zhu[pillar]["藏干"].items():
+                    hidden_stem = tier_info.get("天干", "无")
                     if hidden_stem and hidden_stem != "无":
                         new_hidden_stem_tengod = LunarUtil.SHI_SHEN.get(new_dm_stem + hidden_stem, "无")
-                        ten_gods[pillar]["藏干十神"][f"{tier}十神"] = new_hidden_stem_tengod
-                        si_zhu[pillar]["藏干十神"][f"{tier}十神"]   = new_hidden_stem_tengod
+                        ten_gods[pillar]["藏干十神"][tier] = new_hidden_stem_tengod
+                        tier_info["十神"] = new_hidden_stem_tengod
 
                 if original_visible_stem_tengod != ten_gods[pillar]["天干十神"] or original_hidden_stem_tengod != ten_gods[pillar]["藏干十神"]:
                     si_zhu[pillar]["化气格变化"] = {
@@ -140,7 +139,7 @@ def apply_heavenlystem_tranformation_tengods(
                 original_tengods_by_pillar[pillar] = ten_gods[pillar]["天干十神"]
                 new_visible_stem_tengod = _ten_god_for_transformed(stem, transformed_element, day_master_stem)
                 ten_gods[pillar]["天干十神"] = new_visible_stem_tengod
-                si_zhu[pillar]["天干十神"]   = new_visible_stem_tengod
+                si_zhu[pillar]["天干"]["十神"] = new_visible_stem_tengod
                 # 藏干十神 unchanged — DM and hidden stems are unaffected
 
             for pillar in interaction["组合明细"]:

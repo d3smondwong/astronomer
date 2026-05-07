@@ -34,7 +34,7 @@ from apps.backend.astronomer_logic.natal_shen_sha import get_shen_sha
 from apps.backend.astronomer_logic.interpretation_shen_sha import get_shen_sha_interpretations
 from apps.backend.astronomer_logic.natal_interactions import get_natal_interactions
 from apps.backend.astronomer_logic.day_master_strength import get_day_master_strength
-from apps.backend.astronomer_logic.natal_five_elements import QualitativeFiveElementsClassifier
+from apps.backend.astronomer_logic.natal_five_elements import QualitativeFiveElementsClassifier, get_pillar_five_elements
 
 _PILLAR_KEYS = ["年柱", "月柱", "日柱", "时柱"]
 
@@ -88,28 +88,43 @@ def calculate_natal_chart(
     ten_gods       = get_ten_gods(bazi)
     na_yin         = get_na_yin(bazi)
     classical_texts_data = get_classical_texts(pillars)
+    pillar_elements = get_pillar_five_elements(pillars)
+
+    # Enrich pillars 藏干 with 十神 — consumed by get_natal_interactions
+    for k in _PILLAR_KEYS:
+        for tier, info in pillars[k]["藏干"].items():
+            info["十神"] = ten_gods[k]["藏干十神"][tier]
 
     # Merge all module outputs per pillar
     si_zhu = {
         key: {
-            "天干":     pillars[key]["天干"],
-            "根基强度": pillars[key]["根基强度"],
-            "通根于":     pillars[key]["通根于"],
-            "天干十神": ten_gods[key]["天干十神"],
-            "地支":     pillars[key]["地支"],
-            "藏干":     pillars[key]["藏干"],
-            "藏干十神": ten_gods[key]["藏干十神"],
+            "天干": {
+                "天干":    pillars[key]["天干"],
+                "阴阳":    pillars[key]["天干阴阳"],
+                "五行":    pillar_elements[key]["天干五行"],
+                "根基强度": pillars[key]["根基强度"],
+                "通根于":  pillars[key]["通根于"],
+                "十神":    ten_gods[key]["天干十神"],
+            },
+            "地支": {
+                "地支": pillars[key]["地支"],
+                "阴阳": pillars[key]["地支阴阳"],
+                "五行": pillar_elements[key]["地支五行"],
+            },
+            "藏干": {
+                tier: {
+                    **info,  # 天干, 阴阳, 十神
+                    "五行": pillar_elements[key]["藏干五行"][tier],
+                }
+                for tier, info in pillars[key]["藏干"].items()
+            },
             "十二长生": life_stages[key],
             "空亡地支": void[key],
             **pillar_void[key],
-            "纳音":     na_yin[key],
+            "纳音":    na_yin[key],
         }
         for key in _PILLAR_KEYS
     }
-
-    # Merge 藏干十神 into pillars so natal_interactions can read ten gods without recomputing
-    for k in _PILLAR_KEYS:
-        pillars[k]["藏干十神"] = ten_gods[k]["藏干十神"]
 
     # Individual Modules
     natal_interactions_data = get_natal_interactions(pillars, void)

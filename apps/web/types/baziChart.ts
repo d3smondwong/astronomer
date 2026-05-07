@@ -11,10 +11,41 @@
 export interface TenGods {
   天干十神: string;
   藏干十神: {
-    本气十神: string;
-    中气十神: string;
-    余气十神: string;
+    本气: string;
+    中气: string;
+    余气: string;
   };
+}
+
+/**
+ * Heavenly stem with all derived attributes.
+ */
+export interface HeavenlyStem {
+  天干: string;
+  阴阳: string;
+  五行: string;
+  根基强度: string;
+  通根于: string;
+  十神: string;
+}
+
+/**
+ * Earthly branch with all derived attributes.
+ */
+export interface EarthlyBranch {
+  地支: string;
+  阴阳: string;
+  五行: string;
+}
+
+/**
+ * A single hidden stem tier within a pillar.
+ */
+export interface HiddenStemTier {
+  天干: string;
+  阴阳: string;
+  五行: string;
+  十神: string;
 }
 
 /**
@@ -38,14 +69,12 @@ export interface VoidStatus {
  * A single pillar (year, month, day, hour).
  */
 export interface Pillar {
-  天干: string;
-  天干十神: string;
-  地支: string;
-  藏干: string[];
-  藏干十神: {
-    本气十神: string;
-    中气十神: string;
-    余气十神: string;
+  天干: HeavenlyStem;
+  地支: EarthlyBranch;
+  藏干: {
+    本气: HiddenStemTier;
+    中气?: HiddenStemTier;
+    余气?: HiddenStemTier;
   };
   十二长生: string;
   空亡地支: string;
@@ -65,9 +94,9 @@ export interface Pillar {
   化气格变化?: {
     原天干十神: string;
     原藏干十神: {
-      本气十神: string;
-      中气十神: string;
-      余气十神: string;
+      本气: string;
+      中气?: string;
+      余气?: string;
     };
   };
 }
