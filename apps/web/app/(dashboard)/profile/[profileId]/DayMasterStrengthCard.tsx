@@ -21,7 +21,7 @@ interface DayMasterStrengthCardProps {
   language: 'en' | 'ch';
 }
 
-const MOBILE_BREAKPOINT = 640;
+const MOBILE_BREAKPOINT = 720;
 const TABLET_BREAKPOINT = 1024;
 
 const ELEMENT_ICONS: Record<string, React.ComponentType<any>> = {

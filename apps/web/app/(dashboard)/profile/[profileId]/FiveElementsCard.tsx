@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { Card } from 'antd';
-import Nature from '@mui/icons-material/Nature';
+import Forest from '@mui/icons-material/Forest';
 import LocalFireDepartment from '@mui/icons-material/LocalFireDepartment';
 import Terrain from '@mui/icons-material/Terrain';
 import StopCircleOutlined from '@mui/icons-material/StopCircleOutlined';
 import Waves from '@mui/icons-material/Waves';
 import { BaziChartData, ElementState, FiveElements } from '@/types/baziChart';
 
-const MOBILE_BREAKPOINT = 640;
+const MOBILE_BREAKPOINT = 720;
 
 interface FiveElementsCardProps {
   chartData: BaziChartData;
@@ -19,7 +19,7 @@ interface FiveElementsCardProps {
 const ELEMENTS = ['木', '火', '土', '金', '水'] as const;
 
 const ELEMENT_ICONS = {
-  '木': Nature,
+  '木': Forest,
   '火': LocalFireDepartment,
   '土': Terrain,
   '金': StopCircleOutlined,
@@ -69,7 +69,7 @@ export default function FiveElementsCard({ chartData, language }: FiveElementsCa
   return (
     <Card
       styles={{
-        body: { padding: '20px 20px 16px' },
+        body: { padding: isMobile ? '20px 20px 16px' : '20px 20px 16px' },
       }}
       style={{
         background: '#faf8f2',
@@ -130,7 +130,7 @@ export default function FiveElementsCard({ chartData, language }: FiveElementsCa
               <span
                 style={{
                   fontFamily: '"Ma Shan Zheng", serif',
-                  fontSize: 28,
+                  fontSize: isMobile ? 18 : 28,
                   fontWeight: 700,
                   color: '#4d4635',
                   lineHeight: 1,
@@ -185,7 +185,7 @@ export default function FiveElementsCard({ chartData, language }: FiveElementsCa
               )}
 
               {/* State badge */}
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, paddingTop: 4 }}>
+              <div style={{ display: 'inline-flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? 2 : 6, paddingTop: 4 }}>
                 <span
                   style={{
                     fontFamily: '"Ma Shan Zheng", serif',

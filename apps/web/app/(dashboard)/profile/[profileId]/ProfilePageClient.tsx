@@ -1,6 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import Forest from '@mui/icons-material/Forest';
+import LocalFireDepartment from '@mui/icons-material/LocalFireDepartment';
+import Terrain from '@mui/icons-material/Terrain';
+import StopCircleOutlined from '@mui/icons-material/StopCircleOutlined';
+import Waves from '@mui/icons-material/Waves';
 import { type LifeStageInfo, type NaYinInfo, type VoidInfo, type VoidStatus } from '@/types/baziLibraryTypes';
 import { type ProfileRecord } from '@/lib/profilesDb';
 import { Card, Tabs, Button, Popconfirm, Tooltip } from 'antd';
@@ -13,6 +18,27 @@ import { deleteProfileAction } from './actions';
 import FiveElementsCard from './FiveElementsCard';
 import PillarInteractionsCard from './PillarInteractionsCard';
 import DayMasterStrengthCard from './DayMasterStrengthCard';
+
+const STEM_ELEMENT: Record<string, string> = {
+  甲: '木', 乙: '木', 丙: '火', 丁: '火',
+  戊: '土', 己: '土', 庚: '金', 辛: '金',
+  壬: '水', 癸: '水',
+};
+
+const BRANCH_ELEMENT: Record<string, string> = {
+  子: '水', 丑: '土', 寅: '木', 卯: '木',
+  辰: '土', 巳: '火', 午: '火', 未: '土',
+  申: '金', 酉: '金', 戌: '土', 亥: '水',
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ELEMENT_ICON: Record<string, any> = {
+  '木': Forest, '火': LocalFireDepartment, '土': Terrain, '金': StopCircleOutlined, '水': Waves,
+};
+
+const ELEMENT_COLOR: Record<string, string> = {
+  '木': '#2d6a2d', '火': '#b42424', '土': '#8a6200', '金': '#666666', '水': '#1e5a9a',
+};
 
 interface ProfilePageClientProps {
   profileRecord: ProfileRecord;
@@ -265,37 +291,49 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
             {heavenlyChar}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-            <p
-              style={{
-                fontSize: '13px',
-                color: '#4d4635',
-                opacity: 0.75,
-                margin: 0,
-                fontStyle: 'italic',
-              }}
-            >
-              {(() => {
-                const stemTransform: { 合化五行: string; label: string } | undefined =
-                  tianGanHua ? { 合化五行: tianGanHua.元素, label: tianGanHua.label } : undefined;
-                const origLabel = language === 'en' ? heavenlyName : (GAN_LABELS_CH[heavenlyChar] ?? heavenlyChar);
-                if (!stemTransform) return origLabel;
-                let combinedLabel: string;
-                if (language === 'en') {
-                  const polarity = origLabel.split(' ')[0];
-                  combinedLabel = `${polarity} ${ELEMENT_EN[stemTransform.合化五行] ?? stemTransform.合化五行}`;
-                } else {
-                  const polarity = origLabel[0];
-                  combinedLabel = `${polarity}${stemTransform.合化五行}`;
-                }
+            {(() => {
+              const stemTransform: { 合化五行: string; label: string } | undefined =
+                tianGanHua ? { 合化五行: tianGanHua.元素, label: tianGanHua.label } : undefined;
+              const origLabel = language === 'en' ? heavenlyName : (GAN_LABELS_CH[heavenlyChar] ?? heavenlyChar);
+
+              if (!stemTransform) {
+                const el = STEM_ELEMENT[heavenlyChar];
+                const Icon = el ? ELEMENT_ICON[el] : null;
+                const color = el ? ELEMENT_COLOR[el] : '#4d4635';
                 return (
-                  <>
-                    <span style={{ opacity: 0.55 }}>{origLabel}</span>
-                    <span style={{ margin: '0 4px', opacity: 0.45 }}>→</span>
-                    <span>{combinedLabel}</span>
-                  </>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                    {Icon && <Icon style={{ fontSize: 13, color }} />}
+                    <p style={{ fontSize: '13px', color: '#4d4635', opacity: 0.75, margin: 0, fontStyle: 'italic' }}>
+                      {origLabel}
+                    </p>
+                  </div>
                 );
-              })()}
-            </p>
+              }
+
+              const oldEl = STEM_ELEMENT[heavenlyChar];
+              const OldIcon = oldEl ? ELEMENT_ICON[oldEl] : null;
+              const oldColor = oldEl ? ELEMENT_COLOR[oldEl] : '#4d4635';
+              const newEl = stemTransform.合化五行;
+              const NewIcon = newEl ? ELEMENT_ICON[newEl] : null;
+              const newColor = newEl ? ELEMENT_COLOR[newEl] : '#4d4635';
+              const combinedLabel = language === 'en'
+                ? `${origLabel.split(' ')[0]} ${ELEMENT_EN[newEl] ?? newEl}`
+                : `${origLabel[0]}${newEl}`;
+
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '13px', color: '#4d4635', fontStyle: 'italic' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', opacity: 0.55 }}>
+                    {OldIcon && <OldIcon style={{ fontSize: 13, color: oldColor }} />}
+                    <span>{origLabel}</span>
+                  </span>
+                  <span style={{ margin: '0 2px', opacity: 0.45 }}>→</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                    {NewIcon && <NewIcon style={{ fontSize: 13, color: newColor }} />}
+                    <span>{combinedLabel}</span>
+                  </span>
+                </div>
+              );
+            })()}
             {anyHeavenlyStemBadge && (
               <span style={{
                 display: 'inline-block',
@@ -434,17 +472,19 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
           >
             {earthlyChar}
           </div>
-          <p
-            style={{
-              fontSize: '13px',
-              color: '#4d4635',
-              opacity: 0.75,
-              margin: 0,
-              fontStyle: 'italic',
-            }}
-          >
-            {language === 'en' ? earthlyName : (ZHI_LABELS_CH[earthlyChar] ?? earthlyChar)}
-          </p>
+          {(() => {
+            const branchElement = BRANCH_ELEMENT[earthlyChar];
+            const ElemIcon = branchElement ? ELEMENT_ICON[branchElement] : null;
+            const elemColor = branchElement ? ELEMENT_COLOR[branchElement] : '#4d4635';
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                {ElemIcon && <ElemIcon style={{ fontSize: 13, color: elemColor }} />}
+                <p style={{ fontSize: '13px', color: '#4d4635', opacity: 0.75, margin: 0, fontStyle: 'italic' }}>
+                  {language === 'en' ? earthlyName : (ZHI_LABELS_CH[earthlyChar] ?? earthlyChar)}
+                </p>
+              </div>
+            );
+          })()}
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '8px', gap: '3px' }}>
             {voidStatus.primaryVoid === true && (
               <span style={{ fontSize: '11px', color: '#8C2F2F', fontFamily: 'Noto Serif, serif', fontStyle: 'italic',
@@ -529,16 +569,19 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                     {stem}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                    <p
-                      style={{
-                        fontSize: '11px',
-                        color: 'rgba(77, 70, 53, 0.6)',
-                        margin: 0,
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      {language === 'en' ? (GAN_LABELS[stem] || stem) : (GAN_LABELS_CH[stem] || stem)}
-                    </p>
+                    {(() => {
+                      const stemElement = STEM_ELEMENT[stem];
+                      const ElemIcon = stemElement ? ELEMENT_ICON[stemElement] : null;
+                      const elemColor = stemElement ? ELEMENT_COLOR[stemElement] : 'rgba(77, 70, 53, 0.6)';
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                          {ElemIcon && <ElemIcon style={{ fontSize: 11, color: elemColor }} />}
+                          <p style={{ fontSize: '11px', color: 'rgba(77, 70, 53, 0.6)', margin: 0, lineHeight: 1.2 }}>
+                            {language === 'en' ? (GAN_LABELS[stem] || stem) : (GAN_LABELS_CH[stem] || stem)}
+                          </p>
+                        </div>
+                      );
+                    })()}
                   </div>
                   {tenGod && (() => {
                     const hasHiddenTransformation = oldTenGod != null && oldTenGod !== '' && oldTenGod !== tenGod;
@@ -568,7 +611,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                         </div>
                       );
                     }
-                    return <HiddenTenGodCard value={tenGod} />;
+                    return <div style={{ marginTop: '8px' }}><HiddenTenGodCard value={tenGod} /></div>;
                   })()}
                 </div>
                 );

@@ -3,12 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import { Card } from 'antd';
 import {
-  Nature,
+  Forest,
   LocalFireDepartment,
   Terrain,
-  Diamond,
   Waves,
-  Circle,
   StopCircleOutlined,
 } from '@mui/icons-material';
 import { translations } from '@/lib/translations';
@@ -32,7 +30,7 @@ const SHI_SHEN_LABELS: Record<string, string> = {
 
 // Element to Material Design Icon mapping
 const ELEMENT_ICONS: Record<string, React.ComponentType<any>> = {
-  '木': Nature,
+  '木': Forest,
   '火': LocalFireDepartment,
   '土': Terrain,
   '金': StopCircleOutlined,
@@ -252,8 +250,21 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
     );
   };
 
-  const activeEntries = entries.filter(e => e.interaction.强度 !== '消融吸收');
+  const DIVIDER_STRENGTHS = new Set(['中等衰减', '大幅衰减', '消融吸收']);
+  const topEntries = entries.filter(e => !DIVIDER_STRENGTHS.has(e.interaction.强度));
+  const moderateEntries = entries.filter(e => e.interaction.强度 === '中等衰减');
+  const weakEntries = entries.filter(e => e.interaction.强度 === '大幅衰减');
   const absorbedEntries = entries.filter(e => e.interaction.强度 === '消融吸收');
+
+  const renderDivider = (strengthKey: string) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '2px 0' }}>
+      <div style={{ flex: 1, height: '1px', background: 'rgba(115,92,0,0.15)' }} />
+      <span style={{ fontFamily: 'Noto Serif, serif', fontSize: '10px', color: 'rgba(115,92,0,0.4)', whiteSpace: 'nowrap' }}>
+        {STRENGTH_LABEL[strengthKey]?.[language] ?? strengthKey}
+      </span>
+      <div style={{ flex: 1, height: '1px', background: 'rgba(115,92,0,0.15)' }} />
+    </div>
+  );
 
   return (
     <div style={{ marginTop: '16px' }}>
@@ -318,16 +329,22 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {activeEntries.map((e, i) => renderRow(e, `active-${i}`))}
+            {topEntries.map((e, i) => renderRow(e, `top-${i}`))}
+            {moderateEntries.length > 0 && (
+              <>
+                {renderDivider('中等衰减')}
+                {moderateEntries.map((e, i) => renderRow(e, `moderate-${i}`))}
+              </>
+            )}
+            {weakEntries.length > 0 && (
+              <>
+                {renderDivider('大幅衰减')}
+                {weakEntries.map((e, i) => renderRow(e, `weak-${i}`))}
+              </>
+            )}
             {absorbedEntries.length > 0 && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '2px 0' }}>
-                  <div style={{ flex: 1, height: '1px', background: 'rgba(115,92,0,0.15)' }} />
-                  <span style={{ fontFamily: 'Noto Serif, serif', fontSize: '10px', color: 'rgba(115,92,0,0.4)', whiteSpace: 'nowrap' }}>
-                    {language === 'ch' ? '消融吸收' : 'Fully Absorbed'}
-                  </span>
-                  <div style={{ flex: 1, height: '1px', background: 'rgba(115,92,0,0.15)' }} />
-                </div>
+                {renderDivider('消融吸收')}
                 {absorbedEntries.map((e, i) => renderRow(e, `absorbed-${i}`))}
               </>
             )}
