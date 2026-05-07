@@ -159,14 +159,15 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     '退真禄': 'Retreating True Lu', '德秀贵人': 'Virtue & Elegance Noble', '暗禄': 'Hidden Lu',
   };
 
-  const tianGanHuaMap: Record<string, { 元素: string; label: string }> = {};
-  const pillarDynamic = (chartData?.作用?.柱位动态 ?? []) as any[];
-  for (const ix of pillarDynamic) {
-    const huaElement = ix.合化条件?.合化元素;
-    if (ix.类型 === '天干合' && (ix.形态 === '合化' || ix.形态 === '化气格') && huaElement) {
-      for (const pillarName of Object.keys(ix.组合明细 ?? {})) {
-        tianGanHuaMap[pillarName] = { 元素: huaElement, label: `天干合·${ix.形态}` };
-      }
+  const tianGanHuaMap: Record<string, { 元素: string; 原五行: string; label: string }> = {};
+  const siZhuMeta = (chartData?.["四柱实体"] ?? {}) as Record<string, any>;
+  for (const pillarName of ['年柱', '月柱', '日柱', '时柱']) {
+    const pillar = siZhuMeta[pillarName];
+    if (!pillar) continue;
+    if (pillar.合化信息?.现五行) {
+      tianGanHuaMap[pillarName] = { 元素: pillar.合化信息.现五行, 原五行: pillar.合化信息.原五行, label: `天干合·${pillar.合化信息.类型}` };
+    } else if (pillar.化气格信息?.现五行) {
+      tianGanHuaMap[pillarName] = { 元素: pillar.化气格信息.现五行, 原五行: pillar.化气格信息.原五行, label: `天干合·${pillar.化气格信息.类型}` };
     }
   }
 
@@ -193,7 +194,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     voidStatus: VoidStatus;
     maxVoidCount: number;
     shenSha?: { 名称: string; 来源: string; 解读?: string }[];
-    tianGanHua?: { 元素: string; label: string };
+    tianGanHua?: { 元素: string; 原五行: string; label: string };
   }) => {
     const heavenlyChar = pillar.天干?.天干;
     const earthlyChar = pillar.地支?.地支;
@@ -292,8 +293,8 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
             {(() => {
-              const stemTransform: { 合化五行: string; label: string } | undefined =
-                tianGanHua ? { 合化五行: tianGanHua.元素, label: tianGanHua.label } : undefined;
+              const stemTransform: { 合化五行: string; 原五行: string; label: string } | undefined =
+                tianGanHua ? { 合化五行: tianGanHua.元素, 原五行: tianGanHua.原五行, label: tianGanHua.label } : undefined;
               const origLabel = language === 'en' ? heavenlyName : (GAN_LABELS_CH[heavenlyChar] ?? heavenlyChar);
 
               if (!stemTransform) {
@@ -310,15 +311,15 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                 );
               }
 
-              const oldEl = STEM_ELEMENT[heavenlyChar];
-              const OldIcon = oldEl ? ELEMENT_ICON[oldEl] : null;
-              const oldColor = oldEl ? ELEMENT_COLOR[oldEl] : '#4d4635';
-              const newEl = stemTransform.合化五行;
-              const NewIcon = newEl ? ELEMENT_ICON[newEl] : null;
-              const newColor = newEl ? ELEMENT_COLOR[newEl] : '#4d4635';
+              const OldElement = stemTransform.原五行;
+              const OldIcon = OldElement ? ELEMENT_ICON[OldElement] : null;
+              const oldColor = OldElement ? ELEMENT_COLOR[OldElement] : '#4d4635';
+              const NewElement = stemTransform.合化五行;
+              const NewIcon = NewElement ? ELEMENT_ICON[NewElement] : null;
+              const newColor = NewElement ? ELEMENT_COLOR[NewElement] : '#4d4635';
               const combinedLabel = language === 'en'
-                ? `${origLabel.split(' ')[0]} ${ELEMENT_EN[newEl] ?? newEl}`
-                : `${origLabel[0]}${newEl}`;
+                ? `${origLabel.split(' ')[0]} ${ELEMENT_EN[NewElement] ?? NewElement}`
+                : `${origLabel[0]}${NewElement}`;
 
               return (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '13px', color: '#4d4635', fontStyle: 'italic' }}>
@@ -357,11 +358,6 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
             const displayChar  = pillar.天干.十神 === '日主' ? '我' : pillar.天干.十神;
             const displayLabel = pillar.天干.十神 === '日主' ? 'Self' : (SHI_SHEN_LABELS[pillar.天干.十神] ?? pillar.天干.十神);
             const oldTenGod    = pillar.合化信息?.原天干十神 ?? pillar.化气格变化?.原天干十神;
-            const pillboxLabel = pillar.合化信息
-              ? `天干合·${pillar.合化信息.类型}`
-              : pillar.化气格变化
-                ? '天干合·化气格'
-                : (tianGanHua?.label ?? '天干合');
             const hasTransformation = oldTenGod != null && oldTenGod !== '' && oldTenGod !== pillar.天干.十神;
 
             const TenGodCard = ({ value, dimmed }: { value: string; dimmed?: boolean }) => {

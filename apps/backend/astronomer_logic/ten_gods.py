@@ -14,7 +14,7 @@ The 日柱 天干 is always "日主" (Day Master — the self reference).
 import copy
 
 from lunar_python.util import LunarUtil
-from apps.backend.astronomer_logic.bazi_pillars import _YANG_STEMS
+from apps.backend.astronomer_logic.bazi_pillars import _YANG_STEMS, compute_single_stem_rooting
 _ELEMENT_YANG_STEM: dict[str, str] = {"木": "甲", "火": "丙", "土": "戊", "金": "庚", "水": "壬"}
 _ELEMENT_YIN_STEM:  dict[str, str] = {"木": "乙", "火": "丁", "土": "己", "金": "辛", "水": "癸"}
 
@@ -88,6 +88,14 @@ def apply_heavenlystem_tranformation_tengods(
     ten_gods = copy.deepcopy(ten_gods)
     si_zhu   = copy.deepcopy(si_zhu)
 
+    _PILLAR_ORDER = ("年柱", "月柱", "日柱", "时柱")
+    _zhis  = [si_zhu[p]["地支"]["地支"] for p in _PILLAR_ORDER]
+    _hides = [
+        [si_zhu[p]["藏干"].get(t, {}).get("天干", "无") for t in ("本气", "中气", "余气")]
+        for p in _PILLAR_ORDER
+    ]
+    _pillar_cn: list[str] = list(_PILLAR_ORDER)
+
     for interaction in interactions_data["作用"]["柱位动态"]:
         if interaction.get("类型") != "天干合":
             continue
@@ -105,7 +113,19 @@ def apply_heavenlystem_tranformation_tengods(
                 else _ELEMENT_YIN_STEM[transformed_element]
             )
             original_dm_element = LunarUtil.WU_XING_GAN.get(day_master_stem, "无")
-            si_zhu["日柱"]["化气格信息"] = {"原五行": original_dm_element, "现五行": transformed_element}
+            si_zhu["日柱"]["化气格信息"] = {"类型": "化气格", "原五行": original_dm_element, "现五行": transformed_element}
+            si_zhu["日柱"]["天干"]["五行"] = transformed_element
+            new_rooting = compute_single_stem_rooting(transformed_element, _zhis, _hides, _pillar_cn)
+            si_zhu["日柱"]["天干"]["根基强度"] = new_rooting["根基强度"]
+            si_zhu["日柱"]["天干"]["通根于"]   = new_rooting["通根于"]
+            for partner in interaction["组合明细"]:
+                if partner == "日柱":
+                    continue
+                original_partner_element = si_zhu[partner]["天干"].get("五行", "无")
+                si_zhu[partner]["化气格信息"]            = {"类型": "化气格", "原五行": original_partner_element, "现五行": transformed_element}
+                si_zhu[partner]["天干"]["五行"]          = transformed_element
+                si_zhu[partner]["天干"]["根基强度"]      = new_rooting["根基强度"]
+                si_zhu[partner]["天干"]["通根于"]        = new_rooting["通根于"]
 
             for pillar in ("年柱", "月柱", "日柱", "时柱"):
                 original_visible_stem_tengod      = ten_gods[pillar]["天干十神"]
@@ -131,21 +151,26 @@ def apply_heavenlystem_tranformation_tengods(
                     }
 
         else:
-            # 合化 (non-DM) → update 天干十神 for affected pillars only
+            # 合化 (non-DM pillars only)
             original_tengods_by_pillar: dict[str, str] = {}
+            original_wuxing_by_pillar: dict[str, str] = {}
             for pillar, stem in interaction["组合明细"].items():
-                if pillar == "日柱":
-                    continue
                 original_tengods_by_pillar[pillar] = ten_gods[pillar]["天干十神"]
+                original_wuxing_by_pillar[pillar] = si_zhu[pillar]["天干"].get("五行", "无")
                 new_visible_stem_tengod = _ten_god_for_transformed(stem, transformed_element, day_master_stem)
                 ten_gods[pillar]["天干十神"] = new_visible_stem_tengod
                 si_zhu[pillar]["天干"]["十神"] = new_visible_stem_tengod
+                si_zhu[pillar]["天干"]["五行"] = transformed_element
+                new_rooting = compute_single_stem_rooting(transformed_element, _zhis, _hides, _pillar_cn)
+                si_zhu[pillar]["天干"]["根基强度"] = new_rooting["根基强度"]
+                si_zhu[pillar]["天干"]["通根于"]   = new_rooting["通根于"]
                 # 藏干十神 unchanged — DM and hidden stems are unaffected
 
             for pillar in interaction["组合明细"]:
                 si_zhu[pillar]["合化信息"] = {
                     "类型": 形态,
-                    "合化元素": transformed_element,
+                    "原五行": original_wuxing_by_pillar.get(pillar, ""),
+                    "现五行": transformed_element,
                     "参与柱位": list(interaction["组合明细"].keys()),
                     "原天干十神": original_tengods_by_pillar.get(pillar, ""),
                 }

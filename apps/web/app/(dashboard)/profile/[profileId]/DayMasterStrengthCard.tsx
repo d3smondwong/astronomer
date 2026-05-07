@@ -212,7 +212,8 @@ export default function DayMasterStrengthCard({ chartData, language }: DayMaster
             {(() => {
               const 化气格信息 = chartData?.["四柱实体"]?.["日柱"]?.["化气格信息"];
               const 原五行 = 化气格信息?.["原五行"];
-              const hasTransform = 原五行 != null && 原五行 !== 五行;
+              const 现五行 = 化气格信息?.["现五行"];
+              const hasTransform = 原五行 != null && 现五行 != null;
 
               const ElementRow = ({ elem, dimmed }: { elem: string; dimmed?: boolean }) => {
                 const Icon = ELEMENT_ICONS[elem];
@@ -230,7 +231,7 @@ export default function DayMasterStrengthCard({ chartData, language }: DayMaster
 
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                  <ElementRow elem={五行} />
+                  <ElementRow elem={现五行!} />
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ opacity: 0.45, fontSize: '20px', color: '#4d4635' }}>↑</span>
                     <span style={{

@@ -83,11 +83,13 @@ export interface Pillar {
   纳音: string;
   合化信息?: {
     类型: string;
-    合化元素: string;
+    原五行: string;
+    现五行: string;
     参与柱位: string[];
     原天干十神: string;
   };
   化气格信息?: {
+    类型: string;
     原五行: string;
     现五行: string;
   };

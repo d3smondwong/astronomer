@@ -95,6 +95,59 @@ def compute_pillar_rooting(
     return result
 
 
+def compute_single_stem_rooting(
+    element: str,
+    zhis: list[str],
+    hides: list[list[str]],
+    pillar_cn: list[str] | None = None,
+) -> dict[str, str]:
+    """
+    Compute 根基强度 / 通根于 for a single stem given its element directly.
+    Used after 合化 / 化气格 where the stem character is unchanged but its
+    effective element has transformed.
+
+    Args:
+        element:   transformed Five-Element string (e.g. "火")
+        zhis:      earthly branches for all 4 pillars, in pillar order
+        hides:     hidden stems for all 4 pillars [[本气, 中气, 余气], ...]
+        pillar_cn: pillar labels for branch descriptions (default: 年月日时柱)
+
+    Returns:
+        {"根基强度": "深根"|"中根"|"浅根"|"无根", "通根于": "..."|"无根浮干"}
+    """
+    if pillar_cn is None:
+        pillar_cn = _PILLAR_NAMES_CN
+
+    def _short(label: str) -> str:
+        return label[:-1] if label.endswith("柱") else label
+
+    best_idx = len(_ROOT_DEPTH_LABELS)
+    matches: list[str] = []
+
+    for j, (zhi, hide) in enumerate(zip(zhis, hides)):
+        for idx, hidden_stem in enumerate(hide):
+            if not hidden_stem or hidden_stem == "无":
+                continue
+            if LunarUtil.WU_XING_GAN.get(hidden_stem) == element:
+                if idx < best_idx:
+                    best_idx = idx
+                matches.append(f"{_short(pillar_cn[j])}支{zhi}({_ROOT_DEPTH_LABELS[idx]})")
+                break
+
+    if best_idx == 0:
+        strength = "深根"
+    elif best_idx == 1:
+        strength = "中根"
+    elif best_idx == 2:
+        strength = "浅根"
+    else:
+        strength = "无根"
+
+    return {
+        "根基强度": strength,
+        "通根于": "、".join(matches) if matches else "无根浮干",
+    }
+
 
 def get_bazi_pillars(bazi) -> dict:
     """
