@@ -33,6 +33,7 @@ Output structure:
 from dataclasses import dataclass
 from typing import Dict, List
 from lunar_python.util import LunarUtil
+from apps.backend.astronomer_logic.bazi_pillars import _YANG_STEMS
 
 # ─────────────────────────────────────────────
 # Hidden stems — single source of truth
@@ -57,11 +58,10 @@ BRANCH_HIDDEN_STEM_ROOTING: dict[str, list[tuple[str, float]]] = {
 
 def get_stem_element(stem: str) -> str:
     """Get element for a heavenly stem using lunar-python library."""
-    return LunarUtil.WU_XING_GAN.get(stem, "无")
+    return LunarUtil.WU_XING_GAN[stem]
 
 
 _ROOT_DEPTH_LABELS: list[str] = ["本气根", "中气根", "余气根"]
-_YANG_STEMS: frozenset = frozenset({"甲", "丙", "戊", "庚", "壬"})
 
 _STATE_DESCRIPTIONS: dict = {
     "旺": "旺 (最强)",
@@ -456,7 +456,7 @@ def compute_de_di(
         # 2c. Get the list of hidden stems for this branch.
         #     BRANCH_HIDDEN_STEM_ROOTING is a dict: branch -> list of (stem, weight)
         #     Example: "寅" -> [("甲", 0.6), ("丙", 0.3), ("戊", 0.1)]
-        hidden_stem_list = BRANCH_HIDDEN_STEM_ROOTING.get(branch, [])
+        hidden_stem_list = BRANCH_HIDDEN_STEM_ROOTING[branch]
 
         # 2d. Scan hidden stems in order (本气 first, then 中气, then 余气)
         for idx, (stem, weight) in enumerate(hidden_stem_list):
@@ -692,9 +692,10 @@ if __name__ == "__main__":
         _void = get_void_xun_kong(_bazi)
         _ten_gods = get_ten_gods(_bazi)
 
-        # Merge 藏干十神 into pillars so natal_interactions can read ten gods
+        # Enrich 藏干 with 十神 so natal_interactions can read ten gods
         for k in ["年柱", "月柱", "日柱", "时柱"]:
-            _pillars[k]["藏干十神"] = _ten_gods[k]["藏干十神"]
+            for tier, info in _pillars[k]["藏干"].items():
+                info["十神"] = _ten_gods[k]["藏干十神"][tier]
 
         _interactions = get_natal_interactions(_pillars, _void)
         _ten_gods, _ = apply_heavenlystem_tranformation_tengods(
