@@ -33,7 +33,7 @@ _ZHI_INDEX = {
     '午': 6, '未': 7, '申': 8, '酉': 9, '戌': 10, '亥': 11,
 }
 
-_YANG_STEMS = {'甲', '丙', '戊', '庚', '壬'}
+from apps.backend.astronomer_logic.bazi_pillars import _YANG_STEMS
 
 
 def _self_seated_stage(stem: str, branch: str) -> str | None:
