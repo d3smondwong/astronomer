@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
 import { deleteProfileAction } from './actions';
+import FiveElementsCard from './FiveElementsCard';
 import PillarInteractionsCard from './PillarInteractionsCard';
 import DayMasterStrengthCard from './DayMasterStrengthCard';
 
@@ -1135,6 +1136,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                       </div>
                     );
                   })()}
+                  <FiveElementsCard chartData={chartData} language={language} />
                   <PillarInteractionsCard chartData={chartData} language={language} />
                   <DayMasterStrengthCard chartData={chartData} language={language} />
                 </div>

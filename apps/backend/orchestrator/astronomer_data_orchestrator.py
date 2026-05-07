@@ -34,7 +34,7 @@ from apps.backend.astronomer_logic.natal_shen_sha import get_shen_sha
 from apps.backend.astronomer_logic.interpretation_shen_sha import get_shen_sha_interpretations
 from apps.backend.astronomer_logic.natal_interactions import get_natal_interactions
 from apps.backend.astronomer_logic.day_master_strength import get_day_master_strength
-from apps.backend.astronomer_logic.natal_five_elements import get_natal_five_elements
+from apps.backend.astronomer_logic.natal_five_elements import QualitativeFiveElementsClassifier
 
 _PILLAR_KEYS = ["年柱", "月柱", "日柱", "时柱"]
 
@@ -115,7 +115,7 @@ def calculate_natal_chart(
     natal_interactions_data = get_natal_interactions(pillars, void)
     ten_gods, si_zhu = apply_heavenlystem_tranformation_tengods(ten_gods, si_zhu, natal_interactions_data, pillars["日柱"]["天干"])
     day_master_data = get_day_master_strength(bazi, pillars, ten_gods, natal_interactions_data)
-    five_elements_data = get_natal_five_elements(si_zhu, day_master_data, natal_interactions_data)
+    five_elements_data = QualitativeFiveElementsClassifier(si_zhu, natal_interactions_data, lunar_birthday=lunar_birthday).classify_all()
     tai_ming_shen = get_san_yuan(lunar_birthday)
     shen_sha = get_shen_sha(bazi, na_yin, gender)
     shen_sha_with_interpretations = get_shen_sha_interpretations(shen_sha)
@@ -150,8 +150,8 @@ if __name__ == "__main__":
 
     # ── Subjects ──────────────────────────────────────────────────────────────
     subjects = {
-        # "Desmond": (dt(1985, 11, 25, 17, 7, 0), 1.3253, 103.808053, 1),
-        "Corinne": (dt(1987, 6, 3, 12, 6, 0), 1.4759, 103.808053, 0),
+        "Desmond": (dt(1985, 11, 25, 17, 7, 0), 1.3253, 103.808053, 1),
+        # "Corinne": (dt(1987, 6, 3, 12, 6, 0), 1.4759, 103.808053, 0),
         # "Lara":    (dt(2025,  7, 31,  9, 10, 0), 1.3253,  103.808053, 0),
     }
 

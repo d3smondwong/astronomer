@@ -101,20 +101,16 @@ export interface ThreePalaces {
 }
 
 /**
- * Five elements (五行) distribution and lucky/unlucky analysis.
+ * Five elements (五行) qualitative classical state per element.
+ * 状态 is one of 旺 / 相 / 休 / 囚 / 死.
  */
-export interface WuXing {
-  counts: {
-    木: number;
-    火: number;
-    土: number;
-    金: number;
-    水: number;
-  };
-  lucky_elements: string[];
-  unlucky_elements: string[];
-  element_names: Record<string, string>;
+export type ElementState = '旺' | '相' | '休' | '囚' | '死';
+
+export interface ElementVerdict {
+  状态: ElementState;
 }
+
+export type FiveElements = Record<'木' | '火' | '土' | '金' | '水', ElementVerdict>;
 
 /**
  * Chart data payload — all Chinese-keyed calculation output.
@@ -133,7 +129,7 @@ export interface BaziChartData {
     天干: string;
     地支: string;
   };
-  五行?: WuXing;
+  五行?: FiveElements;
   [key: string]: any; // Allow other keys for future expansion
 }
 
