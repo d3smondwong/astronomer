@@ -27,6 +27,12 @@ Output shape (from classify_all):
     }
   }
 
+Per-pillar element assignments (from get_pillar_five_elements):
+  {
+    "年柱": { "天干五行": "木", "地支五行": "水", "藏干五行": { "本气": "水", "中气": "金" } },
+    ...
+  }
+
 Debugging:
   Uncomment the "依据" block inside _classify_one to emit a per-element audit dict
   showing every factor that influenced the final state.
@@ -135,7 +141,7 @@ class QualitativeFiveElementsClassifier:
         lunar_birthday=None,
     ):
         self.si_zhu = si_zhu
-        self.season = MONTH_SEASON[si_zhu["月柱"]["地支"]]
+        self.season = MONTH_SEASON[si_zhu["月柱"]["地支"]["地支"]]
         self.void_map = {
             key: si_zhu[key].get("空亡", "无") != "无"
             for key in _PILLAR_ORDER
@@ -153,10 +159,15 @@ class QualitativeFiveElementsClassifier:
         """Parse 柱位动态 list into typed Interaction objects; skips 消融吸收 (strength=0)."""
         result: List[Interaction] = []
         for item in natal_interactions_data.get("作用", {}).get("柱位动态", []):
-            interaction_strength = STRENGTH_WEIGHTS.get(item.get("强度", "强势主流"), 1.0)
+            raw_strength = item.get("强度", "强势主流")
+            if raw_strength not in STRENGTH_WEIGHTS:
+                raise ValueError(f"Unknown interaction strength label '{raw_strength}' in item: {item}")
+            interaction_strength = STRENGTH_WEIGHTS[raw_strength]
             if interaction_strength == 0.0:
                 continue
-            type_   = item.get("类型", "")
+            type_ = item.get("类型", "")
+            if not type_:
+                raise ValueError(f"Interaction item is missing '类型': {item}")
             pillars = list(item.get("组合明细", {}).keys())
             root_strength: Optional[Tuple[str, str]] = None
             if type_ in ("六冲", "天克地冲") and len(pillars) == 2:
@@ -209,7 +220,7 @@ class QualitativeFiveElementsClassifier:
         defined as 1 ≤ (end_of_season_term − birth_date).days ≤ 18.
         Born on the solar term itself (delta=0) is excluded — that day starts the next season.
         """
-        month_branch = self.si_zhu["月柱"]["地支"]
+        month_branch = self.si_zhu["月柱"]["地支"]["地支"]
         if month_branch not in _EARTH_BRANCH_END_JIEQI or lunar_birthday is None:
             return False
         end_solar = lunar_birthday.getJieQiTable().get(_EARTH_BRANCH_END_JIEQI[month_branch])
@@ -227,7 +238,11 @@ class QualitativeFiveElementsClassifier:
             return None
         if pillar in self.stem_transform:
             return self.stem_transform[pillar]
-        return STEM_ELEMENT.get(self.si_zhu[pillar].get("天干", ""))
+        stem = self.si_zhu[pillar]["天干"]["天干"]
+        element = STEM_ELEMENT.get(stem)
+        if element is None:
+            raise ValueError(f"Unknown stem '{stem}' in pillar {pillar}")
+        return element
 
     # ------------------------------------------------------------------
     # Per-element factor extraction
@@ -237,9 +252,8 @@ class QualitativeFiveElementsClassifier:
         """Return [(hidden_stem, depth_label)] from si_zhu['藏干']."""
         zang = self.si_zhu[pillar].get("藏干", {}) or {}
         return [
-            (zang[depth], depth)
-            for depth in ("本气", "中气", "余气")
-            if zang.get(depth)
+            (info["天干"], depth)
+            for depth, info in zang.items()
         ]
 
     def _pillars_holding_element(self, element: str) -> Set[str]:
@@ -249,11 +263,18 @@ class QualitativeFiveElementsClassifier:
             if self._effective_stem_element(p) == element:
                 held.add(p)
                 continue
-            if BRANCH_ELEMENT.get(self.si_zhu[p].get("地支", "")) == element:
+            branch = self.si_zhu[p]["地支"]["地支"]
+            branch_el = BRANCH_ELEMENT.get(branch)
+            if branch_el is None:
+                raise ValueError(f"Unknown branch '{branch}' in pillar {p}")
+            if branch_el == element:
                 held.add(p)
                 continue
             for hidden_stem, _ in self._hidden_stems_for_pillar(p):
-                if STEM_ELEMENT.get(hidden_stem) == element:
+                hs_el = STEM_ELEMENT.get(hidden_stem)
+                if hs_el is None:
+                    raise ValueError(f"Unknown hidden stem '{hidden_stem}' in pillar {p}")
+                if hs_el == element:
                     held.add(p)
                     break
         return held
@@ -264,7 +285,12 @@ class QualitativeFiveElementsClassifier:
         """Root depth tier for element in a single pillar: 3=本气, 2=中气, 1=余气 or floating stem, 0=absent."""
         tier = 0
         for hidden_stem, depth in self._hidden_stems_for_pillar(pillar):
-            if STEM_ELEMENT.get(hidden_stem) == element:
+            hs_el = STEM_ELEMENT.get(hidden_stem)
+            if hs_el is None:
+                raise ValueError(f"Unknown hidden stem '{hidden_stem}' in pillar {pillar}")
+            if depth not in self._DEPTH_TIER:
+                raise ValueError(f"Unknown hidden stem depth '{depth}' in pillar {pillar}")
+            if hs_el == element:
                 tier = max(tier, self._DEPTH_TIER[depth])
         if tier == 0 and self._effective_stem_element(pillar) == element:
             tier = 1  # floating stem — weak but non-zero
@@ -291,16 +317,24 @@ class QualitativeFiveElementsClassifier:
         same_element_root_labels: List[str]   = []
         for p in _PILLAR_ORDER:
             for hidden_stem, depth in self._hidden_stems_for_pillar(p):
-                if STEM_ELEMENT.get(hidden_stem) == element:
+                hs_el = STEM_ELEMENT.get(hidden_stem)
+                if hs_el is None:
+                    raise ValueError(f"Unknown hidden stem '{hidden_stem}' in pillar {p}")
+                if hs_el == element:
                     same_element_hidden_stem.append(p)
                     same_element_hidden_stem_root_depth.append(depth)
                     same_element_root_labels.append(f"{p}({depth})")
         strong_root = "本气" in same_element_hidden_stem_root_depth
 
-        has_visible_branch = any(
-            BRANCH_ELEMENT.get(self.si_zhu[p].get("地支", "")) == element
-            for p in _PILLAR_ORDER
-        )
+        has_visible_branch = False
+        for p in _PILLAR_ORDER:
+            branch = self.si_zhu[p]["地支"]["地支"]
+            branch_el = BRANCH_ELEMENT.get(branch)
+            if branch_el is None:
+                raise ValueError(f"Unknown branch '{branch}' in pillar {p}")
+            if branch_el == element:
+                has_visible_branch = True
+                break
 
         has_effective_presence = (
             any(self._effective_stem_element(p) == element for p in _PILLAR_ORDER)
@@ -462,6 +496,43 @@ class QualitativeFiveElementsClassifier:
         return {"五行": {element: self._classify_one(element) for element in ELEMENTS}}
 
 
+def get_pillar_five_elements(pillars: Dict[str, Any]) -> Dict[str, Any]:
+    """Return the five-element category for each component of all four pillars.
+
+    Pure structural lookup — requires only the pillars dict, no interactions or classifier state.
+
+    Returns:
+        {
+            "年柱": { "天干五行": "木", "地支五行": "水", "藏干五行": { "本气": "水", ... } },
+            ...
+        }
+    """
+    result: Dict[str, Any] = {}
+    for key in _PILLAR_ORDER:
+        p = pillars[key]
+        stem = p["天干"]
+        stem_el = STEM_ELEMENT.get(stem)
+        if stem_el is None:
+            raise ValueError(f"Unknown stem '{stem}' in pillar {key}")
+        branch = p["地支"]
+        branch_el = BRANCH_ELEMENT.get(branch)
+        if branch_el is None:
+            raise ValueError(f"Unknown branch '{branch}' in pillar {key}")
+        zang_wu_xing: Dict[str, str] = {}
+        for tier, info in p.get("藏干", {}).items():
+            hs = info["天干"]
+            hs_el = STEM_ELEMENT.get(hs)
+            if hs_el is None:
+                raise ValueError(f"Unknown hidden stem '{hs}' in pillar {key} tier {tier}")
+            zang_wu_xing[tier] = hs_el
+        result[key] = {
+            "天干五行": stem_el,
+            "地支五行": branch_el,
+            "藏干五行": zang_wu_xing,
+        }
+    return result
+
+
 # ============================================================================
 # EXECUTION
 # python -m apps.backend.astronomer_logic.natal_five_elements
@@ -498,7 +569,8 @@ if __name__ == "__main__":
         ten_gods = get_ten_gods(bazi)
 
         for k in ["年柱", "月柱", "日柱", "时柱"]:
-            pillars[k]["藏干十神"] = ten_gods[k]["藏干十神"]
+            for tier, info in pillars[k]["藏干"].items():
+                info["十神"] = ten_gods[k]["藏干十神"].get(tier, "无")
             pillars[k]["空亡"] = void_status[k]["空亡"]
 
         lunar_bday = tst_birthday.getLunar()
