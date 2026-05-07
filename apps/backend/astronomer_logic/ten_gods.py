@@ -72,7 +72,7 @@ def get_ten_gods(bazi) -> dict:
     }
 
 
-def apply_he_hua_overrides(
+def apply_heavenlystem_tranformation_tengods(
     ten_gods: dict,
     si_zhu: dict,
     interactions_data: dict,
@@ -109,38 +109,38 @@ def apply_he_hua_overrides(
             si_zhu["日柱"]["化气格信息"] = {"原五行": original_dm_element, "现五行": transformed_element}
 
             for pillar in ("年柱", "月柱", "日柱", "时柱"):
-                orig_tg      = ten_gods[pillar]["天干十神"]
-                orig_藏干十神 = dict(ten_gods[pillar]["藏干十神"])
+                original_visible_stem_tengod      = ten_gods[pillar]["天干十神"]
+                original_hidden_stem_tengod = dict(ten_gods[pillar]["藏干十神"])
 
                 if pillar != "日柱":
                     stem = si_zhu[pillar]["天干"]
-                    new_tg = LunarUtil.SHI_SHEN.get(new_dm_stem + stem, "无")
-                    ten_gods[pillar]["天干十神"] = new_tg
-                    si_zhu[pillar]["天干十神"]   = new_tg
+                    new_visible_stem_tengod = LunarUtil.SHI_SHEN.get(new_dm_stem + stem, "无")
+                    ten_gods[pillar]["天干十神"] = new_visible_stem_tengod
+                    si_zhu[pillar]["天干十神"]   = new_visible_stem_tengod
 
                 for tier in ("本气", "中气", "余气"):
                     hidden_stem = si_zhu[pillar]["藏干"].get(tier, "无")
                     if hidden_stem and hidden_stem != "无":
-                        hs_tg = LunarUtil.SHI_SHEN.get(new_dm_stem + hidden_stem, "无")
-                        ten_gods[pillar]["藏干十神"][f"{tier}十神"] = hs_tg
-                        si_zhu[pillar]["藏干十神"][f"{tier}十神"]   = hs_tg
+                        new_hidden_stem_tengod = LunarUtil.SHI_SHEN.get(new_dm_stem + hidden_stem, "无")
+                        ten_gods[pillar]["藏干十神"][f"{tier}十神"] = new_hidden_stem_tengod
+                        si_zhu[pillar]["藏干十神"][f"{tier}十神"]   = new_hidden_stem_tengod
 
-                if orig_tg != ten_gods[pillar]["天干十神"] or orig_藏干十神 != ten_gods[pillar]["藏干十神"]:
+                if original_visible_stem_tengod != ten_gods[pillar]["天干十神"] or original_hidden_stem_tengod != ten_gods[pillar]["藏干十神"]:
                     si_zhu[pillar]["化气格变化"] = {
-                        "原天干十神": orig_tg,
-                        "原藏干十神": orig_藏干十神,
+                        "原天干十神": original_visible_stem_tengod,
+                        "原藏干十神": original_hidden_stem_tengod,
                     }
 
         else:
             # 合化 (non-DM) → update 天干十神 for affected pillars only
-            orig_ten_gods: dict[str, str] = {}
+            original_tengods_by_pillar: dict[str, str] = {}
             for pillar, stem in interaction["组合明细"].items():
                 if pillar == "日柱":
                     continue
-                orig_ten_gods[pillar] = ten_gods[pillar]["天干十神"]
-                new_tg = _ten_god_for_transformed(stem, transformed_element, day_master_stem)
-                ten_gods[pillar]["天干十神"] = new_tg
-                si_zhu[pillar]["天干十神"]   = new_tg
+                original_tengods_by_pillar[pillar] = ten_gods[pillar]["天干十神"]
+                new_visible_stem_tengod = _ten_god_for_transformed(stem, transformed_element, day_master_stem)
+                ten_gods[pillar]["天干十神"] = new_visible_stem_tengod
+                si_zhu[pillar]["天干十神"]   = new_visible_stem_tengod
                 # 藏干十神 unchanged — DM and hidden stems are unaffected
 
             for pillar in interaction["组合明细"]:
@@ -148,7 +148,7 @@ def apply_he_hua_overrides(
                     "类型": 形态,
                     "合化元素": transformed_element,
                     "参与柱位": list(interaction["组合明细"].keys()),
-                    "原天干十神": orig_ten_gods.get(pillar, ""),
+                    "原天干十神": original_tengods_by_pillar.get(pillar, ""),
                 }
 
     return ten_gods, si_zhu
