@@ -17,6 +17,14 @@ _ROOT_DEPTH_LABELS: list[str] = ["本气", "中气", "余气"]
 
 _PILLAR_NAMES_CN = ["年柱", "月柱", "日柱", "时柱"]
 
+_YANG_STEMS    = frozenset("甲丙戊庚壬")   # even-index stems in the 10-stem cycle
+_YANG_BRANCHES = frozenset("子寅辰午申戌") # even-index branches in the 12-branch cycle
+
+
+def _yin_yang(char: str, yang_set: frozenset) -> str:
+    return "阳" if char in yang_set else "阴"
+
+
 def _hidden_stems(hide_gan: list) -> tuple:
     """Unpack up to 3 hidden stems from the library list, padding with "无"."""
     stems = list(hide_gan) + ["无", "无", "无"]
@@ -87,6 +95,7 @@ def compute_pillar_rooting(
     return result
 
 
+
 def get_bazi_pillars(bazi) -> dict:
     """
     Extract the Four Pillars and stem rooting from an EightChar object.
@@ -109,10 +118,16 @@ def get_bazi_pillars(bazi) -> dict:
         ben, zhong, yu = _hidden_stems(hide)
         pillars[name] = {
             "天干": gan,
+            "天干阴阳": _yin_yang(gan, _YANG_STEMS),
             "根基强度": rooting[name]["根基强度"],
             "通根于": rooting[name]["通根于"],
             "地支": zhi,
-            "藏干": {"本气": ben, "中气": zhong, "余气": yu},
+            "地支阴阳": _yin_yang(zhi, _YANG_BRANCHES),
+            "藏干": {
+                tier: {"天干": stem, "阴阳": _yin_yang(stem, _YANG_STEMS)}
+                for tier, stem in zip(("本气", "中气", "余气"), (ben, zhong, yu))
+                if stem != "无"
+            },
         }
 
     return pillars
