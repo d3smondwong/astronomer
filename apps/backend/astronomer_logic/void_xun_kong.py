@@ -7,18 +7,35 @@ Each cycle leaves two 地支 unused — those are the void (空亡) branches.
 Returns the raw two-character void-pair string from the lunar-python library
 for each of the Four Pillars (年柱, 月柱, 日柱, 时柱). Example: "戌亥".
 
-Two void conditions are checked by check_pillar_void_status():
-  空亡 Primary Void  — Day pillar's pair voids 年柱, 月柱, 时柱.
-  年日互换空亡 Mutual Void (Roots)     — Day pillar's pair voids 年柱 AND year pillar's pair voids 日柱 (both directions active).
-  月日互换空亡 Mutual Void (Life Path) — Day pillar's pair voids 月柱 AND month pillar's pair voids 日柱 (both directions active).
-  日时互换空亡 Mutual Void (Legacy)    — Day pillar's pair voids 时柱 AND hour pillar's pair voids 日柱 (both directions active).
+check_pillar_void_status() evaluates 9 void conditions, all day-pillar-centric:
+
+  Primary Void (被日柱空) — 3 conditions, always from day pillar's perspective:
+    年支 ∈ 日空 → "被日柱空" in 年柱
+    月支 ∈ 日空 → "被日柱空" in 月柱
+    时支 ∈ 日空 → "被日柱空" in 时柱
+
+  One-Way Void (被X柱空) — 3 directional checks for the day pillar only:
+    日支 ∈ 年空 → "被年柱空" in 日柱
+    日支 ∈ 月空 → "被月柱空" in 日柱
+    日支 ∈ 时空 → "被时柱空" in 日柱
+
+  Mutual Void (互换空亡) — 3 conditions involving the day pillar:
+    年日互换空亡: (年支 ∈ 日空) AND (日支 ∈ 年空) → 年柱 + 日柱
+    月日互换空亡: (月支 ∈ 日空) AND (日支 ∈ 月空) → 月柱 + 日柱
+    日时互换空亡: (时支 ∈ 日空) AND (日支 ∈ 时空) → 日柱 + 时柱
 """
 
 
 _VOID_INTERPRETATIONS: dict[tuple[str, str], str] = {
-    ("年柱", "空亡"): "年柱落于空亡。祖基薄弱，早年与父母缘分较淡，先天福泽不足。",
-    ("月柱", "空亡"): "月柱落于空亡。事业根基不稳，兄弟姊妹情缘疏离，中年发展易逢瓶颈。",
-    ("时柱", "空亡"): "时柱落于空亡。与子女缘薄，晚年少人扶持，个人志向难以完全实现。",
+    # Primary void — day pillar voids each pillar
+    ("年柱", "被日柱空"): "年柱落于空亡。祖基薄弱，早年与父母缘分较淡，先天福泽不足。",
+    ("月柱", "被日柱空"): "月柱落于空亡。事业根基不稳，兄弟姊妹情缘疏离，中年发展易逢瓶颈。",
+    ("时柱", "被日柱空"): "时柱落于空亡。与子女缘薄，晚年少人扶持，个人志向难以完全实现。",
+    # One-way void — 日柱 voided by other pillars
+    ("日柱", "被年柱空"): "日柱落入年柱空亡范围。先天祖荫将日元空去，自身在祖辈格局中显得虚浮，根基受祖运牵制。",
+    ("日柱", "被月柱空"): "日柱落入月柱空亡范围。月令环境将日元空去，事业格局对自身产生虚化，中年运势易逢波折。",
+    ("日柱", "被时柱空"): "日柱落入时柱空亡范围。子嗣宫将日元空去，晚年子女与自身之间缘分被削，志业传承受阻。",
+    # Mutual void — 日柱 involved
     ("年柱", "年日互换空亡"): "年柱与日柱互换空亡。根不养花——祖荫与自身命格互相落空，先天根基无法滋养日元。",
     ("日柱", "年日互换空亡"): "日柱与年柱互换空亡。根不养花——自身缺乏祖荫庇护，性格趋向离散与精神追求，漂泊不定，六亲缘薄。",
     ("月柱", "月日互换空亡"): "月柱与日柱互换空亡。路不载人——事业格局与自身命格互相落空，中年发展之路易逢阻断。",
@@ -49,18 +66,17 @@ def get_void_xun_kong(bazi) -> dict:
 
 def check_pillar_void_status(void_pairs: dict, pillars: dict) -> dict:
     """
-    Check three void conditions for each of the Four Pillars.
+    Evaluate 11 void conditions across the Four Pillars.
 
-    空亡 Primary Void          — Day pillar's xun kong pair voids 年柱, 月柱, 时柱.
-    年日互换空亡 Mutual Void (Roots)     — Both conditions must hold simultaneously:
-                                           1. Day pillar's void pair voids 年柱.
-                                           2. Year pillar's void pair voids 日柱.
-    月日互换空亡 Mutual Void (Life Path)  — Both conditions must hold simultaneously:
-                                           1. Day pillar's void pair voids 月柱.
-                                           2. Month pillar's void pair voids 日柱.
-    日时互换空亡 Mutual Void (Legacy)     — Both conditions must hold simultaneously:
-                                           1. Day pillar's void pair voids 时柱.
-                                           2. Hour pillar's void pair voids 日柱.
+    Primary Void (被日柱空) — day pillar's pair voids 年柱, 月柱, 时柱. Always present; "无" when inactive.
+
+    One-Way Void (被X柱空) — day pillar only; only appear as keys when True:
+      日支 ∈ 年空 → "被年柱空" in 日柱
+      日支 ∈ 月空 → "被月柱空" in 日柱
+      日支 ∈ 时空 → "被时柱空" in 日柱
+
+    Mutual Void (互换空亡) — day-pillar-involved only; only appear as keys when True:
+      年日互换空亡, 月日互换空亡, 日时互换空亡
 
     Args:
         void_pairs: Result of get_void_xun_kong() — two-char void pair per pillar.
@@ -68,10 +84,9 @@ def check_pillar_void_status(void_pairs: dict, pillars: dict) -> dict:
 
     Returns:
         dict keyed by 年柱, 月柱, 日柱, 时柱. Each value contains:
-          "空亡":        Descriptive Chinese string when void applies; "无" otherwise.
-          "年日互换空亡": Descriptive Chinese string when void applies; "无" otherwise.
-          "月日互换空亡": Descriptive Chinese string when void applies; "无" otherwise.
-          "日时互换空亡": Descriptive Chinese string when void applies; "无" otherwise.
+          "被日柱空": descriptive string or "无" (always present).
+          Optional keys (absent when condition is False): 被年柱空, 被月柱空, 被时柱空,
+          年日互换空亡, 月日互换空亡, 日时互换空亡.
     """
     day_void   = void_pairs["日柱"]
     year_void  = void_pairs["年柱"]
@@ -92,30 +107,36 @@ def check_pillar_void_status(void_pairs: dict, pillars: dict) -> dict:
         val = _void_value(condition, pillar, void_type)
         return {void_type: val} if val != "无" else {}
 
-    # 年日互换空亡: day voids year AND year voids day
+    # Existing mutual voids (日柱 involved)
     year_day_mutual  = (branch("年柱") in day_void) and (branch("日柱") in year_void)
-    # 月日互换空亡: day voids month AND month voids day
     month_day_mutual = (branch("月柱") in day_void) and (branch("日柱") in month_void)
-    # 日时互换空亡: day voids hour AND hour voids day
     day_time_mutual  = (branch("时柱") in day_void) and (branch("日柱") in time_void)
+
+    # New one-way: 日柱 voided by other pillars
+    day_by_year  = branch("日柱") in year_void
+    day_by_month = branch("日柱") in month_void
+    day_by_time  = branch("日柱") in time_void
 
     return {
         "年柱": {
-            "空亡": _void_value(branch("年柱") in day_void, "年柱", "空亡"),
+            "被日柱空": _void_value(branch("年柱") in day_void, "年柱", "被日柱空"),
             **_mutual(year_day_mutual, "年柱", "年日互换空亡"),
         },
         "月柱": {
-            "空亡": _void_value(branch("月柱") in day_void, "月柱", "空亡"),
+            "被日柱空": _void_value(branch("月柱") in day_void, "月柱", "被日柱空"),
             **_mutual(month_day_mutual, "月柱", "月日互换空亡"),
         },
         "日柱": {
-            "空亡": "无",
+            "被日柱空": "无",
+            **_mutual(day_by_year,      "日柱", "被年柱空"),
+            **_mutual(day_by_month,     "日柱", "被月柱空"),
+            **_mutual(day_by_time,      "日柱", "被时柱空"),
             **_mutual(year_day_mutual,  "日柱", "年日互换空亡"),
             **_mutual(month_day_mutual, "日柱", "月日互换空亡"),
             **_mutual(day_time_mutual,  "日柱", "日时互换空亡"),
         },
         "时柱": {
-            "空亡": _void_value(branch("时柱") in day_void, "时柱", "空亡"),
+            "被日柱空": _void_value(branch("时柱") in day_void, "时柱", "被日柱空"),
             **_mutual(day_time_mutual, "时柱", "日时互换空亡"),
         },
     }

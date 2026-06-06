@@ -105,7 +105,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     alt="Huat Life"
                     width={40}
                     height={40}
-                    style={{ width: 'auto', height: '40px' }}
                     priority
                   />
                 ) : (

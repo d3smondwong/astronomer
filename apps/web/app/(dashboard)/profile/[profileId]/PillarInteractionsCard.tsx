@@ -72,6 +72,19 @@ const STRENGTH_LABEL: Record<string, { en: string; ch: string; opacity: number }
   '消融吸收': { en: 'Fully Absorbed', ch: '消融吸收', opacity: 0.4  },
 };
 
+const VAULT_LABEL_EN: Record<string, string> = {
+  '金库': 'Metal Vault', '水库': 'Water Vault',
+  '木库': 'Wood Vault',  '火库': 'Fire Vault',
+};
+const SEASONAL_STATE_EN: Record<string, string> = {
+  '旺': 'Dominant', '相': 'Prosperous', '休': 'Resting', '囚': 'Imprisoned', '死': 'Dead',
+};
+const ELEMENT_ACCENT: Record<string, string> = {
+  '木': '#2e7d32', '火': '#c62828', '土': '#8d6e28', '金': '#546e7a', '水': '#1565c0',
+};
+const VAULT_OPEN_STYLE   = { bg: 'rgba(184,134,11,0.06)', border: 'rgba(184,134,11,0.22)', accent: '#b8860b', text: '#7a5800' };
+const VAULT_SEALED_STYLE = { bg: 'rgba(115,105,90,0.06)', border: 'rgba(115,105,90,0.2)',  accent: '#8b8070', text: '#5c5445' };
+
 
 
 function getPillarChar(ix: any, pillarIndex: number): string {
@@ -82,7 +95,6 @@ function getPillarChar(ix: any, pillarIndex: number): string {
 }
 
 const MOBILE_BREAKPOINT = 640;
-const TABLET_BREAKPOINT = 1024;
 
 export default function PillarInteractionsCard({ chartData, language }: PillarInteractionsCardProps) {
   const tr = translations.profile;
@@ -96,6 +108,8 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
+
+  const vaultItems = (chartData?.作用?.库位状态 ?? []) as any[];
 
   const entries = pillarDynamic
     .filter(item => !HIDDEN_STRENGTHS.has(item.强度))
@@ -250,6 +264,82 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
     );
   };
 
+  const renderVaultCard = (item: any, key: string) => {
+    const isOpen     = item.是否开库 as boolean;
+    const vs         = isOpen ? VAULT_OPEN_STYLE : VAULT_SEALED_STYLE;
+    const elemAccent = isOpen ? (ELEMENT_ACCENT[item.元素] ?? vs.accent) : vs.accent;
+    const labelEn    = VAULT_LABEL_EN[item.标签] ?? item.标签;
+    const colIndex   = PILLAR_INDEX[item.库柱] ?? 0;
+    const ElemIcon   = ELEMENT_ICONS[item.元素];
+    const mechanisms: string[] = item.开库机制 ?? [];
+
+    return (
+      <div key={key} style={{
+        gridColumn: colIndex + 1,
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        gap: '4px', padding: '8px 6px 0 5px', borderRadius: '7px', textAlign: 'center',
+        background: vs.bg,
+        border: `1px solid ${vs.border}`,
+        borderLeft: `1px solid ${vs.border}`,
+        overflow: 'hidden',
+      }}>
+        {/* Element icon + vault label */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {ElemIcon && React.createElement(ElemIcon, { sx: { fontSize: '15px', color: elemAccent } })}
+          <span style={{ fontFamily: language === 'en' ? '"Noto Sans SC", sans-serif' : '"Ma Shan Zheng", cursive', fontSize: language === 'en' ? '12px' : '14px', fontWeight: language === 'en' ? 500 : undefined, color: vs.text, lineHeight: 1.1 }}>
+            {language === 'en' ? labelEn : item.标签}
+          </span>
+        </div>
+        {/* Mechanisms */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {mechanisms.length > 0 ? mechanisms.map((m, i) => (
+            <span key={i} style={{ fontFamily: '"Noto Sans SC", sans-serif', fontSize: '11px', fontStyle: 'italic', color: vs.accent, opacity: 0.85 }}>
+              {i > 0 && <span style={{ margin: '0 2px', opacity: 0.5 }}>·</span>}{m}
+            </span>
+          )) : (
+            <span style={{ fontSize: '11px', color: vs.accent, opacity: 0.25 }}>—</span>
+          )}
+        </div>
+        {/* Released stem + seasonal state */}
+        <div style={{ fontFamily: '"Noto Sans SC", sans-serif', fontSize: '11px', color: vs.accent, opacity: 0.75 }}>
+          {language === 'en'
+            ? `${item.释放} · ${SEASONAL_STATE_EN[item.季节状态] ?? item.季节状态}`
+            : `释放${item.释放} · 库气${item.季节状态}`}
+        </div>
+        {/* Ten God badge */}
+        {item.释放十神 && (
+          <div style={{
+            display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+            border: `1px solid ${vs.border}`, borderRadius: '6px', padding: '6px 6px',
+            background: vs.bg,
+          }}>
+            <span style={{ fontSize: '13px', color: vs.text, fontFamily: '"Ma Shan Zheng", serif', lineHeight: 1, whiteSpace: 'nowrap' }}>
+              {item.释放十神}
+            </span>
+            {language === 'en' && (
+              <span style={{ fontSize: '10px', color: vs.accent, fontFamily: '"Noto Serif", serif', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                {SHI_SHEN_LABELS[item.释放十神] || item.释放十神}
+              </span>
+            )}
+          </div>
+        )}
+        {/* Open / Sealed footer strip */}
+        <div style={{
+          alignSelf: 'stretch',
+          marginLeft: '-5px', marginRight: '-6px', marginTop: '4px',
+          padding: '4px 6px',
+          background: isOpen ? '#1e7a3a18' : `${vs.accent}12`,
+          borderTop: `1px solid ${isOpen ? '#1e7a3a40' : vs.border}`,
+          textAlign: 'center',
+        }}>
+          <span style={{ fontFamily: 'Noto Serif, serif', fontSize: '10px', color: isOpen ? '#1e7a3a' : vs.accent }}>
+            {isOpen ? (language === 'en' ? 'Open' : '开泄') : (language === 'en' ? 'Sealed' : '封藏')}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   const DIVIDER_STRENGTHS = new Set(['中等衰减', '大幅衰减', '消融吸收']);
   const topEntries = entries.filter(e => !DIVIDER_STRENGTHS.has(e.interaction.强度));
   const moderateEntries = entries.filter(e => e.interaction.强度 === '中等衰减');
@@ -323,7 +413,7 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
         </div>
 
         {/* Interaction bars */}
-        {entries.length === 0 ? (
+        {entries.length === 0 && vaultItems.length === 0 ? (
           <p style={{ textAlign: 'center', color: 'rgba(115,92,0,0.35)', fontFamily: 'Noto Serif, serif', fontSize: '12px', margin: '8px 0' }}>
             {tr.noInteractions[language]}
           </p>
@@ -346,6 +436,20 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
               <>
                 {renderDivider('消融吸收')}
                 {absorbedEntries.map((e, i) => renderRow(e, `absorbed-${i}`))}
+              </>
+            )}
+            {vaultItems.length > 0 && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '2px 0' }}>
+                  <div style={{ flex: 1, height: '1px', background: 'rgba(115,92,0,0.15)' }} />
+                  <span style={{ fontFamily: 'Noto Serif, serif', fontSize: '10px', color: 'rgba(115,92,0,0.4)', whiteSpace: 'nowrap' }}>
+                    {language === 'en' ? 'Vault Dynamics' : '库藏动态'}
+                  </span>
+                  <div style={{ flex: 1, height: '1px', background: 'rgba(115,92,0,0.15)' }} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                  {vaultItems.map((item, i) => renderVaultCard(item, `vault-${i}`))}
+                </div>
               </>
             )}
           </div>

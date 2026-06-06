@@ -77,9 +77,16 @@ export interface Pillar {
     余气?: HiddenStemTier;
   };
   十二长生: string;
-  空亡地支: string;
-  primary_void_status?: string;
-  reverse_void_status?: string;
+  空亡: {
+    本柱旬空: string;
+    被日柱空: string;
+    被年柱空?: string;
+    被月柱空?: string;
+    被时柱空?: string;
+    年日互换空亡?: string;
+    月日互换空亡?: string;
+    日时互换空亡?: string;
+  };
   纳音: string;
   合化信息?: {
     类型: string;
@@ -162,6 +169,21 @@ export interface BaziChartData {
   };
   五行?: FiveElements;
   [key: string]: any; // Allow other keys for future expansion
+}
+
+export interface VaultState {
+  库柱: string;
+  库支: string;
+  标签: string;
+  元素: string;
+  释放: string;
+  释放十神: string;
+  是否开库: boolean;
+  开库机制: string[];
+  透干: { 是否透干: boolean; 透干柱位: string | null };
+  季节状态: string;
+  开库条件?: { 冲开: string; 刑开: string[]; 透干: string };
+  备注: string;
 }
 
 /**

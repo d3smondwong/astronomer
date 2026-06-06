@@ -6,7 +6,7 @@ import LocalFireDepartment from '@mui/icons-material/LocalFireDepartment';
 import Terrain from '@mui/icons-material/Terrain';
 import StopCircleOutlined from '@mui/icons-material/StopCircleOutlined';
 import Waves from '@mui/icons-material/Waves';
-import { type LifeStageInfo, type NaYinInfo, type VoidInfo, type VoidStatus } from '@/types/baziLibraryTypes';
+import { type LifeStageInfo, type NaYinInfo, type VoidInfo, type VoidStatus, type VoidCondition } from '@/types/baziLibraryTypes';
 import { type ProfileRecord } from '@/lib/profilesDb';
 import { Card, Tabs, Button, Popconfirm, Tooltip } from 'antd';
 import { format } from 'date-fns';
@@ -115,15 +115,16 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     // Year branch stars
     '龙德': 'Dragon Virtue', '红鸾': 'Red Luan', '天喜': 'Heavenly Joy',
     '桃花': 'Peach Blossom', '墙内桃花': 'Inner Peach Blossom', '墙外桃花': 'Outer Peach Blossom',
-    '孤辰': 'Lonely Star', '寡宿': "Widow's Lodge",
-    '大耗': 'Great Drain', '病符': 'Illness Star', '吊客': 'Mourning Guest',
+    '孤辰': 'Lonely Star', '寡宿': "Widow Star",
+    '病符': 'Illness Star', '吊客': 'Mourning Guest',
     '丧门': 'Messenger of Death', '白虎': 'White Tiger', '卷舌': 'Curled Tongue',
     '披麻': 'Mourning Attire', '披头': 'Disheveled Head',
     '吟呻': 'Groaning Malefic', '破碎': 'Shattering Malefic', '白衣': 'White Garment Malefic',
-    '元辰': 'Primary Star', '六厄': 'Six Adversities',
+    '元辰': 'Star of Separation and Discord', '六厄': 'Six Adversities',
     // Month branch stars
     '天德贵人': 'Heavenly Virtue Noble', '月德贵人': 'Monthly Virtue Noble', '天医': 'Heavenly Doctor',
     '月空': 'Monthly Void', '血刃': 'Blood Blade', '天赦': 'Heavenly Pardon',
+    '月厌': 'Monthly Abomination', '月煞': 'Monthly Malefic',
     '天转': 'Heavenly Turn', '地转': 'Earthly Turn', '季节性退神': 'Seasonal Retreating Spirit',
     '天德合': 'Heavenly Virtue Combination', '月德合': 'Monthly Virtue Combination',
     '天月德合': 'Heavenly & Monthly Virtue Combination',
@@ -133,8 +134,10 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     '沐浴桃花': 'Peach Blossom Bath',
     // Day/year stem stars
     '昼天乙贵人': 'Day Heavenly Noble', '夜天乙贵人': 'Night Heavenly Noble',
-    '文昌': 'Literary Star', '学堂': 'Academy Star', '太极贵人': 'Tai Ji Noble',
+    '文昌贵人': 'Literary Star Noble', '学堂': 'Academy Star', '太极贵人': 'Tai Ji Noble',
     '禄神': 'Prosperity Star', '金舆': 'Golden Carriage', '国印': 'National Seal',
+    '文昌贵': 'Literary Star Honour', '文誉贵': 'Literary Prestige Noble',
+    '文星贵': 'Literary Luminary', '天印贵': 'Heavenly Seal Noble',
     '福星': 'Fortune Star', '真词馆': 'True Literary Academy', '正词馆': 'Standard Literary Academy',
     '红艳': 'Red Charm', '天厨贵人': 'Heavenly Kitchen Noble', '飞刃': 'Flying Blade',
     '天官贵人': 'Heavenly Officer Noble', '羊刃': 'Sheep Blade', '流霞': 'Blood Disaster Star',
@@ -142,7 +145,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     // Derived & special
     '福禄双美': 'Double Fortune & Prosperity',
     '天上三奇': "Heaven's Three Wonders", '地下三奇': "Earth's Three Wonders",
-    '人中三奇': "Human's Three Wonders",
+    '人间三奇': "Human's Three Wonders",
     '寅命自禄': 'Yin Self-Lu', '卯命自禄': 'Mao Self-Lu',
     '申命自禄': 'Shen Self-Lu', '酉命自禄': 'You Self-Lu',
     '巳中藏丙': 'Si Hidden Bing', '亥中藏壬': 'Hai Hidden Ren',
@@ -152,11 +155,13 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     '进神': 'Advancing Spirit', '六秀': 'Six Elegance', '八专': 'Eight Specialty',
     '九丑': 'Nine Ugly', '孤鸾': 'Lone Phoenix', '退气神煞': 'Retreating Qi Sha',
     '四废': 'Four Wastes', '金神': 'Golden Deity', '十灵': 'Ten Spirits',
-    '天罗': 'Heavenly Net', '地网': 'Earthly Net', '童子煞': 'Child Sha',
-    '隔角煞': 'Separated Corner Sha',
+    '天罗': 'Heavenly Net', '地网': 'Earthly Net', '童子煞': 'Child Star',
+    '隔角煞': 'Separated Corner Star',
+    '自缢煞': 'Self-Strangulation Star', '破煞': 'Breakage Star',
+    '挂剑煞': 'Hanging Sword Star', '天火煞': 'Celestial Fire Star',
+    '天屠煞': 'Heavenly Slaughter Star', '剑锋煞': 'Sword Blade Star',
     // Relational stars (can appear on pillars)
-    '禄元互换': 'Lu-Yuan Exchange', '进真禄': 'Advancing True Lu',
-    '退真禄': 'Retreating True Lu', '德秀贵人': 'Virtue & Elegance Noble', '暗禄': 'Hidden Lu',
+    '禄元互换': 'Lu-Yuan Exchange', '德秀贵人': 'Virtue & Elegance Noble', '暗禄': 'Hidden Lu',
   };
 
   const tianGanHuaMap: Record<string, { 元素: string; 原五行: string; label: string }> = {};
@@ -200,7 +205,6 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     const earthlyChar = pillar.地支?.地支;
     const heavenlyName = GAN_LABELS[heavenlyChar] || heavenlyChar;
     const earthlyName = ZHI_LABELS[earthlyChar] || earthlyChar;
-    const activeVoidCount = (voidStatus.primaryVoid === true ? 1 : 0) + voidStatus.mutualVoid;
 
     const 化气格变化 = pillar.化气格变化;
     const hiddenStemPairs = [
@@ -420,8 +424,9 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
             if (!cfg) return null;
             return (
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '12px' }}>
-                <span style={{ fontSize: '11px', color: cfg.color, fontFamily: 'Noto Serif, serif', fontStyle: 'italic',
-                               borderLeft: `3px solid ${cfg.color}`, background: cfg.bg, padding: '2px 10px' }}>
+                <span style={{ display: 'block', width: '60%', fontSize: '11px', color: cfg.color, fontFamily: 'Noto Serif, serif',
+                               fontStyle: 'italic', textAlign: 'center', borderLeft: `3px solid ${cfg.color}`,
+                               background: cfg.bg, padding: '2px 10px' }}>
                   {language === 'en' ? tr[cfg.trKey][language] : pillar.天干.根基强度}
                 </span>
               </div>
@@ -481,22 +486,20 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
               </div>
             );
           })()}
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '8px', gap: '3px' }}>
-            {voidStatus.primaryVoid === true && (
-              <span style={{ fontSize: '11px', color: '#8C2F2F', fontFamily: 'Noto Serif, serif', fontStyle: 'italic',
-                             borderLeft: '3px solid #8C2F2F', background: 'rgba(140, 47, 47, 0.08)', padding: '2px 10px' }}>
-                {tr.primaryVoid[language]}
-              </span>
-            )}
-            {Array.from({ length: voidStatus.mutualVoid }).map((_, i) => (
-              <span key={i} style={{ fontSize: '11px', color: '#8C2F2F', fontFamily: 'Noto Serif, serif', fontStyle: 'italic',
-                             borderLeft: '3px solid #8C2F2F', background: 'rgba(140, 47, 47, 0.08)', padding: '2px 10px' }}>
-                {tr.mutualVoid[language]}
-              </span>
-            ))}
-            {Array.from({ length: maxVoidCount - activeVoidCount }).map((_, i) => (
-              <span key={i} style={{ fontSize: '11px', padding: '2px 10px', visibility: 'hidden' }}>–</span>
-            ))}
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '8px', gap: '8px' }}>
+            {Array.from({ length: maxVoidCount }).map((_, i) => {
+              const c = voidStatus.conditions[i];
+              if (!c) return <span key={i} style={{ display: 'block', width: '66.67%', fontSize: '11px', padding: '2px 10px', visibility: 'hidden' }}>–</span>;
+              const color = c.category === 'primary' ? '#8C2F2F' : c.category === 'oneway' ? '#b77306' : '#4A2080';
+              const rgb   = c.category === 'primary' ? '140,47,47' : c.category === 'oneway' ? '122,79,0' : '74,32,128';
+              return (
+                <span key={i} style={{ display: 'block', width: '60%', fontSize: '11px', color, fontFamily: 'Noto Serif, serif',
+                                       fontStyle: 'italic', textAlign: 'center', borderLeft: `3px solid ${color}`,
+                                       background: `rgba(${rgb}, 0.08)`, padding: '2px 10px' }}>
+                  {language === 'en' ? c.label.en : c.label.ch}
+                </span>
+              );
+            })}
           </div>
         </div>
 
@@ -1129,19 +1132,45 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                   {(() => {
                     const siZhu = chartData?.四柱实体 || {};
 
-                    // Void status computed from Python data (空亡, 年日互换空亡, 月日互换空亡, 日时互换空亡)
-                    const buildVoidStatus = (pillarData: any) => ({
-                      primaryVoid: pillarData?.空亡 !== '无' && pillarData?.空亡 !== undefined,
-                      mutualVoid: [pillarData?.年日互换空亡, pillarData?.月日互换空亡, pillarData?.日时互换空亡]
-                        .filter(v => v !== undefined && v !== '无').length,
-                    });
+                    // Void condition metadata and supersession rules
+                    const VOID_CONDITION_META: Record<string, { category: 'primary' | 'oneway' | 'mutual'; ch: string; en: string }> = {
+                      被日柱空:    { category: 'primary', ch: '空亡',    en: 'Primary Void'           },
+                      被年柱空:    { category: 'oneway',  ch: '被年空',  en: 'Void by Year'           },
+                      被月柱空:    { category: 'oneway',  ch: '被月空',  en: 'Void by Month'          },
+                      被时柱空:    { category: 'oneway',  ch: '被时空',  en: 'Void by Hour'           },
+                      年日互换空亡: { category: 'mutual',  ch: '年日互换', en: 'Mutual Void Year↔Day'  },
+                      月日互换空亡: { category: 'mutual',  ch: '月日互换', en: 'Mutual Void Month↔Day' },
+                      日时互换空亡: { category: 'mutual',  ch: '日时互换', en: 'Mutual Void Day↔Hour'  },
+                    };
+                    const SUPERSEDED_BY: Record<string, string[]> = {
+                      被日柱空: ['年日互换空亡', '月日互换空亡', '日时互换空亡'],
+                      被年柱空: ['年日互换空亡'],
+                      被月柱空: ['月日互换空亡'],
+                      被时柱空: ['日时互换空亡'],
+                    };
+
+                    const buildVoidStatus = (pillarData: any): VoidStatus => {
+                      const v = pillarData?.空亡 ?? {};
+                      const activeKeys = new Set<string>();
+                      for (const key of Object.keys(VOID_CONDITION_META)) {
+                        const val = v[key];
+                        const isActive = key === '被日柱空' ? val !== '无' : !!val;
+                        if (isActive) activeKeys.add(key);
+                      }
+                      const conditions: VoidCondition[] = [...activeKeys]
+                        .filter(key => !(SUPERSEDED_BY[key] ?? []).some(s => activeKeys.has(s)))
+                        .map(key => {
+                          const meta = VOID_CONDITION_META[key];
+                          return { category: meta.category, label: { ch: meta.ch, en: meta.en } };
+                        });
+                      return { conditions };
+                    };
 
                     const yearVS  = buildVoidStatus(siZhu.年柱);
                     const monthVS = buildVoidStatus(siZhu.月柱);
                     const dayVS   = buildVoidStatus(siZhu.日柱);
                     const hourVS  = buildVoidStatus(siZhu.时柱);
-                    const countVoids = (vs: VoidStatus) => (vs.primaryVoid === true ? 1 : 0) + vs.mutualVoid;
-                    const maxVoidCount = Math.max(countVoids(yearVS), countVoids(monthVS), countVoids(dayVS), countVoids(hourVS));
+                    const maxVoidCount = Math.max(yearVS.conditions.length, monthVS.conditions.length, dayVS.conditions.length, hourVS.conditions.length);
 
                     // Helper to extract element from naYin phrase (last character typically contains the element)
                     const extractElementFromNaYin = (naYinPhrase: string): 'Metal' | 'Wood' | 'Water' | 'Fire' | 'Earth' => {
@@ -1168,10 +1197,10 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
 
                     return (
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" style={{ position: 'relative', paddingTop: '20px', minWidth: 0 }}>
-                        <PillarCard pillarLabel={tr.yearPillar[language]}  pillar={siZhu.年柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.年柱?.十二长生)}  naYin={buildNaYin(siZhu.年柱?.纳音)}  xunKong={buildXunKong(siZhu.年柱?.空亡地支)}  voidStatus={yearVS}  maxVoidCount={maxVoidCount} shenSha={pillarShenSha.年柱} tianGanHua={tianGanHuaMap['年柱']} />
-                        <PillarCard pillarLabel={tr.monthPillar[language]} pillar={siZhu.月柱} isDayMaster={false} lifeStages={buildLifeStage(siZhu.月柱?.十二长生)} naYin={buildNaYin(siZhu.月柱?.纳音)} xunKong={buildXunKong(siZhu.月柱?.空亡地支)} voidStatus={monthVS} maxVoidCount={maxVoidCount} shenSha={pillarShenSha.月柱} tianGanHua={tianGanHuaMap['月柱']} />
-                        <PillarCard pillarLabel={tr.dayPillar[language]}   pillar={siZhu.日柱}   isDayMaster={true}  lifeStages={buildLifeStage(siZhu.日柱?.十二长生)}   naYin={buildNaYin(siZhu.日柱?.纳音)}   xunKong={buildXunKong(siZhu.日柱?.空亡地支)}   voidStatus={dayVS}   maxVoidCount={maxVoidCount} shenSha={pillarShenSha.日柱} tianGanHua={tianGanHuaMap['日柱']} />
-                        <PillarCard pillarLabel={tr.hourPillar[language]}  pillar={siZhu.时柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.时柱?.十二长生)}  naYin={buildNaYin(siZhu.时柱?.纳音)}  xunKong={buildXunKong(siZhu.时柱?.空亡地支)}  voidStatus={hourVS}  maxVoidCount={maxVoidCount} shenSha={pillarShenSha.时柱} tianGanHua={tianGanHuaMap['时柱']} />
+                        <PillarCard pillarLabel={tr.yearPillar[language]}  pillar={siZhu.年柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.年柱?.十二长生)}  naYin={buildNaYin(siZhu.年柱?.纳音)}  xunKong={buildXunKong(siZhu.年柱?.空亡?.本柱旬空)}  voidStatus={yearVS}  maxVoidCount={maxVoidCount} shenSha={pillarShenSha.年柱} tianGanHua={tianGanHuaMap['年柱']} />
+                        <PillarCard pillarLabel={tr.monthPillar[language]} pillar={siZhu.月柱} isDayMaster={false} lifeStages={buildLifeStage(siZhu.月柱?.十二长生)} naYin={buildNaYin(siZhu.月柱?.纳音)} xunKong={buildXunKong(siZhu.月柱?.空亡?.本柱旬空)} voidStatus={monthVS} maxVoidCount={maxVoidCount} shenSha={pillarShenSha.月柱} tianGanHua={tianGanHuaMap['月柱']} />
+                        <PillarCard pillarLabel={tr.dayPillar[language]}   pillar={siZhu.日柱}   isDayMaster={true}  lifeStages={buildLifeStage(siZhu.日柱?.十二长生)}   naYin={buildNaYin(siZhu.日柱?.纳音)}   xunKong={buildXunKong(siZhu.日柱?.空亡?.本柱旬空)}   voidStatus={dayVS}   maxVoidCount={maxVoidCount} shenSha={pillarShenSha.日柱} tianGanHua={tianGanHuaMap['日柱']} />
+                        <PillarCard pillarLabel={tr.hourPillar[language]}  pillar={siZhu.时柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.时柱?.十二长生)}  naYin={buildNaYin(siZhu.时柱?.纳音)}  xunKong={buildXunKong(siZhu.时柱?.空亡?.本柱旬空)}  voidStatus={hourVS}  maxVoidCount={maxVoidCount} shenSha={pillarShenSha.时柱} tianGanHua={tianGanHuaMap['时柱']} />
                       </div>
                     );
                   })()}

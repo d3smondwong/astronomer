@@ -68,13 +68,18 @@ export interface VoidInfo {
 }
 
 /**
- * Void Status - Primary and Mutual Void indicators
+ * A single active void condition for a pillar.
+ */
+export interface VoidCondition {
+  category: 'primary' | 'oneway' | 'mutual';
+  label: { ch: string; en: string };
+}
+
+/**
+ * Void Status — ordered list of active void conditions (after mutual supersedes one-way collapsing).
  */
 export interface VoidStatus {
-  /** 空亡 — branch falls in the Day pillar's void pair. null for the Day pillar itself. */
-  primaryVoid: boolean | null;
-  /** 互换空亡 — count of active mutual voids (年日, 月日, 日时). 0–3. */
-  mutualVoid: number;
+  conditions: VoidCondition[];
 }
 
 /**

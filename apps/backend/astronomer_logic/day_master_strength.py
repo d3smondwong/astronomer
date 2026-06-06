@@ -12,7 +12,12 @@ Key Exports (shared constants):
     get_stem_element()                               — delegates to LunarUtil.WU_XING_GAN
 
 Main Function:
-    get_day_master_strength(bazi, pillars, ten_gods, natal_interactions) → dict
+    get_day_master_strength(bazi, pillars, ten_gods, natal_interactions, pillar_void=None) → dict
+
+    pillar_void (optional): result of check_pillar_void_status(). When the Day Branch falls
+    into the Month or Hour Pillar's void pair (被月柱空 / 被时柱空), the Day Branch's rooting
+    contribution to 得地 is nullified. Voided by Year (被年柱空) is ignored per classical rule —
+    ancestral emptiness does not weaken the self's core vitality.
 
 Output structure:
     {
@@ -91,6 +96,7 @@ VISIBLE_STEM_MULTIPLIER: Dict[str, float] = {
     "死": 0.40,
 }
 
+# Refactor this for full 12 month Grid.
 _SEASONAL_TABLE: dict = {
     "spring": {"木": "旺", "火": "相", "土": "死", "金": "囚", "水": "休"},
     "summer": {"木": "休", "火": "旺", "土": "相", "金": "死", "水": "囚"},
@@ -280,6 +286,7 @@ def apply_interactions(
     stem_weakened: set[str] = set()  # pillar labels whose stem contribution is halved
     stem_combined: dict = {}  # pillar label → {"合化元素": elem} for full 合化
     dm_hua_qi_ge: dict | None = None  # set when 化气格 involves the day master
+    vault_opened: dict[str, str] = {}  # branch char → released stem char (冲开/刑开 only)
 
     # natal_interactions already de-conflicts overlapping interactions via apply_bazi_master_priority,
     # so we trust the output and assign scores directly without re-checking priority.
@@ -358,6 +365,13 @@ def apply_interactions(
                 stem_cancelled.add(pillar_label)
             summaries.append(f"天干冲: 相互消除")
 
+    # Vault-opening supersedes standard clash-nullification for those branches.
+    # Only 冲开/刑开 need a root override — 透干开 roots already count at full weight.
+    for vs in natal_interactions.get("作用", {}).get("库位状态", []):
+        if vs.get("是否开库") and any(m in ("冲开", "刑开") for m in vs.get("开库机制", [])):
+            vault_opened[vs["库支"]] = vs["释放"]
+    clashed -= set(vault_opened.keys())
+
     # Downgrade month seasonal power if month branch was clashed
     if month_branch in clashed:
         sf = get_seasonal_factors(month_branch)
@@ -376,6 +390,7 @@ def apply_interactions(
             "合化天干": stem_combined,
         },
         "日主化气格": dm_hua_qi_ge,
+        "库开支": vault_opened,
         "活跃互动": summaries,
     }
 
@@ -419,6 +434,8 @@ def compute_de_di(
     day_elem: str,
     all_branches: list[str],
     natal_interactions_transformation: dict,
+    void_excluded_day_branch: bool = False,
+    vault_opened: dict[str, str] | None = None,
 ) -> dict:
     """
     得地: Does the Day Master element appear as hidden stems in the four branches?
@@ -447,6 +464,27 @@ def compute_de_di(
         #     skip root calculation entirely and record zero contribution.
         if branch in excluded:
             detail[label] = {"根类": "无根", "贡献": 0.0, "备注": "冲/合消根"}
+            continue
+
+        # Classical void rule: Day Branch voided by Month or Hour Pillar loses its root.
+        # Voided by Year is ignored — ancestral emptiness does not weaken the self.
+        if void_excluded_day_branch and label == "日柱":
+            detail[label] = {"根类": "无根", "贡献": 0.0, "备注": "空亡消根"}
+            continue
+
+        # Vault-opening (冲开/刑开): the vault is disrupted but not destroyed.
+        # The treasure stem is released at half the 余气 weight if it matches the DM element.
+        # (透干开 vaults are not in vault_opened — their roots count at full weight below.)
+        if vault_opened and branch in vault_opened:
+            released_stem = vault_opened[branch]
+            released_elem = get_stem_element(released_stem)
+            if released_elem == day_elem:
+                yu_qi_weight = BRANCH_HIDDEN_STEM_ROOTING[branch][-1][1]
+                partial = round(yu_qi_weight * 0.5, 2)
+                root_score += partial
+                detail[label] = {"根类": "余气根(库开)", "贡献": partial, "备注": "库开释放"}
+            else:
+                detail[label] = {"根类": "无根", "贡献": 0.0, "备注": "库开非我用"}
             continue
 
         # 2b. Prepare per-branch variables
@@ -577,6 +615,7 @@ def get_day_master_strength(
     pillars: dict,
     ten_gods: dict,
     natal_interactions: dict,
+    pillar_void: dict | None = None,
 ) -> dict:
     """
     Compute full Day Master strength analysis.
@@ -586,6 +625,9 @@ def get_day_master_strength(
         pillars:            Pre-computed pillar data from get_bazi_pillars()
         ten_gods:           Already-transformed ten gods from apply_heavenlystem_tranformation_tengods()
         natal_interactions: Pre-computed interactions from get_natal_interactions()
+        pillar_void:        Optional result of check_pillar_void_status(). When provided,
+                            Day Branch voided by Month or Hour Pillar loses its 得地 root
+                            contribution. Voided by Year is ignored (classical rule).
 
     If 化气格 is detected in natal_interactions, the day master's effective element is
     overridden to the transformed element before computing 得令, 得地, and 得势.
@@ -617,7 +659,22 @@ def get_day_master_strength(
 
     # ── Steps 2–4: each compute function owns its own scoring ────────────────
     de_ling = compute_de_ling(day_elem, month_branch, natal_interactions_transformation)
-    de_di = compute_de_di(day_elem, all_branches, natal_interactions_transformation)
+
+    # Classical void rule: Day Branch voided by Month or Hour Pillar reduces 得地.
+    # Voided by Year is ignored — year represents ancestral roots, not the self's vitality.
+    day_void_info = (pillar_void or {}).get("日柱", {})
+    day_branch_void_active = (
+        day_void_info.get("被月柱空", "无") != "无"
+        or day_void_info.get("被时柱空", "无") != "无"
+    )
+
+    # Vault-opened branches (冲开/刑开 only) get partial root credit instead of zero.
+    vault_opened = natal_interactions_transformation.get("库开支", {})
+
+    de_di = compute_de_di(
+        day_elem, all_branches, natal_interactions_transformation,
+        day_branch_void_active, vault_opened,
+    )
     de_shi = compute_de_shi(
         day_elem, ten_gods, pillars, natal_interactions_transformation
     )
