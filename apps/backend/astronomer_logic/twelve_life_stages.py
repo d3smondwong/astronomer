@@ -62,7 +62,7 @@ def get_twelve_life_stages(bazi, pillars: dict) -> dict:
         stem   = pillars[pillar_key]["天干"]
         branch = pillars[pillar_key]["地支"]
         return {
-            "星运":     library_fn(),
+            "日干":     library_fn(),
             "自坐": _self_seated_stage(stem, branch),
         }
 
