@@ -26,7 +26,7 @@ from apps.backend.astronomer_logic.true_solar_time import get_true_solar_time
 from apps.backend.astronomer_logic.bazi_pillars import get_bazi_pillars
 from apps.backend.astronomer_logic.twelve_life_stages import get_twelve_life_stages
 from apps.backend.astronomer_logic.void_xun_kong import get_void_xun_kong, check_pillar_void_status
-from apps.backend.astronomer_logic.ten_gods import get_ten_gods, apply_heavenlystem_tranformation_tengods
+from apps.backend.astronomer_logic.ten_gods import get_ten_gods, apply_heavenlystem_tranformation_tengods, apply_qi_sha_transformation
 from apps.backend.astronomer_logic.na_yin import get_na_yin
 from apps.backend.astronomer_logic.tai_ming_shen import get_san_yuan
 from apps.backend.astronomer_logic.classical_texts import get_classical_texts
@@ -35,6 +35,7 @@ from apps.backend.astronomer_logic.interpretation_shen_sha import get_shen_sha_i
 from apps.backend.astronomer_logic.natal_interactions import get_natal_interactions
 from apps.backend.astronomer_logic.day_master_strength import get_day_master_strength
 from apps.backend.astronomer_logic.natal_five_elements import QualitativeFiveElementsClassifier, get_pillar_five_elements
+from apps.backend.astronomer_logic.interaction_natal_chart import get_natal_interpretations
 
 _PILLAR_KEYS = ["年柱", "月柱", "日柱", "时柱"]
 
@@ -119,8 +120,10 @@ def calculate_natal_chart(
                 for tier, info in pillars[key]["藏干"].items()
             },
             "十二长生": life_stages[key],
-            "空亡地支": void[key],
-            **pillar_void[key],
+            "空亡": {
+                "本柱旬空": void[key],
+                **pillar_void[key],
+            },
             "纳音":    na_yin[key],
         }
         for key in _PILLAR_KEYS
@@ -129,11 +132,24 @@ def calculate_natal_chart(
     # Individual Modules
     natal_interactions_data = get_natal_interactions(pillars, void)
     ten_gods, si_zhu = apply_heavenlystem_tranformation_tengods(ten_gods, si_zhu, natal_interactions_data, pillars["日柱"]["天干"])
-    day_master_data = get_day_master_strength(bazi, pillars, ten_gods, natal_interactions_data)
+    day_master_data = get_day_master_strength(bazi, pillars, ten_gods, natal_interactions_data, pillar_void)
+    ten_gods, si_zhu = apply_qi_sha_transformation(ten_gods, si_zhu, day_master_data)
     five_elements_data = QualitativeFiveElementsClassifier(si_zhu, natal_interactions_data, lunar_birthday=lunar_birthday).classify_all()
     tai_ming_shen = get_san_yuan(lunar_birthday)
     shen_sha = get_shen_sha(bazi, na_yin, gender)
     shen_sha_with_interpretations = get_shen_sha_interpretations(shen_sha)
+
+    # Build partial chart for the classical-text interpretation layer
+    partial_chart = {
+        "性别": "男" if gender == 1 else "女",
+        "四柱实体": si_zhu,
+        "_lunar_birthday": lunar_birthday,
+        **day_master_data,
+        **five_elements_data,
+        **shen_sha_with_interpretations,
+        **natal_interactions_data,
+    }
+    natal_interpretations_data = get_natal_interpretations(partial_chart)
 
     return {
         "农历生日": lunar_birthday.toString() + f" {birth_datetime.hour:02d}:{birth_datetime.minute:02d} ({lunar_time})",
@@ -147,6 +163,7 @@ def calculate_natal_chart(
         **tai_ming_shen,
         **classical_texts_data,
         **natal_interactions_data,
+        **natal_interpretations_data,
     }
 
 
@@ -165,14 +182,16 @@ if __name__ == "__main__":
 
     # ── Subjects ──────────────────────────────────────────────────────────────
     subjects = {
-        # "Desmond": (dt(1985, 11, 25, 17, 7, 0), 1.3253, 103.808053, 1),
-        "Corinne": (dt(1987, 6, 3, 12, 6, 0), 1.4759, 103.808053, 0),
+        "Desmond": (dt(1985, 11, 25, 17, 7, 0), 1.3253, 103.808053, 1),
+        # "Corinne": (dt(1987, 6, 3, 12, 6, 0), 1.4759, 103.808053, 0),
         # "Lara":    (dt(2025,  7, 31,  9, 10, 0), 1.3253,  103.808053, 0),
+        # "Waifu": (dt(1985, 2, 11, 10, 15, 0), 1.3253, 103.808053, 1),
+        # "Ayden": (dt(2020, 2, 23, 00, 34, 0), 1.3253, 103.808053, 1),
     }
 
     for name, (birthday, lat, lon, gender) in subjects.items():
         logger.info("=" * 60)
         logger.info("Subject: %s  (%s)", name, birthday.strftime("%Y-%m-%d %H:%M"))
 
-        chart = calculate_natal_chart(birthday, lat, lon, gender=gender)
+        chart = calculate_natal_chart(birthday, lat, lon, gender=gender, use_solar_time_correction=True)
         logger.info("Natal chart output:\n%s", json.dumps(chart, ensure_ascii=False, indent=2))
