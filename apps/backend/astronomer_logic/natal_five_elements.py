@@ -143,7 +143,11 @@ class QualitativeFiveElementsClassifier:
         self.si_zhu = si_zhu
         self.season = MONTH_SEASON[si_zhu["月柱"]["地支"]["地支"]]
         self.void_map = {
-            key: si_zhu[key].get("空亡", "无") != "无"
+            key: any(
+                v != "无"
+                for k, v in (si_zhu[key].get("空亡", {}) or {}).items()
+                if k != "本柱旬空"
+            )
             for key in _PILLAR_ORDER
         }
         self.interactions = self._convert_interactions(natal_interactions_data)
@@ -475,20 +479,20 @@ class QualitativeFiveElementsClassifier:
 
         return {
             "状态": STATE_ORDER[idx],
-            #For debugging and interpretability
-            "依据": {
-                "季节基态": base_state,
-                "土旺用事": self.earth_wang,
-                "通根": f["same_element_root_labels"],
-                "本气根": f["strong_root"],
-                "见支": f["has_visible_branch"],
-                "助合": "; ".join(f["combo_descriptions"]) if f["combo_descriptions"] else "",
-                "受冲": "; ".join(f["clash_descriptions"]) if f["clash_descriptions"] else False,
-                "受冲(吸收)": "; ".join(f["absorbed_descriptions"]) if f["absorbed_descriptions"] else False,
-                "空亡": f["void_penalty"],
-                "无根透干": f["has_stem_without_root"],
-                "缺失": not f["has_effective_presence"],
-            },
+            # For debugging and interpretability
+            # "依据": {
+            #     "季节基态": base_state,
+            #     "土旺用事": self.earth_wang,
+            #     "通根": f["same_element_root_labels"],
+            #     "本气根": f["strong_root"],
+            #     "见支": f["has_visible_branch"],
+            #     "助合": "; ".join(f["combo_descriptions"]) if f["combo_descriptions"] else "",
+            #     "受冲": "; ".join(f["clash_descriptions"]) if f["clash_descriptions"] else False,
+            #     "受冲(吸收)": "; ".join(f["absorbed_descriptions"]) if f["absorbed_descriptions"] else False,
+            #     "空亡": f["void_penalty"],
+            #     "无根透干": f["has_stem_without_root"],
+            #     "缺失": not f["has_effective_presence"],
+            # },
         }
 
     def classify_all(self) -> Dict[str, Any]:
