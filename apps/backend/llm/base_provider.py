@@ -24,9 +24,6 @@ class Personality:
     key_traits: list[str] = field(default_factory=list)
     strengths: list[str] = field(default_factory=list)
     areas_to_note: list[str] = field(default_factory=list)
-    lucky_colors: list[str] = field(default_factory=list)
-    lucky_numbers: list[str] = field(default_factory=list)
-
 
 @dataclass
 class InsightsResponse:
