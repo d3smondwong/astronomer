@@ -49,15 +49,15 @@ def _extract_san_ming_tong_hui_day_hour(day_pillar: dict, hour_pillar: dict) -> 
 
     if hour_entry is None:
         return {
-            "日柱": {"天干": day_stem, "地支": day_branch},
-            "时柱": {"天干": hour_stem, "地支": hour_branch},
+            "日柱": {"干支": f"{day_stem}{day_branch}"},
+            "时柱": {"干支": f"{hour_stem}{hour_branch}"},
             "时柱解读": {"诗句": None, "解释": None, "总结诗词": []},
             "日柱解读": None,
         }
 
     return {
-        "日柱": {"天干": day_stem, "地支": day_branch},
-        "时柱": {"天干": hour_stem, "地支": hour_branch},
+        "日柱": {"干支": f"{day_stem}{day_branch}"},
+        "时柱": {"干支": f"{hour_stem}{hour_branch}"},
         "时柱解读": {
             "诗句":    hour_entry.get("诗句"),
             "解释":    hour_entry.get("解释"),
