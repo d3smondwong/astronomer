@@ -155,7 +155,7 @@ def calculate_natal_chart(
         "农历生日": lunar_birthday.toString() + f" {birth_datetime.hour:02d}:{birth_datetime.minute:02d} ({lunar_time})",
         "性别": "男" if gender == 1 else "女",
         "生肖": lunar_birthday.getYearShengXiao(),
-        "生时节气": lunar_birthday.getJieQi(),
+        "生时节气": lunar_birthday.getJieQi() or (lunar_birthday.getPrevJieQi().getName() if lunar_birthday.getPrevJieQi() else ""),
         "四柱实体": si_zhu,
         **day_master_data,
         **five_elements_data,
