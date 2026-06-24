@@ -2836,6 +2836,12 @@ def _detect_vault_states(pillars: dict, pillar_dynamics: list[dict]) -> list[dic
 
     Classical basis: "透干为库，不透为墓" — 透干 alone is sufficient to open.
 
+    破损 (六破, does NOT open):
+    When a 六破 pair involves two vault branches (e.g. 丑破辰), each closed vault
+    receives a "破损" annotation (是否受破: True). The vault remains closed — 六破
+    is 破而不开 — but the stored treasure stem's element strength is already penalised
+    downstream by the five-elements classifier via _SYMMETRIC_CLASH_TYPES.
+
     四库全 (辰戌丑未 all four earth vault branches present):
     This function implicitly handles the classical 四库全 concept without needing a
     dedicated interaction type. When all four branches are present:
@@ -2858,20 +2864,27 @@ def _detect_vault_states(pillars: dict, pillar_dynamics: list[dict]) -> list[dic
 
     CLASH_TYPES = {"六冲", "天克地冲"}
     PENALTY_TYPES = {"恃势之刑", "自刑"}
+    BREAK_TYPES = {"六破"}
     SUFFICIENT = {"强势主流", "显著影响"}
 
-    # Pre-scan pillar_dynamics for clash/penalty hits on vault branches
+    # Pre-scan pillar_dynamics for clash/penalty/break hits on vault branches
     clash_hits: dict[str, set[str]] = {}
+    break_hits: dict[str, list[str]] = {}  # branch → list of opposing vault branches
     for ix in pillar_dynamics:
         if ix.get("强度") not in SUFFICIENT:
             continue
         ix_type = ix.get("类型")
-        if ix_type not in CLASH_TYPES | PENALTY_TYPES:
-            continue
-        form = "冲开" if ix_type in CLASH_TYPES else "刑开"
-        for branch in ix.get("组合明细", {}).values():
-            if branch in _VAULT_BRANCHES:
-                clash_hits.setdefault(branch, set()).add(form)
+        if ix_type in CLASH_TYPES | PENALTY_TYPES:
+            form = "冲开" if ix_type in CLASH_TYPES else "刑开"
+            for branch in ix.get("组合明细", {}).values():
+                if branch in _VAULT_BRANCHES:
+                    clash_hits.setdefault(branch, set()).add(form)
+        elif ix_type in BREAK_TYPES:
+            vault_pair = [b for b in ix.get("组合明细", {}).values() if b in _VAULT_BRANCHES]
+            if len(vault_pair) == 2:
+                b0, b1 = vault_pair
+                break_hits.setdefault(b0, []).append(b1)
+                break_hits.setdefault(b1, []).append(b0)
 
     all_stems = {p: pillars[p]["天干"] for p in _PILLAR_NAMES_CN}
 
@@ -2928,6 +2941,14 @@ def _detect_vault_states(pillars: dict, pillar_dynamics: list[dict]) -> list[dic
                 "透干": treasure_stem,
             }
 
+        broken_by = break_hits.get(branch, [])
+        if broken_by:
+            entry["破损"] = {
+                "是否受破": True,
+                "破力来源": broken_by,
+                "说明": "破而不开：六破冲扰库门，库藏受损但未释放",
+            }
+
         if is_open:
             mech_str = "、".join(mechanisms)
             tou_str = (
@@ -2937,9 +2958,10 @@ def _detect_vault_states(pillars: dict, pillar_dynamics: list[dict]) -> list[dic
                 f"{branch}{info['label']}已开：{mech_str}{tou_str}，库气{seasonal_state}"
             )
         else:
+            po_str = f"，受{'/'.join(broken_by)}六破冲扰（破而不开）" if broken_by else ""
             entry["备注"] = (
                 f"{branch}{info['label']}藏而未开：{treasure_stem}（{treasure_elem}）"
-                f"深藏不出，库气{seasonal_state}"
+                f"深藏不出{po_str}，库气{seasonal_state}"
             )
 
         results.append(entry)

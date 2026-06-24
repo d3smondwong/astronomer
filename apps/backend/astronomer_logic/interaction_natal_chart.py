@@ -347,6 +347,7 @@ from apps.backend.data.san_ming_tong_hui_v4 import (
     volume_4_elements_combo_prediction,
 )
 from apps.backend.data.san_ming_tong_hui_v5 import volume_5_rules
+from apps.backend.data.key_rules import key_rules_predictions
 
 _ALL_PILLARS = ["年柱", "月柱", "日柱", "时柱"]
 _YANG_REN_XIANG_SHI_PAIRS: frozenset[tuple[str, str]] = frozenset([
@@ -4213,6 +4214,15 @@ def analyse_volume5_guan_sha(context: ChartContext) -> dict:
     return {"论官煞格局": matched}
 
 
+def analyse_key_rules(context: ChartContext) -> dict:
+    matched = []
+    for rule in key_rules_predictions:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"关键规则": matched}
+
+
 def analyse_volume3_horse_fortune(context: ChartContext) -> dict:
     matched = []
     for rule in volume_3_horse_fortune_predictions:
@@ -4743,6 +4753,7 @@ ANALYZERS: list[Callable[[ChartContext], dict]] = [
     analyse_volume2_chong_ji,
     analyse_volume2_liu_shi_jiazi,
     analyse_volume1_nayin_ge_ju,
+    analyse_key_rules,
 ]
 
 
