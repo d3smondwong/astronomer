@@ -6,23 +6,22 @@ Shen Sha are additional spiritual stars used in Chinese astrology to provide dee
 into a person's character, destiny, relationships, and challenges.
 
 Key Methodology:
-- Year Branch (年系) → 龙德, 红鸾, 天喜, 孤辰, 寡宿, 大耗, 病符, 吊客, 丧门, 白虎,
+- Year Branch (年系) → 龙德, 红鸾, 天喜, 孤辰, 寡宿, 病符, 吊客, 丧门, 白虎,
                        勾绞煞, 披头, 披麻, 元辰, 卷舌, 六厄
                        暗金的煞 → 吟呻 (子午卯酉年), 破碎 (寅申巳亥年), 白衣 (辰戌丑未年)
                          └─ checked on Day & Hour Pillars only
 - Month Branch (月系) → 天德贵人, 月德贵人, 天医, 月空, 血刃, 天赦, 天转, 地转, 季节性退神
                         天德合, 月德合, 天月德合, 德秀贵人
-- Day & Year Branch (日/年系) → 将星, 华盖, 驿马, 劫煞, 亡神, 桃花 (→ 墙内/墙外桃花),
-                                沐浴桃花, 灾煞
+- Day & Year Branch (日/年系) → 将星, 华盖, 驿马, 劫煞, 亡神, 桃花, 灾煞
 - Day & Year Stem (日/年干系) → 昼天乙贵人, 夜天乙贵人, 文昌, 学堂, 太极贵人, 禄神,
                                 金舆, 国印, 福星, 真词馆 (stem→exact pillar),
-                                天厨贵人, 飞刃, 天官贵人, 羊刃
+                                天厨贵人, 飞刃, 天官贵人, 阳刃, 阴刃
 - Day Stem only (日干系) → 红艳, 流霞
                                 正词馆 (Year Nayin→exact pillar, via _calc_ci_guan)
 - Day Pillar (日柱) → 阴阳差错, 十恶大败, 魁罡, 进神, 六秀, 八专, 九丑, 孤鸾, 退气神煞,
                       四废, 金神, 十灵, 天罗, 地网, 童子煞
-- Inter-Pillar (组合) → 福禄双美, 三奇贵人 (天上/地下/人中), 自禄, 藏干, 隔角煞
-- Relational (关系) → 禄元互换, 进退真禄 (进真禄/退真禄), 暗禄
+- Inter-Pillar (组合) → 三奇贵人 (天上/地下/人中), 自禄, 隔角煞
+- Relational (关系) → 暗禄
 
 Architecture:
 - ShenShaCalculator class encapsulates full natal chart analysis
@@ -76,21 +75,7 @@ stem_partners = {
     "癸": "戊",
 }
 
-# --- BATH POSITION (DAY STEM → BATH BRANCH) ---
-# Maps Day Master stem to its "Bath" (沐浴) stage
-# Used for 沐浴桃花 activation (Peach Blossom at Bath position = amplified)
-bath_position = {
-    "甲": "子",
-    "乙": "巳",
-    "丙": "卯",
-    "丁": "申",
-    "戊": "卯",
-    "己": "申",
-    "庚": "午",
-    "辛": "亥",
-    "壬": "酉",
-    "癸": "寅",
-}
+
 
 # --- SEASONAL MAPPING ---
 # Maps month branch to Chinese season
@@ -128,23 +113,6 @@ yuan_chen_map = {
     "亥": ("午", "辰"),
 }
 
-# --- 大耗 (DA HAO) - GENDER & YEAR YIN/YANG DEPENDENT ---
-# Formula: Year Branch + (Gender & Year Yin/Yang) → ±1 position from 六冲
-# 阳男阴女 → 冲前一位 (first element); 阴男阳女 → 冲后一位 (second element)
-da_hao_map = {
-    "子": ("未", "巳"),
-    "丑": ("申", "午"),
-    "寅": ("酉", "未"),
-    "卯": ("戌", "申"),
-    "辰": ("亥", "酉"),
-    "巳": ("子", "戌"),
-    "午": ("丑", "亥"),
-    "未": ("寅", "子"),
-    "申": ("卯", "丑"),
-    "酉": ("辰", "寅"),
-    "戌": ("巳", "卯"),
-    "亥": ("午", "辰"),
-}
 
 # --- YEAR BRANCH BASED SHENS ---
 year_earthly_branches_shens = {
@@ -221,6 +189,20 @@ year_earthly_branches_shens = {
         "亥": "戌",
     },
     "病符": {
+        "子": "亥",
+        "丑": "子",
+        "寅": "丑",
+        "卯": "寅",
+        "辰": "卯",
+        "巳": "辰",
+        "午": "巳",
+        "未": "午",
+        "申": "未",
+        "酉": "申",
+        "戌": "酉",
+        "亥": "戌",
+    },
+    "天空": {
         "子": "丑",
         "丑": "寅",
         "寅": "卯",
@@ -465,6 +447,26 @@ month_earthly_branches_shens = {
         "子": "午",
         "丑": "子",
     },
+    "月厌": {   # retrograde sequence 戌酉申未午巳辰卯寅丑子亥 for months 寅→丑
+        "寅": "戌",
+        "卯": "酉",
+        "辰": "申",
+        "巳": "未",
+        "午": "午",
+        "未": "巳",
+        "申": "辰",
+        "酉": "卯",
+        "戌": "寅",
+        "亥": "丑",
+        "子": "子",
+        "丑": "亥",
+    },
+    "月煞": {   # 四季三合组 → 库支 (丑戌未辰)
+        "寅": "丑",  "午": "丑",  "戌": "丑",
+        "亥": "戌",  "卯": "戌",  "未": "戌",
+        "申": "未",  "子": "未",  "辰": "未",
+        "巳": "辰",  "酉": "辰",  "丑": "辰",
+    },
     # --- SEASONAL ---
     "天赦": {"春": "戊寅", "夏": "甲午", "秋": "戊申", "冬": "甲子"},
     "天转": {"春": "乙卯", "夏": "丙午", "秋": "辛酉", "冬": "壬子"},
@@ -603,7 +605,7 @@ year_day_heavenly_stem_shens = {
         "壬": "巳",
         "癸": "卯",
     },
-    "文昌": {
+    "文昌贵人": {
         "甲": "巳",
         "乙": "午",
         "丙": "申",
@@ -620,8 +622,8 @@ year_day_heavenly_stem_shens = {
         "乙": "子午",
         "丙": "卯酉",
         "丁": "卯酉",
-        "戊": "辰戌丑未",
-        "己": "辰戌丑未",
+        "戊": "申辰戌丑未",
+        "己": "申辰戌丑未",
         "庚": "寅亥",
         "辛": "寅亥",
         "壬": "巳申",
@@ -688,18 +690,6 @@ year_day_heavenly_stem_shens = {
         "壬": "寅",
         "癸": "卯",
     },
-    "飞刃": {
-        "甲": "酉",
-        "乙": "申",
-        "丙": "子",
-        "丁": "亥",
-        "戊": "子",
-        "己": "亥",
-        "庚": "卯",
-        "辛": "寅",
-        "壬": "午",
-        "癸": "巳",
-    },
     "天官贵人": {
         "甲": "未",
         "乙": "辰",
@@ -712,13 +702,6 @@ year_day_heavenly_stem_shens = {
         "壬": "寅",
         "癸": "午",
     },
-    "羊刃": {
-        "甲": "卯",
-        "丙": "午",
-        "戊": "午",
-        "庚": "酉",
-        "壬": "子",
-    },
 }
 
 # --- DAY STEM ONLY SHENS ---
@@ -729,11 +712,11 @@ day_stem_only_shens = {
         "乙": "午",
         "丙": "寅",
         "丁": "未",
-        "戊": "辰",
+        "戊": "子",
         "己": "辰",
         "庚": "戌",
         "辛": "酉",
-        "壬": "子",
+        "壬": "巳",
         "癸": "申",
     },
     "流霞": {
@@ -747,6 +730,44 @@ day_stem_only_shens = {
         "辛": "卯",
         "壬": "亥",
         "癸": "寅",
+    },
+    "文昌贵": {
+        "甲": "巳", "乙": "亥", "丙": "戌", "丁": "辰", "戊": "申",
+        "己": "午", "庚": "寅", "辛": "未", "壬": "卯", "癸": "丑",
+    },
+    "文星贵": {
+        "甲": "午", "乙": "巳", "丙": "申", "丁": "酉", "戊": "申",
+        "己": "酉", "庚": "戌", "辛": "亥", "壬": "寅", "癸": "卯",
+    },
+    "天印贵": {
+        "甲": "寅", "乙": "亥", "丙": "戌", "丁": "酉", "戊": "申",
+        "己": "未", "庚": "午", "辛": "巳", "壬": "辰", "癸": "卯",
+    },
+    "羊刃": {
+        # Yang stems
+        "甲": "卯",
+        "丙": "午",
+        "戊": "午",
+        "庚": "酉",
+        "壬": "子",
+        # # Yin stems
+        # "乙": "辰",
+        # "丁": "未",
+        # "己": "未",
+        # "辛": "戌",
+        # "癸": "丑",
+    },
+     "飞刃": {
+        "甲": "酉",
+        "乙": "戌",
+        "丙": "子",
+        "丁": "丑",
+        "戊": "子",
+        "己": "丑",
+        "庚": "卯",
+        "辛": "辰",
+        "壬": "午",
+        "癸": "未",
     },
 }
 
@@ -778,9 +799,7 @@ pillar_shens = {
         "壬申",
         "癸亥",
     ],
-    "魁罡": ["庚辰", "庚戌", "戊戌", "壬辰"],
     "金神": ["癸酉", "己巳", "乙丑"],
-    "福禄双美": ["丁卯", "癸未", "甲寅"],
     "进神": ["甲子", "甲午", "己卯", "己酉"],
     "六秀": ["丙午", "丁未", "戊子", "戊午", "己丑", "己未"],
     "八专": ["甲寅", "乙卯", "丁未", "戊戌", "己未", "庚申", "辛酉", "癸丑"],
@@ -806,6 +825,40 @@ pillar_shens = {
         "秋": ["甲寅", "乙卯"],
         "冬": ["丙午", "丁巳"],
     },
+}
+
+# --- 自缢煞 / 破煞 branch-pair sets ---
+# 自缢煞: 6 pairs — if BOTH branches of a pair appear anywhere in the 4 pillars, both are marked
+_ZI_YI_SHA_PAIRS: list[frozenset] = [
+    frozenset({"戌", "巳"}), frozenset({"辰", "亥"}), frozenset({"寅", "未"}),
+    frozenset({"卯", "申"}), frozenset({"午", "丑"}), frozenset({"子", "酉"}),
+]
+# 破煞: 4 pairs (寅申巳亥 excluded per text — they form 三合 so are not taken)
+_PO_SHA_PAIRS: list[frozenset] = [
+    frozenset({"卯", "午"}), frozenset({"丑", "辰"}),
+    frozenset({"子", "酉"}), frozenset({"未", "戌"}),
+]
+
+# --- 天屠煞 (TIAN TU SHA) ---
+# Day Branch → Hour Branch: 5 mutual pairs where branch indices sum to 12.
+# 子↔午 (sum=6) explicitly excluded by classical text.
+_TIAN_TU_SHA_DAY_HOUR: dict[str, str] = {
+    "丑": "亥", "亥": "丑",
+    "寅": "戌", "戌": "寅",
+    "卯": "酉", "酉": "卯",
+    "辰": "申", "申": "辰",
+    "巳": "未", "未": "巳",
+}
+
+# --- 剑锋煞 (JIAN FENG SHA) ---
+# Year pillar's 旬首 branch → (剑枝, 锋枝)
+_JIAN_FENG_SHA_XUN: dict[str, tuple[str, str]] = {
+    "子": ("辰", "戌"),  # 甲子旬: 剑辰, 锋戌
+    "戌": ("寅", "子"),  # 甲戌旬: 剑寅, 锋子
+    "申": ("子", "寅"),  # 甲申旬: 剑子, 锋寅
+    "午": ("戌", "辰"),  # 甲午旬: 剑戌, 锋辰
+    "辰": ("申", "午"),  # 甲辰旬: 剑申, 锋午
+    "寅": ("午", "申"),  # 甲寅旬: 剑午, 锋申
 }
 
 # --- 隔角煞 (GE JIAO SHA) ---
@@ -1036,7 +1089,6 @@ class ShenShaCalculator:
         self.hour_pillar = self.gans[3] + self.zhis[3]
         self.birth_season = seasons_map.get(self.zhis[1])
 
-        # Year pillar's Nayin element (for 天罗地网 calculation)
         self.year_nayin = nayin_to_element(self.na_yin.get("年柱", ""))
 
         # Year yin/yang determined by Year Stem (not Branch)
@@ -1111,14 +1163,7 @@ class ShenShaCalculator:
                     continue
 
                 if self.zhis[i] in lookup:
-                    # Special case: Peach Blossom has wall classification
-                    if shen_name == "桃花":
-                        # Add base star for 沐浴桃花 detection, then add wall-classified variant
-                        self._add_shen(i, "桃花", source="年支")
-                        wall_type = "墙内桃花" if i < 2 else "墙外桃花"
-                        self._add_shen(i, wall_type, source="年支")
-                    else:
-                        self._add_shen(i, shen_name, source="年支")
+                    self._add_shen(i, shen_name, source="年支")
 
     def _calc_yuan_chen(self) -> None:
         """
@@ -1138,25 +1183,6 @@ class ShenShaCalculator:
         for i in range(4):
             if self.zhis[i] == target_branch:
                 self._add_shen(i, "元辰", source="年支")
-
-    def _calc_da_hao(self) -> None:
-        """
-        大耗 (Major Drain) - Gender and year yin/yang dependent.
-        Formula: Year Branch + Gender + Year Yin/Yang → ±1 from 六冲
-
-        阳男阴女 → 冲前一位 (first tuple element)
-        阴男阳女 → 冲后一位 (second tuple element)
-        """
-        if (self.is_yang_year and self.is_male) or (
-            not self.is_yang_year and not self.is_male
-        ):
-            target_branch = da_hao_map[self.zhis[0]][0]
-        else:
-            target_branch = da_hao_map[self.zhis[0]][1]
-
-        for i in range(4):
-            if self.zhis[i] == target_branch:
-                self._add_shen(i, "大耗", source="年支")
 
     def _calc_gou_jiao(self) -> None:
         """
@@ -1409,23 +1435,7 @@ class ShenShaCalculator:
                         continue
 
                     if self.zhis[i] in lookup:
-                        if shen_name == "桃花":
-                            self._add_shen(i, "桃花", source=source_label)
-                            wall_type = "墙内桃花" if i < 2 else "墙外桃花"
-                            self._add_shen(i, wall_type, source=source_label)
-                        else:
-                            self._add_shen(i, shen_name, source=source_label)
-
-    def _calc_bath_peach_blossom(self) -> None:
-        """
-        沐浴桃花 (Bath-Activated Peach Blossom).
-        Triggers when 桃花 is already present AND the branch is the Day Master's bath position.
-        """
-        my_bath_branch = bath_position.get(self.me)
-
-        for i in range(4):
-            if self._has_shen(i, "桃花") and self.zhis[i] == my_bath_branch:
-                self._add_shen(i, "沐浴桃花", source="日支")
+                        self._add_shen(i, shen_name, source=source_label)
 
     # ========================================================================
     # SECTION 4: DAY & YEAR STEM DERIVED STARS (日干 + 年干)
@@ -1527,40 +1537,38 @@ class ShenShaCalculator:
                 if self.zhis[i] == lookup:
                     self._add_shen(i, shen_name, source="日干")
 
+    def _calc_wen_yu_gui(self) -> None:
+        """文誉贵: mark any pillar whose ganzhi is ±2 positions in the 60-cycle from day pillar."""
+        _s = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
+        _b = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+        sixty = [_s[i % 10] + _b[i % 12] for i in range(60)]
+        day_gz = self.me + self.zhis[2]
+        try:
+            day_pos = sixty.index(day_gz)
+        except ValueError:
+            return
+        targets = {sixty[(day_pos - 2) % 60], sixty[(day_pos + 2) % 60]}
+        for i in range(4):
+            if self.gans[i] + self.zhis[i] in targets:
+                self._add_shen(i, "文誉贵", source="日柱")
+
     # ========================================================================
     # SECTION 6: DERIVED & SPECIAL COMBINATION STARS
     # ========================================================================
-
-    def _calc_fortune_virtue(self) -> None:
-        """
-        福禄双美 (Fortune & Virtue Double Beauty).
-        Dual activation paths:
-        1. Pillar-specific (inherited): exact pillar in list
-        2. Combination (earned): both 福星 and 禄神 present in same pillar
-        """
-        fu_lu_special_pillars = pillar_shens.get("福禄双美", [])
-
-        for i in range(4):
-            current_pillar = self.gans[i] + self.zhis[i]
-            is_special_pillar = current_pillar in fu_lu_special_pillars
-            has_combo = self._has_shen(i, "福星") and self._has_shen(i, "禄神")
-
-            if is_special_pillar or has_combo:
-                self._add_shen(i, "福禄双美", source="组合")
 
     def _calc_three_wonders(self) -> None:
         """
         三奇贵人 (Three Wonders / Three Stems Noble).
         Triggers when three consecutive pillars have stems matching one of
         (forward or reverse order):
-        - 甲 戊 庚 (天上三奇 - Heaven's Three Wonders)
-        - 乙 丙 丁 (地下三奇 - Earth's Three Wonders)
-        - 壬 癸 辛 (人中三奇 - Human's Three Wonders)
+        - 乙 丙 丁 (天上三奇 - Heaven's Three Wonders: sun/moon/star per 《玉霄宝鉴》)
+        - 甲 戊 庚 (地下三奇 - Earth's Three Wonders: wood/earth/metal per 《三车一览》)
+        - 辛 壬 癸 (人间三奇 - Human's Three Wonders: consecutive stems 8→9→10 per 《太乙经》)
         """
         trios = [
-            (["甲", "戊", "庚"], "天上三奇"),
-            (["乙", "丙", "丁"], "地下三奇"),
-            (["壬", "癸", "辛"], "人中三奇"),
+            (["乙", "丙", "丁"], "天上三奇"),
+            (["甲", "戊", "庚"], "地下三奇"),
+            (["辛", "壬", "癸"], "人间三奇"),
         ]
 
         # Check Year-Month-Day (indices 0,1,2) and Month-Day-Hour (indices 1,2,3)
@@ -1585,17 +1593,6 @@ class ShenShaCalculator:
             if pillar in self_lu_map:
                 self._add_shen(i, self_lu_map[pillar], source="自柱")
 
-    def _calc_hidden_stem_revelations(self):
-        """Adds 藏干 revelations for specific pillars."""
-        hidden_map = {
-            "丁巳": "巳中藏丙",
-            "癸亥": "亥中藏壬",
-        }
-        for i in range(4):
-            pillar = self.gans[i] + self.zhis[i]
-            if pillar in hidden_map:
-                self._add_shen(i, hidden_map[pillar], source="自柱")
-
     # ========================================================================
     # SECTION 7: PILLAR-LEVEL & SEASONAL STARS (杂项)
     # ========================================================================
@@ -1605,9 +1602,7 @@ class ShenShaCalculator:
         Day pillar special formations: 阴阳差错, 十恶大败, 魁罡.
         """
         day_checks = {
-            "阴阳差错": pillar_shens.get("阴阳差错", []),
             "十恶大败": pillar_shens.get("十恶大败", []),
-            "魁罡": pillar_shens.get("魁罡", []),
             "六秀": pillar_shens.get("六秀", []),
             "八专": pillar_shens.get("八专", []),
             "九丑": pillar_shens.get("九丑", []),
@@ -1622,6 +1617,21 @@ class ShenShaCalculator:
         # 进神 handled separately to record the specific day pillar as 细节
         if self.day_pillar in pillar_shens.get("进神", []):
             self._add_shen(2, "进神", source="日柱", detail=self.day_pillar)
+
+    def _calc_yin_yang_cha_cuo(self) -> None:
+        """
+        阴阳差错 — checked on ALL four pillars, not just the day pillar.
+        Classical text: '月日时两重或三重犯之，极重' — month, day, and time pillars
+        can all carry this star independently for severity grading.
+        Day pillar uses source '日柱' (preserves interpretation lookup).
+        Other pillars use source '自柱' (severity handled at DSL layer).
+        """
+        target = pillar_shens.get("阴阳差错", [])
+        for i in range(4):
+            pillar = self.gans[i] + self.zhis[i]
+            if pillar in target:
+                source = "日柱"
+                self._add_shen(i, "阴阳差错", source=source)
 
     def _calc_four_wastes(self) -> None:
         """
@@ -1652,47 +1662,87 @@ class ShenShaCalculator:
 
     def _calc_tian_luo_di_wang(self) -> None:
         """
-        天罗地网 — two independent methods, both handled here.
+        天罗地网 — both net branches present anywhere in the four pillars.
 
-        查法一 (Year/Day branch mutual presence — applies to everyone):
-          天罗: 戌 and 亥 both present anywhere in the 4 pillars → source="年支"
-          地网: 辰 and 巳 both present anywhere in the 4 pillars → source="年支"
+        天罗 (Heavenly Net): 戌 AND 亥 both appear across the four pillars.
+        地网 (Earthly Net):  辰 AND 巳 both appear across the four pillars.
 
-        查法二 (Year Nayin qualification — additional strength):
-          天罗: Fire Nayin year + 戌亥 both present → source="纳音"
-          地网: Water/Earth Nayin year + 辰巳 both present → source="纳音"
-          (金/木 Nayin years are exempt from 查法二)
-
-        A chart with Fire Nayin AND 戌+亥 receives both sources (stronger effect).
-        A chart with 金/木 Nayin AND 戌+亥 receives 查法一 only.
+        The star is placed on every pillar carrying the relevant branch.
+        This means 天罗 and 地网 can coexist when all four branches appear.
+        Gender-specific effects, severity grading, and Nayin modifiers are
+        handled at the interpretation layer (DSL rules), not here.
         """
-        branches_set = set(self.zhis)
-        has_xu  = "戌" in branches_set
-        has_hai = "亥" in branches_set
-        has_chen = "辰" in branches_set
-        has_si   = "巳" in branches_set
+        all_zhis = set(self.zhis)
 
-        # 查法一: mutual presence, no Nayin requirement
-        if has_xu and has_hai:
+        if {"戌", "亥"} <= all_zhis:
             for i in range(4):
                 if self.zhis[i] in ("戌", "亥"):
-                    self._add_shen(i, "天罗", source="年支")
+                    self._add_shen(i, "天罗", source="四柱")
 
-        if has_chen and has_si:
+        if {"辰", "巳"} <= all_zhis:
             for i in range(4):
                 if self.zhis[i] in ("辰", "巳"):
-                    self._add_shen(i, "地网", source="年支")
+                    self._add_shen(i, "地网", source="四柱")
 
-        # 查法二: Nayin-qualified (additional source label)
-        if self.year_nayin == "火" and has_xu and has_hai:
-            for i in range(4):
-                if self.zhis[i] in ("戌", "亥"):
-                    self._add_shen(i, "天罗", source="纳音")
+    def _calc_zi_yi_sha(self) -> None:
+        """
+        自缢煞 — branch-pair interaction: if both branches of any of the 6 pairs appear
+        anywhere in the four pillars, mark every pillar carrying either branch.
+        Pairs: 戌↔巳, 辰↔亥, 寅↔未, 卯↔申, 午↔丑, 子↔酉
+        """
+        all_zhis = set(self.zhis)
+        for pair in _ZI_YI_SHA_PAIRS:
+            if pair <= all_zhis:
+                for i in range(4):
+                    if self.zhis[i] in pair:
+                        self._add_shen(i, "自缢煞", source="四柱")
 
-        if self.year_nayin in ("水", "土") and has_chen and has_si:
+    def _calc_po_sha(self) -> None:
+        """
+        破煞 — branch-pair breaks: if both branches of a pair appear anywhere in the four
+        pillars, mark every pillar carrying either branch.
+        Pairs: 卯↔午, 丑↔辰, 子↔酉, 未↔戌 (寅申巳亥 excluded — they form 三合).
+        """
+        all_zhis = set(self.zhis)
+        for pair in _PO_SHA_PAIRS:
+            if pair <= all_zhis:
+                for i in range(4):
+                    if self.zhis[i] in pair:
+                        self._add_shen(i, "破煞", source="四柱")
+
+    def _calc_gua_jian_sha(self) -> None:
+        """
+        挂剑煞 — full-metal branch formation (从革).
+        Trigger 1 (纯全): all 4 pillar branches ∈ {巳,酉,丑,申}.
+        Trigger 2 (重带): ≥ 3 occurrences of branches from {巳,酉,丑} across the 4 pillars.
+        Star placed on every pillar whose branch ∈ {巳,酉,丑,申}.
+        """
+        metal_full = {"巳", "酉", "丑", "申"}
+        metal_trio = {"巳", "酉", "丑"}
+        all_in_metal = all(z in metal_full for z in self.zhis)
+        heavy_trio = sum(1 for z in self.zhis if z in metal_trio) >= 3
+        if all_in_metal or heavy_trio:
             for i in range(4):
-                if self.zhis[i] in ("辰", "巳"):
-                    self._add_shen(i, "地网", source="纳音")
+                if self.zhis[i] in metal_full:
+                    self._add_shen(i, "挂剑煞", source="四柱")
+
+    def _calc_tian_huo_sha(self) -> None:
+        """
+        天火煞 — complete fire frame with no water.
+        Conditions: {寅,午,戌} all present in branches + {丙 or 丁} in stems + no water
+        (no 壬/癸 in stems, no 子/亥 in branches). Star placed on pillars with 寅,午,戌.
+        """
+        all_zhis = set(self.zhis)
+        all_gans = set(self.gans)
+        if not ({"寅", "午", "戌"} <= all_zhis):
+            return
+        if not (all_gans & {"丙", "丁"}):
+            return
+        if (all_gans & {"壬", "癸"}) or (all_zhis & {"子", "亥"}):
+            return
+        for i in range(4):
+            if self.zhis[i] in ("寅", "午", "戌"):
+                self._add_shen(i, "天火煞", source="四柱")
 
     def _calc_tong_zi_sha(self) -> None:
         """
@@ -1754,78 +1804,39 @@ class ShenShaCalculator:
         if ge_jiao_sha_map_year_day.get(self.zhis[0]) == self.zhis[2]:
             self._add_shen(2, "隔角煞", source="年支")
 
+    def _calc_tian_tu_sha(self) -> None:
+        """
+        天屠煞 — day branch and hour branch form one of 5 mutual pairs (branch indices sum to 12).
+        子↔午 (sum=6) explicitly excluded by classical text.
+        Star placed on both Day Pillar (i=2) and Hour Pillar (i=3).
+        """
+        expected_hour = _TIAN_TU_SHA_DAY_HOUR.get(self.zhis[2])
+        if expected_hour and self.zhis[3] == expected_hour:
+            self._add_shen(2, "天屠煞", source="日支")
+            self._add_shen(3, "天屠煞", source="日支")
+
+    def _calc_jian_feng_sha(self) -> None:
+        """
+        剑锋煞 — derived from the YEAR pillar's 旬.
+        Derives 旬首 branch via (year_branch_idx - year_stem_idx) % 12 (no bazi object needed).
+        All 4 pillars carrying either the 剑枝 or 锋枝 receive the star. Source = '年支'.
+        """
+        _TIAN_GAN = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
+        _DI_ZHI   = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+        year_stem_idx   = _TIAN_GAN.index(self.gans[0])
+        year_branch_idx = _DI_ZHI.index(self.zhis[0])
+        xun_shou_branch = _DI_ZHI[(year_branch_idx - year_stem_idx) % 12]
+        targets = _JIAN_FENG_SHA_XUN.get(xun_shou_branch)
+        if not targets:
+            return
+        jian_branch, feng_branch = targets
+        for i in range(4):
+            if self.zhis[i] in (jian_branch, feng_branch):
+                self._add_shen(i, "剑锋煞", source="年支")
+
     # ========================================================================
     # SECTION 8: RELATIONAL STARS - INTER-PILLAR INTERACTIONS
     # ========================================================================
-
-    def _calc_lu_yuan_exchange(self):
-        """
-        禄元互换 (Lu Yuan Exchange)
-        Classical day‑hour combinations from San Ming Tong Hui:
-        - 戊申日 + 乙卯时
-        - 丁酉日 + 壬寅时
-        - 丙子日 + 癸巳时
-        - 庚子日 + 丁亥时
-        Adds '禄元互换' to both day and hour pillars when the exact pair appears.
-        """
-        # Valid day‑hour pairs (day pillar, hour pillar)
-        lu_yuan_pairs = [
-            ("戊申", "乙卯"),
-            ("丁酉", "壬寅"),
-            ("丙子", "癸巳"),
-            ("庚子", "丁亥"),
-        ]
-
-        day_pillar = self.gans[2] + self.zhis[2]  # 日柱
-        hour_pillar = self.gans[3] + self.zhis[3]  # 时柱
-
-        for day, hour in lu_yuan_pairs:
-            if day_pillar == day and hour_pillar == hour:
-                # Add star to both pillars
-                self._add_shen(2, "禄元互换", source="组合")
-                self._add_shen(3, "禄元互换", source="组合")
-                break  # Only one pair can match
-
-    def _calc_advancing_retreating_lu(self):
-        """
-        进退真禄 (Advancing/Retreating True Lu)
-        Based on San Ming Tong Hui, the order is critical:
-        - Advancing pairs (Day → Hour): 戊辰‑丁巳, 丙辰‑癸巳, 癸亥‑甲子, 壬戌‑癸亥
-        - Retreating pairs (Day → Hour): 戊午‑丁巳, 丙午‑癸巳, 癸丑‑甲子, 壬子‑癸亥
-
-        The star is added to both the day and hour pillars **only when** the day pillar
-        exactly matches the first element and the hour pillar exactly matches the second.
-        The reversed order does not count as Advancing or Retreating True Lu.
-        """
-        day_pillar = self.gans[2] + self.zhis[2]
-        hour_pillar = self.gans[3] + self.zhis[3]
-
-        advancing_pairs = [
-            ("戊辰", "丁巳"),
-            ("丙辰", "癸巳"),
-            ("癸亥", "甲子"),
-            ("壬戌", "癸亥"),
-        ]
-        retreating_pairs = [
-            ("戊午", "丁巳"),
-            ("丙午", "癸巳"),
-            ("癸丑", "甲子"),
-            ("壬子", "癸亥"),
-        ]
-
-        # Check advancing pairs (exact order)
-        for p1, p2 in advancing_pairs:
-            if day_pillar == p1 and hour_pillar == p2:
-                self._add_shen(2, "进真禄", source="组合")
-                self._add_shen(3, "进真禄", source="组合")
-                break  # Only one advancing pair can match
-
-        # Check retreating pairs (exact order)
-        for p1, p2 in retreating_pairs:
-            if day_pillar == p1 and hour_pillar == p2:
-                self._add_shen(2, "退真禄", source="组合")
-                self._add_shen(3, "退真禄", source="组合")
-                break  # Only one retreating pair can match
 
     # ========================================================================
     # SECTION 9: ADVANCED RELATIONAL STARS
@@ -1895,7 +1906,6 @@ class ShenShaCalculator:
         # YEAR BRANCH (Year系)
         self._calc_year_branch_shens()
         self._calc_yuan_chen()
-        self._calc_da_hao()
         self._calc_gou_jiao()
         self._calc_juan_she()
         self._calc_pi_ma()
@@ -1911,32 +1921,33 @@ class ShenShaCalculator:
 
         # DAY BRANCH (Day系)
         self._calc_day_year_branch_shens()
-        self._calc_bath_peach_blossom()
 
         # STEMS (Day + Year, 干系)
         self._calc_day_year_stem_shens()
         self._calc_xue_tang()
         self._calc_day_stem_only_shens()
+        self._calc_wen_yu_gui()
         self._calc_ci_guan()
 
         # DERIVED & SPECIAL
-        self._calc_fortune_virtue()
         self._calc_three_wonders()
         self._calc_self_lu()
-        self._calc_hidden_stem_revelations()
 
         # PILLAR & SEASONAL (Miscellaneous)
         self._calc_day_pillar_specials()
+        self._calc_yin_yang_cha_cuo()
         self._calc_four_wastes()
         self._calc_jin_shen()
         self._calc_shi_ling()
         self._calc_tian_luo_di_wang()
+        self._calc_zi_yi_sha()
+        self._calc_po_sha()
+        self._calc_gua_jian_sha()
+        self._calc_tian_huo_sha()
         self._calc_tong_zi_sha()
         self._calc_ge_jiao_sha()
-
-        # RELATIONAL (Inter-pillar interactions)
-        self._calc_lu_yuan_exchange()
-        self._calc_advancing_retreating_lu()
+        self._calc_tian_tu_sha()
+        self._calc_jian_feng_sha()
 
         # ADVANCED RELATIONAL
         self._calc_virtue_elegance()
