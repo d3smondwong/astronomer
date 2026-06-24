@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import Forest from '@mui/icons-material/Forest';
@@ -116,7 +116,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     '龙德': 'Dragon Virtue', '红鸾': 'Red Luan', '天喜': 'Heavenly Joy',
     '桃花': 'Peach Blossom', '墙内桃花': 'Inner Peach Blossom', '墙外桃花': 'Outer Peach Blossom',
     '孤辰': 'Lonely Star', '寡宿': "Widow Star",
-    '病符': 'Illness Star', '吊客': 'Mourning Guest',
+    '病符': 'Illness Star', '吊客': 'Mourning Guest', '天空': 'Sky Void',
     '丧门': 'Messenger of Death', '白虎': 'White Tiger', '卷舌': 'Curled Tongue',
     '披麻': 'Mourning Attire', '披头': 'Disheveled Head',
     '吟呻': 'Groaning Malefic', '破碎': 'Shattering Malefic', '白衣': 'White Garment Malefic',
@@ -143,15 +143,12 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     '天官贵人': 'Heavenly Officer Noble', '羊刃': 'Sheep Blade', '流霞': 'Blood Disaster Star',
     '勾煞': 'Hook Disaster', '绞煞': 'Twist Disaster',
     // Derived & special
-    '福禄双美': 'Double Fortune & Prosperity',
     '天上三奇': "Heaven's Three Wonders", '地下三奇': "Earth's Three Wonders",
     '人间三奇': "Human's Three Wonders",
     '寅命自禄': 'Yin Self-Lu', '卯命自禄': 'Mao Self-Lu',
     '申命自禄': 'Shen Self-Lu', '酉命自禄': 'You Self-Lu',
-    '巳中藏丙': 'Si Hidden Bing', '亥中藏壬': 'Hai Hidden Ren',
     // Pillar formations
     '阴阳差错': 'Yin-Yang Discord', '十恶大败': 'Ten Great Failures',
-    '魁罡': 'Kui Gang',
     '进神': 'Advancing Spirit', '六秀': 'Six Elegance', '八专': 'Eight Specialty',
     '九丑': 'Nine Ugly', '孤鸾': 'Lone Phoenix', '退气神煞': 'Retreating Qi Sha',
     '四废': 'Four Wastes', '金神': 'Golden Deity', '十灵': 'Ten Spirits',
@@ -161,7 +158,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
     '挂剑煞': 'Hanging Sword Star', '天火煞': 'Celestial Fire Star',
     '天屠煞': 'Heavenly Slaughter Star', '剑锋煞': 'Sword Blade Star',
     // Relational stars (can appear on pillars)
-    '禄元互换': 'Lu-Yuan Exchange', '德秀贵人': 'Virtue & Elegance Noble', '暗禄': 'Hidden Lu',
+    '德秀贵人': 'Virtue & Elegance Noble', '暗禄': 'Hidden Lu',
   };
 
   const tianGanHuaMap: Record<string, { 元素: string; 原五行: string; label: string }> = {};
@@ -169,9 +166,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
   for (const pillarName of ['年柱', '月柱', '日柱', '时柱']) {
     const pillar = siZhuMeta[pillarName];
     if (!pillar) continue;
-    if (pillar.合化信息?.现五行) {
-      tianGanHuaMap[pillarName] = { 元素: pillar.合化信息.现五行, 原五行: pillar.合化信息.原五行, label: `天干合·${pillar.合化信息.类型}` };
-    } else if (pillar.化气格信息?.现五行) {
+    if (pillar.化气格信息?.现五行) {
       tianGanHuaMap[pillarName] = { 元素: pillar.化气格信息.现五行, 原五行: pillar.化气格信息.原五行, label: `天干合·${pillar.化气格信息.类型}` };
     }
   }
@@ -361,7 +356,7 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
           {pillar.天干?.十神 && (() => {
             const displayChar  = pillar.天干.十神 === '日主' ? '我' : pillar.天干.十神;
             const displayLabel = pillar.天干.十神 === '日主' ? 'Self' : (SHI_SHEN_LABELS[pillar.天干.十神] ?? pillar.天干.十神);
-            const oldTenGod    = pillar.合化信息?.原天干十神 ?? pillar.化气格变化?.原天干十神;
+            const oldTenGod    = pillar.化气格变化?.原天干十神;
             const hasTransformation = oldTenGod != null && oldTenGod !== '' && oldTenGod !== pillar.天干.十神;
 
             const TenGodCard = ({ value, dimmed }: { value: string; dimmed?: boolean }) => {
@@ -1184,9 +1179,9 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
                     // Helper to build lifeStage, naYin, xunKong objects from pillar data
                     const buildLifeStage = (lifeStageData: any) => {
                       if (!lifeStageData) return null;
-                      // lifeStageData is { 星运: "养", 自坐: "衰" }
+                      // lifeStageData is { 日干: "养", 自坐: "衰" }
                       return {
-                        xingYun: { chinese: lifeStageData.星运, english: '' },
+                        xingYun: { chinese: lifeStageData.日干, english: '' },
                         ziZuo: { chinese: lifeStageData.自坐, english: '' }
                       };
                     };
