@@ -2,8 +2,8 @@
 LLM service — single entry point for all BaZi LLM analysis.
 
 Usage:
-    from src.llm.llm_service import analyse_bazi, LLMError
-    response = analyse_bazi(llm_friendly_data)
+    from src.llm.llm_service import llm_analyse_bazi, LLMError
+    response = llm_analyse_bazi(llm_friendly_data)
 """
 
 from pathlib import Path
@@ -100,7 +100,7 @@ def get_active_model() -> str:
     return f"{config.provider}/{config.model}"
 
 
-def analyse_bazi(llm_data: dict) -> LLMResponse:
+def llm_analyse_bazi(llm_data: dict) -> LLMResponse:
     """
     Run BaZi LLM analysis using the configured provider.
 
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     llm_friendly_data = AstroDataLLMFormatter(raw_data).format_for_llm()
 
     logger.info("=== Running LLM Analysis ===")
-    result = analyse_bazi(llm_friendly_data)
+    result = llm_analyse_bazi(llm_friendly_data)
 
     ov = result.life_overview
     logger.info(

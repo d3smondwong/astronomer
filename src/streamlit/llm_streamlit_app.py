@@ -17,7 +17,7 @@ from src.services.astronomer_data_aggregator import AstroDataAggregator
 from src.services.astronomer_data_llm_formatter import AstroDataLLMFormatter
 from src.astronomer_calculations.solar_lunar_time import get_true_solar_time
 from src.utils.logging import configure_logging, get_logger
-from src.llm.llm_service import analyse_bazi, get_active_model, LLMError
+from src.llm.llm_service import llm_analyse_bazi, get_active_model, LLMError
 from lunar_python import Solar
 
 # To run it
@@ -224,7 +224,7 @@ if analyze_button:
         try:
             with st.spinner("🤖 Consulting the LLM..."):
                 active_model = get_active_model()
-                llm_response = analyse_bazi(llm_friendly_data)
+                llm_response = llm_analyse_bazi(llm_friendly_data)
         except LLMError as e:
             logger.error("LLM analysis failed: %s", e)
             st.error(f"LLM error: {e}")

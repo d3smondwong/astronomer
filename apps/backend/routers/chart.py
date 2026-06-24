@@ -14,7 +14,7 @@ from apps.backend.data_models.insights import (
     Personality,
 )
 from apps.backend.orchestrator.astronomer_data_orchestrator import calculate_natal_chart
-from apps.backend.llm.llm_service import analyse_bazi, LLMError
+from apps.backend.llm.llm_service import llm_analyse_bazi, LLMError
 
 router = APIRouter(prefix="/v1/chart", tags=["chart"])
 
@@ -65,7 +65,7 @@ async def generate_insights(request: InsightsRequest) -> InsightsResponse:
     non-deterministic LLM step never blocks or breaks chart rendering.
     """
     try:
-        result = analyse_bazi(request.data)
+        result = llm_analyse_bazi(request.data)
     except LLMError as e:
         raise HTTPException(status_code=502, detail=f"LLM error: {str(e)}")
     except Exception as e:
