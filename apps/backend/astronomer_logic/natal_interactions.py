@@ -92,6 +92,14 @@ KEY FEATURES:
        Tier 3 (Virtual):    拱合, 拱会 (non-occupying; echo-only strength)
        Tier 4 (Frictional): 三刑 (四种: 无恩之刑/恃势之刑/无礼之刑/自刑), 六害, 六破, 暗合
 
+       Note on 四库全 (辰戌丑未): This formation is NOT a separate interaction type.
+       When all four earth vault branches are present in a chart, the two mutual clashes
+       (辰戌 六冲, 丑未 六冲) are registered as standard 六冲 interactions, and
+       _detect_vault_states emits four open vault entries (是否开库: True, mechanism: 冲开).
+       This is mechanically equivalent to 四库全 and is richer — it names the released
+       treasury stems (辛/癸/乙/丁), their ten gods, and seasonal states. Rule evaluators
+       that reference 辰戌丑未 should check vault states or branch presence directly.
+
     8. Heavenly Stem Interactions:
        天干合 (Harmony) locks stems only when adjacent (distance == 1, 合绊 or 合化),
        absorbing 克/冲 on those two stems. Non-adjacent 天干合 is 遥合 — attractive
@@ -274,6 +282,20 @@ clash_map = {
     "巳": "亥",
     "亥": "巳",
 }
+
+# 纳音关系 helper — generating cycle used for 冲处相生 classification
+_NA_YIN_SHENG: dict[str, str] = {"木": "火", "火": "土", "土": "金", "金": "水", "水": "木"}
+
+
+def _na_yin_rel(e1: str, e2: str) -> str:
+    """Return 相生, 相克, or 比和 for two 纳音 五行 elements (symmetric)."""
+    if not e1 or not e2:
+        return "未知"
+    if e1 == e2:
+        return "比和"
+    if _NA_YIN_SHENG.get(e1) == e2 or _NA_YIN_SHENG.get(e2) == e1:
+        return "相生"
+    return "相克"
 
 harm_map = {
     "子": "未",
@@ -462,21 +484,47 @@ _ELEMENT_CONTROLS: dict[str, str] = {
     "水": "土",
 }
 
-# Month branch → elements that are 旺 or 相 in that branch's season.
-# Used by _check_he_hua_conditions (Condition 2: 得令).
-_ZHI_WANG_XIANG_ELEMENTS = {
-    "寅": frozenset({"木", "火"}),
-    "卯": frozenset({"木", "火"}),
-    "辰": frozenset({"木", "火"}),  # fix: spring, no earth
-    "巳": frozenset({"火", "土"}),
-    "午": frozenset({"火", "土"}),
-    "未": frozenset({"火", "土"}),  # summer, 火旺土相 (same as 巳午)
-    "申": frozenset({"金", "水"}),
-    "酉": frozenset({"金", "水"}),
-    "戌": frozenset({"金", "水"}),  # fix: autumn, no earth
-    "亥": frozenset({"水", "木"}),
-    "子": frozenset({"水", "木"}),
-    "丑": frozenset({"水", "木"}),  # fix: winter, no earth
+
+# Month branch → element → 五行旺相休囚死 state.
+# Used to grade bond strength for non-day-master 合绊 pairs (月令状态).
+# 土 follows four-season rules (辰戌丑 are seasonal, not special 土旺 exceptions).
+_ZHI_ELEMENT_STATE: dict[str, dict[str, str]] = {
+    "寅": {"木": "旺", "火": "相", "水": "休", "金": "囚", "土": "死"},
+    "卯": {"木": "旺", "火": "相", "水": "休", "金": "囚", "土": "死"},
+    "辰": {"木": "旺", "火": "相", "水": "休", "金": "囚", "土": "死"},
+    "巳": {"火": "旺", "土": "相", "木": "休", "水": "囚", "金": "死"},
+    "午": {"火": "旺", "土": "相", "木": "休", "水": "囚", "金": "死"},
+    "未": {"火": "旺", "土": "相", "木": "休", "水": "囚", "金": "死"},
+    "申": {"金": "旺", "水": "相", "土": "休", "火": "囚", "木": "死"},
+    "酉": {"金": "旺", "水": "相", "土": "休", "火": "囚", "木": "死"},
+    "戌": {"金": "旺", "水": "相", "土": "休", "火": "囚", "木": "死"},
+    "亥": {"水": "旺", "木": "相", "金": "休", "土": "囚", "火": "死"},
+    "子": {"水": "旺", "木": "相", "金": "休", "土": "囚", "火": "死"},
+    "丑": {"水": "旺", "木": "相", "金": "休", "土": "囚", "火": "死"},
+}
+
+# Classical 化气月令: 化气元素 → valid month branches for 化气格 (day-master pairs).
+# Source: 三命通会·卷二·论十干化气. Primary = 三合局 month; secondary = one extra per text.
+# Used by Condition 2 (得令) when is_day_master_involved is True.
+_COMBO_HUA_MONTHS: dict[str, frozenset] = {
+    "土": frozenset(
+        {"辰", "戌", "丑", "未", "午"}
+    ),  # 辰戌丑未(primary) + 午(secondary)
+    "金": frozenset({"巳", "酉", "丑", "申"}),  # 巳酉丑(primary) + 申(secondary)
+    "水": frozenset({"申", "子", "辰", "亥"}),  # 申子辰(primary) + 亥(secondary)
+    "木": frozenset({"亥", "卯", "未", "寅"}),  # 亥卯未(primary) + 寅(secondary)
+    "火": frozenset({"寅", "午", "戌", "巳"}),  # 寅午戌(primary) + 巳(secondary)
+}
+
+# Classical 妒合 blockers: 化气元素 → stem that blocks transformation when present in
+# any pillar other than the two combining pillars ("有X字间之则不化").
+# Applies to all pairs (化气格 and 合化).
+_COMBO_DU_HE_BLOCKER: dict[str, str] = {
+    "土": "戊",  # 甲己化土: 有戊字间之则不化
+    "金": "甲",  # 乙庚化金: 有甲字间之则不化
+    "水": "丁",  # 丙辛化水: 柱有丁字不化
+    "木": "丙",  # 丁壬化木: 柱有丙字不化
+    "火": "己",  # 戊癸化火: 柱有己字不化
 }
 
 # Element → branches where it is 本气 (primary hidden stem).
@@ -509,6 +557,26 @@ UNGRATEFUL_PUNISHMENT = {"name": "无恩之刑", "universe": {"寅", "巳", "申
 BULLYING_PUNISHMENT = {"name": "恃势之刑", "universe": {"丑", "戌", "未"}}
 RUDE_PUNISHMENT = {"name": "无礼之刑", "universe": {"子", "卯"}}
 SELF_PUNISHMENT = {"name": "自刑", "universe": {"辰", "午", "酉", "亥"}}
+
+# ── Vault branches (库地) ────────────────────────────────────────────────────
+# Each vault stores a treasure stem (余气) that is released when the vault opens.
+# Opening triggers: 六冲, 恃势之刑, 自刑 (for 辰辰), or 透干 (stem revelation).
+_VAULT_BRANCHES: dict[str, dict] = {
+    "丑": {"element": "金", "releases": "辛", "label": "金库"},
+    "辰": {"element": "水", "releases": "癸", "label": "水库"},
+    "未": {"element": "木", "releases": "乙", "label": "木库"},
+    "戌": {"element": "火", "releases": "丁", "label": "火库"},
+}
+
+_VAULT_SEASONAL_TABLE: dict[str, dict[str, str]] = {
+    "spring": {"木": "旺", "火": "相", "土": "死", "金": "囚", "水": "休"},
+    "summer": {"木": "休", "火": "旺", "土": "相", "金": "死", "水": "囚"},
+    "autumn": {"木": "死", "火": "囚", "土": "休", "金": "旺", "水": "相"},
+    "winter": {"木": "相", "火": "死", "土": "囚", "金": "休", "水": "旺"},
+}
+_VAULT_SPRING_BR = frozenset({"寅", "卯", "辰"})
+_VAULT_SUMMER_BR = frozenset({"巳", "午", "未"})
+_VAULT_AUTUMN_BR = frozenset({"申", "酉", "戌"})
 
 
 # 比和 — classical same-element peer harmony.
@@ -717,7 +785,7 @@ STRENGTH_REMARKS = {
     ("PRIMARY_六合", "干支透合"): "目标地支已被六合占位，藏干潜合力被合力压制",
     ("PRIMARY_六冲", "干支透合"): "目标地支被六冲气散，藏干无力应合",
     ("STEM_天干合", "干支透合"): "源天干已与他干直合，贪合之下，藏干透合消融",
-("INTERACTION_STATE_拱合", "echo"): "虚局与实局同元素共鸣，气场压倒性主导",
+    ("INTERACTION_STATE_拱合", "echo"): "虚局与实局同元素共鸣，气场压倒性主导",
     ("INTERACTION_STATE_拱合", "suppressed"): "虚局被异元素结构压制，共鸣瓦解",
     ("INTERACTION_STATE_拱合", "turbid"): "虚局参与支遭冲，框架混杂衰减",
     ("INTERACTION_STATE_拱会", "echo"): "虚局与实局同元素共鸣，气场压倒性主导",
@@ -760,11 +828,14 @@ DEFAULT_STRENGTH = {
     ("残会", 1): "强势主流",
     ("残会", 2): "显著影响",
     ("拱会", 1): "强势主流",
-    ("天干合", "合化"):  "强势主流",   # full transformation (day master not involved)
-    ("天干合", "化气格"): "强势主流",  # true transformation (day master is one of the pair)
-    ("天干合", "假化"):  "显著影响",   # unstable — breaker element present
-    ("天干合", "合绊"):  "中等衰减",   # binding without transformation
-    ("天干合", "遥合"):  "大幅衰减",   # non-adjacent attraction
+    ("天干合", "合化"): "强势主流",  # full transformation (day master not involved)
+    (
+        "天干合",
+        "化气格",
+    ): "强势主流",  # true transformation (day master is one of the pair)
+    ("天干合", "假化"): "显著影响",  # unstable — breaker element present
+    ("天干合", "合绊"): "中等衰减",  # binding without transformation
+    ("天干合", "遥合"): "大幅衰减",  # non-adjacent attraction
     ("天干克", 1): "强势主流",
     ("天干克", 2): "中等衰减",
     ("天干克", 3): "大幅衰减",
@@ -960,8 +1031,6 @@ def extract_pillar_indices(pillar_indices_str: str) -> tuple:
         elif part in _PILLAR_ABBR_MAP:
             indices.append(_PILLAR_ABBR_MAP[part])
     return tuple(sorted(set(indices)))
-
-
 
 
 def is_valid_punishment(
@@ -1799,7 +1868,7 @@ def __reconcile_stemcontrol_after_stem_transformation(filtered: list) -> None:
 
         for item in registry.get_stem_by_type(["天干克", "天干冲"], idx):
             _apply_rule(item, lock_key)  # → 消融吸收
-            
+
         This scopes to the actor (idx), which means every 天干克 where that stem is either controller OR target — not just the克 between the two 合 partners. So a third-party stem controlling the transformed stem is also neutralised here.
 
     4. Pass 7 explicitly skips already-neutralised items — line 1817:
@@ -1808,7 +1877,7 @@ def __reconcile_stemcontrol_after_stem_transformation(filtered: list) -> None:
             continue
 
         By the time Pass 7 runs, any 天干克 involving a 合化/化气格 stem is already at 消融吸收 from Pass 2. Pass 7 never finds anything to act on.
-        """
+    """
 
     # Step 1 — build stem_combined: pillar → {element, 形态}
     stem_combined: dict[str, dict] = {}
@@ -1823,7 +1892,10 @@ def __reconcile_stemcontrol_after_stem_transformation(filtered: list) -> None:
             continue
         for pillar in item.get("组合明细", {}):
             if pillar not in stem_combined:  # first transformation wins
-                stem_combined[pillar] = {"element": transformed_element, "形态": he_form}
+                stem_combined[pillar] = {
+                    "element": transformed_element,
+                    "形态": he_form,
+                }
 
     if not stem_combined:
         return
@@ -1844,8 +1916,16 @@ def __reconcile_stemcontrol_after_stem_transformation(filtered: list) -> None:
         if p1 not in stem_combined and p2 not in stem_combined:
             continue  # neither stem transformed
 
-        eff1 = stem_combined[p1]["element"] if p1 in stem_combined else LunarUtil.WU_XING_GAN.get(combo[p1], "无")
-        eff2 = stem_combined[p2]["element"] if p2 in stem_combined else LunarUtil.WU_XING_GAN.get(combo[p2], "无")
+        eff1 = (
+            stem_combined[p1]["element"]
+            if p1 in stem_combined
+            else LunarUtil.WU_XING_GAN.get(combo[p1], "无")
+        )
+        eff2 = (
+            stem_combined[p2]["element"]
+            if p2 in stem_combined
+            else LunarUtil.WU_XING_GAN.get(combo[p2], "无")
+        )
 
         controller_pillar = item.get("主动方")
         ctrl_eff, tgt_eff = (eff1, eff2) if controller_pillar == p1 else (eff2, eff1)
@@ -2155,6 +2235,8 @@ class _PairCtx:
     pn_j: str
     combo: str
     detail: dict
+    na_yin_i: str = ""
+    na_yin_j: str = ""
 
 
 def _detect_earthly_branch_relations(
@@ -2181,6 +2263,8 @@ def _detect_earthly_branch_relations(
             pn_i: rooting[pn_i]["根基强度"],
             pn_j: rooting[pn_j]["根基强度"],
         }
+        ny_elem_i = ctx.na_yin_i[-1] if ctx.na_yin_i else ""
+        ny_elem_j = ctx.na_yin_j[-1] if ctx.na_yin_j else ""
         registry.register(
             {
                 "类型": "六冲",
@@ -2189,6 +2273,8 @@ def _detect_earthly_branch_relations(
                 "根基": root_detail,
                 "距离": distance,
                 "组合": combo,
+                "纳音关系": _na_yin_rel(ny_elem_i, ny_elem_j),
+                "同类": g_i == g_j,
             }
         )
     if six_he_map.get(b_i) == b_j:
@@ -2287,7 +2373,9 @@ def _detect_earthly_branch_punishments(
     )
 
 
-def _detect_pillar_interactions(ctx: _PairCtx, registry: InteractionRegistry, rooting: dict) -> None:
+def _detect_pillar_interactions(
+    ctx: _PairCtx, registry: InteractionRegistry, rooting: dict
+) -> None:
     """
     Register pillar-level interactions that require stem AND branch simultaneously:
     伏吟 (identical gan+zhi) and 天克地冲 (stem clash + branch clash).
@@ -2378,97 +2466,65 @@ def _detect_stem_hidden_stem_bonds(
                 break
 
 
-def _detect_stem_interference(gans: list, i: int, j: int) -> tuple[bool, str | None]:
+def _detect_stem_combination_interference(
+    gans: list, i: int, j: int, hua_element: str
+) -> tuple[bool, str | None]:
     """
-    Detect 争合 (competing) or 妒合 (jealous) interference for an adjacent pair (i,j).
+    Detect all interference that can block a 天干合 pair at positions (i, j).
     Returns (has_interference, interference_type).
 
-    Two Blocking Patterns:
-    ═══════════════════════════════════════════════════════════════════════════
+    Two classical blocking mechanisms, checked in priority order:
 
-    Pattern 1: 争合 (Competing Combination)
-    ───────────────────────────────────────
-    One stem appears TWICE in the chart, on both sides of its partner.
-    Structure: X - Y - X (the X on both ends "compete" for Y in the middle)
+    1. 妒合 (Classical Named Blocker)
+    ──────────────────────────────────
+    A specific third-party stem named in the classical texts appears in any pillar
+    other than the two combining pillars ("有X字间之则不化").
+    The blocker is combination-specific (see _COMBO_DU_HE_BLOCKER):
+        甲己化土 → 戊 blocks    乙庚化金 → 甲 blocks
+        丙辛化水 → 丁 blocks    丁壬化木 → 丙 blocks    戊癸化火 → 己 blocks
 
-    Example 1: [甲, 己, 甲, 丙]
-              Year Month Day Hour
-              0    1     2   3
+    Example: [戊, 己, 甲, 壬]  →  年戊 月己 日甲 时壬
+        Pair (1,2): 己-甲 (甲己化土). Blocker for 土 is 戊.
+        戊 sits at position 0 (non-combining) → 妒合 detected.
 
-        For pair (0,1): 甲-己
-        Check: Is there another 甲 at position 2?
-        Yes → 争合 detected (两个甲争夺己)
+    2. 争合 (Structural Competing Combination)
+    ──────────────────────────────────────────
+    One stem appears TWICE in the four pillars, flanking its partner on both sides:
+    X - Y - X. Both copies of X compete for Y, nullifying the combination.
 
-    Example 2: [己, 甲, 甲, 己]
-              0    1    2   3
-        For pair (1,2): 甲-甲 (invalid, same stem, skip)
-        NOT 争合
+    Example: [甲, 己, 甲, 丙]  →  年甲 月己 日甲 时丙
+        Pair (0,1): 甲-己. A second 甲 at position 2 flanks 己 → 争合 detected.
 
-    Pattern 2: 妒合 (Jealous/Blocking Combination)
-    ──────────────────────────────────────────────
-    A duplicate stem sits IMMEDIATELY OUTSIDE the combining pair, blocking it.
-    Structure: A - A - B (left duplicate) or A - B - B (right duplicate)
-
-    Example 1: [甲, 甲, 己, 丙]
-              0    1    2   3
-        For pair (1,2): 甲-己
-        Check: gans[0] == gans[1]? 甲 == 甲 ✓
-        → 妒合 detected (左侧甲妒忌，阻挠甲-己组合)
-
-    Example 2: [己, 甲, 甲, 丙]
-              0    1    2   3
-        For pair (0,1): 己-甲
-        Check: gans[2] == gans[1]? 甲 == 甲 ✓
-        → 妒合 detected (右侧甲妒忌，阻挠己-甲组合)
-
-    Example 3: [己, 甲, 丙, 丙]
-              0    1    2   3
-        For pair (0,1): 己-甲
-        Check right: gans[2] == gans[1]? 丙 == 甲 ✗
-        Check left: gans[-1] invalid
-        → NO interference
-    ═══════════════════════════════════════════════════════════════════════════
+    Non-example: [甲, 甲, 己, 丙]  →  年甲 月甲 日己 时丙
+        Pair (1,2): 甲-己. The two 甲 are adjacent (gap=1), not flanking己 →
+        no 争合. Classical 妒合 does not apply here either (甲 is not the 土 blocker).
     """
-    if i >= j or not (j == i + 1):  # Assume caller provides adjacent pair
+    if i >= j or not (j == i + 1):
         return False, None
 
+    # 1. Classical 妒合: named blocker stem in any non-combining pillar
+    blocker = _COMBO_DU_HE_BLOCKER.get(hua_element, "")
+    if blocker:
+        other_positions = [k for k in range(4) if k != i and k != j]
+        if any(gans[k] == blocker for k in other_positions):
+            return True, "妒合"
+
+    # 2. 争合: X-Y-X flanking pattern
     stem_a = gans[i]
     stem_b = gans[j]
-
-    # Check Pattern 1: 争合 (both sides competition)
-    # One stem appears exactly 2 times; the other appears exactly 1 time.
-    # The 2-time stem must be on both sides of the 1-time stem (middle).
     count_a = gans.count(stem_a)
     count_b = gans.count(stem_b)
 
     if count_a == 2 and count_b == 1:
-        competitor = stem_a
-        partner_stem = stem_b
-        positions = [k for k, val in enumerate(gans) if val == competitor]
-        if len(positions) == 2:
-            pos1, pos2 = sorted(positions)
-            # Check: exactly one position gap, and partner is in the middle
-            if pos2 - pos1 == 2 and gans[pos1 + 1] == partner_stem:
-                return True, "争合"
+        positions = [k for k, v in enumerate(gans) if v == stem_a]
+        pos1, pos2 = sorted(positions)
+        if pos2 - pos1 == 2 and gans[pos1 + 1] == stem_b:
+            return True, "争合"
     elif count_b == 2 and count_a == 1:
-        competitor = stem_b
-        partner_stem = stem_a
-        positions = [k for k, val in enumerate(gans) if val == competitor]
-        if len(positions) == 2:
-            pos1, pos2 = sorted(positions)
-            if pos2 - pos1 == 2 and gans[pos1 + 1] == partner_stem:
-                return True, "争合"
-
-    # Check Pattern 2: 妒合 (immediate outside duplicate)
-    # A duplicate of one combining stem sits immediately adjacent on the outside.
-
-    # Left side: check if gans[i-1] == gans[i]
-    if i > 0 and gans[i - 1] == gans[i] and (i - 1) != j:
-        return True, "妒合"
-
-    # Right side: check if gans[j+1] == gans[j]
-    if j + 1 < 4 and gans[j + 1] == gans[j] and (j + 1) != i:
-        return True, "妒合"
+        positions = [k for k, v in enumerate(gans) if v == stem_b]
+        pos1, pos2 = sorted(positions)
+        if pos2 - pos1 == 2 and gans[pos1 + 1] == stem_a:
+            return True, "争合"
 
     return False, None
 
@@ -2481,169 +2537,118 @@ def _check_he_hua_conditions(
     gans: list,
     zhis: list,
     rooting: dict,
-) -> tuple[str, dict]:
+) -> tuple[str, dict | None]:
     """
-    Classify an adjacent 天干合 pair by evaluating Five Conditions.
-    Caller pre-confirms adjacency (distance == 1).
+    Classify an adjacent 天干合 pair (distance == 1). Caller confirms adjacency.
 
-    Returns:
-        (he_form, detail) where he_form is one of:
-            "合化"   — All conditions pass; day master not involved → simple transformation
-            "化气格" — All conditions pass; day master is one of the pair → true transformation
-            "假化"   — Transformation passes but breaker element present → unstable
-            "合绊"   — One or more conditions fail → combination without transformation
+    Returns (he_form, detail | None):
 
-        Interference (争合/妒合) is NOT returned as he_form; it appears only in
-        detail["干扰"] field when detected.
+    he_form values:
+        "化气格"          — Day master 无根, all conditions pass. True transformation.
+        "假化"            — Day master 浅根, all conditions pass. Unstable transformation.
+        "合绊 - 妒合"     — Classical blocker stem present in a non-combining pillar.
+        "合绊 - 争合"     — Structural X-Y-X competing pair detected.
+        "合绊 - 非日主"   — Day master is not one of the combining stems.
+        "合绊 - 月令不符" — Month branch not in valid 化气 months (_COMBO_HUA_MONTHS).
+        "合绊 - 日主有根" — Day master is 中根 or 深根; too rooted to transform.
+        "合绊 - 化神无根" — No 本气 branch of the transformed element in the chart.
+        (遥合 is returned by the caller for distance > 1; this function is not reached.)
 
-    Five Conditions:
-    ═══════════════════════════════════════════════════════════════════════════
+    All 合绊 forms return a detail dict containing at minimum "干扰".
+    合绊 - 非日主 additionally carries seasonal bond-strength fields.
+    化气格 / 假化 return a full detail dict with transformation diagnostics.
 
-    1. Adjacency (distance == 1)
-       Pre-confirmed by caller.
+    Classical basis (三命通会·卷二·论十干化气):
+        • Transformation (化气) is only defined when the day master is one of the
+          two combining stems. Non-day-master pairs produce 合绊 - 非日主.
+        • 化气格: day master 无根 (completely severs from its original element).
+        • 假化: day master 浅根 (light root remaining — incomplete severance).
+        • 得令: month branch must be in _COMBO_HUA_MONTHS. Generic 五行旺相 not used.
+        • 妒合/争合: delegated to _detect_stem_combination_interference().
 
-    2. 得令 (Seasonal Support)
-       Transformed element must be 旺 or 相 in the month branch.
-       Classical rule: month dominance is required (no fallback conditions).
+    Detail dict (all 合绊 forms):
+        "干扰":      "妒合"|"争合"|"无争合妒合"
 
-    3. 无根/极弱 (Root Weakness)
-       Two paths depending on day master involvement:
+    Detail dict (合绊 - 非日主, additionally):
+        "月支":      str                      — month branch evaluated
+        "得令":      bool                     — True if 月令状态 is 旺 or 相
+        "月令状态":  "旺"|"相"|"休"|"囚"|"死"  — seasonal state of the transformed element;
+                                                旺/相 = tight bond, 休/囚/死 = loose
 
-       Path A (day master involved):
-           - Day master must be 浅根 or 无根
-           - Partner stem's root tier is ignored
-           - Mode: "日主极弱"
-
-       Path B (general transformation):
-           - Both stems must avoid 深根, OR
-           - Month branch contains 本气 of transformed element (classical concession)
-           - Mode: "通用合化"
-
-    4. 无妒合/争合 (No Interference)
-       No duplicate stem of either combining stem elsewhere in the 4 pillars.
-       Evaluated via _detect_stem_interference():
-           - 争合: One stem appears on both sides of partner (X-Y-X pattern)
-           - 妒合: Duplicate sits immediately outside the pair (A-A-B pattern)
-       When interference detected, transformation FAILS → 合绊, with
-       interference_type stored in detail["干扰"].
-
-    5. 化神有根 (Transformed Element Rooting)
-       At least one 本气 branch of the transformed element exists in the 4 pillars.
-
-    假化 Check (化气格 only):
-       If day master path succeeds, check for breaker element (the element that
-       controls the transformed element via 五行相克). If breaker's 本气 exists
-       in the branches, transformation is unstable → 假化. Otherwise → 化气格.
-
-    Detail Dict Structure:
-    ═══════════════════════════════════════════════════════════════════════════
-    Always includes:
-        "合化元素": transformed element (e.g. "土")
-        "得令": {"通过": bool, "月支": branch}
-        "两干极弱": {"通过": bool, "模式": str, pillar1+"根基": tier, pillar2+"根基": tier}
-        "化神有根": {"通过": bool, "锚支": {"月柱": "巳", "时柱": "午"}}
-        "干扰": interference_type ("争合" | "妒合" | "无争合妒合")
-
-    For 化气格/假化 only:
-        "转化品质": {"品质": "假化", "破坏元素": breaker, "破坏支": {"年柱": "申"}}
-                   OR "无破坏元素" (if not 假化)
+    Detail dict (化气格 / 假化):
+        "合化元素":  str           — transformed element (e.g. "土")
+        "得令":      {月支}
+        "日主根基":  {根基强度}
+        "化神有根":  {锚支}
+        "干扰":      "无争合妒合"  — always clear when this path is reached
+        "转化品质":  {品质, 日主根基强度}
     """
     hua_element = _STEM_COMBINE_ELEMENT.get(g_i, "")
     if not hua_element:
-        return "合绊", {"原因": "不构成天干合"}
+        return "合绊 - 非天干合", None
 
-    is_day_master_involved = i == 2 or j == 2  # Day master involved
+    is_day_master_involved = i == 2 or j == 2
+
+    # Condition 4: interference — applies to all pairs
+    interference, interference_type = _detect_stem_combination_interference(
+        gans, i, j, hua_element
+    )
+
+    # Non-day-master pairs never transform classically — always 合绊 - 非日主.
+    # 月令状态 grades how tightly the two stems are coupled this month:
+    # 旺/相 → seasonally supported (hard to break); 休/囚/死 → loose, easily overridden.
+    if not is_day_master_involved:
+        reason = interference_type if interference else "非日主"
+        state = _ZHI_ELEMENT_STATE.get(zhis[1], {}).get(hua_element, "死")
+        return f"合绊 - {reason}", {
+            "月支": zhis[1],
+            "得令": state in {"旺", "相"},
+            "月令状态": state,
+            "干扰": interference_type if interference else "无争合妒合",
+        }
+
+    # ── Day-master path ────────────────────────────────────────────────────
+    # Condition 2: classical month list for 化气格
+    c2 = zhis[1] in _COMBO_HUA_MONTHS.get(hua_element, frozenset())
+
+    # Condition 3: day master root depth
+    # 无根/浅根 → can transform (quality differs); 中根/深根 → too rooted → 合绊
+    dm_root = rooting.get(_PILLAR_NAMES_CN[2], {}).get("根基强度", "无根")
+    c3 = dm_root in {"浅根", "无根"}
+
+    # Condition 5: transformed element needs 本气 anchor in branches
     ben_qi_zhi = _ELEMENT_BEN_QI_ZHI.get(hua_element, frozenset())
-    ben_qi_branches = {_PILLAR_NAMES_CN[k]: z for k, z in enumerate(zhis) if z in ben_qi_zhi}
-
-    # Condition 2: classical – only month branch matters
-    in_season = hua_element in _ZHI_WANG_XIANG_ELEMENTS.get(zhis[1], frozenset())
-    c2 = in_season  # no fallback to branch count
-
-    # Condition 3: 极弱 (root weakness)
-    root_i = rooting.get(_PILLAR_NAMES_CN[i], {}).get("根基强度", "无根")
-    root_j = rooting.get(_PILLAR_NAMES_CN[j], {}).get("根基强度", "无根")
-
-    if is_day_master_involved:
-        # Day master must be 浅根 or 无根
-        dm_root = root_i if i == 2 else root_j
-        c3 = dm_root in {"浅根", "无根"}
-        c3_mode = "日主极弱"
-    else:
-        # General transformation: both stems must be 浅根 or 无根 (极弱) to surrender
-        # their original element. 中根 retains enough grounding to resist transformation.
-        # Exception: if the month branch is a 本气 of the transformed element, seasonal
-        # compulsion overrides root strength — even 中根/深根 stems must transform.
-        both_weak = root_i in {"浅根", "无根"} and root_j in {"浅根", "无根"}
-        month_ben_qi = zhis[1] in ben_qi_zhi
-        c3 = both_weak or month_ben_qi
-        c3_mode = "通用合化"
-
-    # Condition 5: 化神有根
+    ben_qi_branches = {
+        _PILLAR_NAMES_CN[k]: z for k, z in enumerate(zhis) if z in ben_qi_zhi
+    }
     c5 = bool(ben_qi_branches)
 
-    # Condition 4: 无妒合/争合 (interference detection)
-    interference, interference_type = _detect_stem_interference(gans, i, j)
-
-    # Transformation possible only if all conditions (2,3,5) pass and no interference (4)
     can_transform = c2 and c3 and c5 and not interference
-
     if not can_transform:
-        detail = {
-            "合化元素": hua_element,
-            "得令": {"通过": c2, "月支": zhis[1]},
-            "两干极弱": {
-                "通过": c3,
-                "模式": c3_mode,
-                _PILLAR_NAMES_CN[i] + "根基": root_i,
-                _PILLAR_NAMES_CN[j] + "根基": root_j,
-            },
-            "化神有根": {"通过": c5, "锚支": ben_qi_branches},
-            "干扰": interference_type if interference else "无争合妒合",
+        if interference:
+            reason = interference_type
+        elif not c2:
+            reason = "月令不符"
+        elif not c3:
+            reason = "日主有根"
+        else:
+            reason = "化神无根"
+        return f"合绊 - {reason}", {
+            "干扰": interference_type if interference else "无争合妒合"
         }
-        return "合绊", detail
 
-    # Transformation possible
-    if is_day_master_involved:
-        breaker = _ELEMENT_CONTROLS.get(hua_element, "")
-        breaker_ben_qi = _ELEMENT_BEN_QI_ZHI.get(breaker, frozenset())
-        has_breaker = any(z in breaker_ben_qi for z in zhis)
-        he_form = "假化" if has_breaker else "化气格"
-        detail = {
-            "合化元素": hua_element,
-            "得令": {"通过": c2, "月支": zhis[1]},
-            "两干极弱": {
-                "通过": c3,
-                "模式": c3_mode,
-                _PILLAR_NAMES_CN[i] + "根基": root_i,
-                _PILLAR_NAMES_CN[j] + "根基": root_j,
-            },
-            "化神有根": {"通过": c5, "锚支": ben_qi_branches},
-            "干扰": interference_type if interference else "无争合妒合",
-            "转化品质": (
-                {
-                    "品质": he_form,
-                    "破坏元素": breaker,
-                    "破坏支": {_PILLAR_NAMES_CN[k]: zhis[k] for k in range(4) if zhis[k] in breaker_ben_qi},
-                }
-                if he_form == "假化"
-                else "无破坏元素"
-            ),
-        }
-        return he_form, detail
-    else:
-        return "合化", {
-            "合化元素": hua_element,
-            "得令": {"通过": c2, "月支": zhis[1]},
-            "两干极弱": {
-                "通过": c3,
-                "模式": c3_mode,
-                _PILLAR_NAMES_CN[i] + "根基": root_i,
-                _PILLAR_NAMES_CN[j] + "根基": root_j,
-            },
-            "化神有根": {"通过": c5, "锚支": ben_qi_branches},
-            "干扰": interference_type if interference else "无争合妒合",
-        }
+    # All conditions pass — quality determined by day master root depth
+    # 无根 = fully severed from original element → true transformation
+    # 浅根 = light root remains → false/unstable transformation
+    he_form = "化气格" if dm_root == "无根" else "假化"
+    return he_form, {
+        "合化元素": hua_element,
+        "得令": {"通过": True, "月支": zhis[1]},
+        "日主根基": {"根基强度": dm_root},
+        "化神有根": {"锚支": ben_qi_branches},
+        "干扰": interference_type if interference else "无争合妒合",
+        "转化品质": {"品质": he_form, "日主根基强度": dm_root},
+    }
 
 
 def _detect_heavenly_stem_interactions(
@@ -2731,6 +2736,7 @@ def _detect_pairwise(
     registry: InteractionRegistry,
     rooting: dict,
     ten_gods_hidden: dict,
+    na_yins: list | None = None,
 ) -> None:
     """
     Detect all pairwise branch and stem interactions.
@@ -2769,6 +2775,8 @@ def _detect_pairwise(
                 pn_j=_PILLAR_NAMES_CN[j],
                 combo=f"{_PILLAR_NAMES_CN[i]}-{_PILLAR_NAMES_CN[j]}",
                 detail={_PILLAR_NAMES_CN[i]: zhis[i], _PILLAR_NAMES_CN[j]: zhis[j]},
+                na_yin_i=na_yins[i] if na_yins else "",
+                na_yin_j=na_yins[j] if na_yins else "",
             )
             _detect_earthly_branch_relations(ctx, registry, rooting)
             _detect_earthly_branch_punishments(ctx, registry, zhis)
@@ -2797,6 +2805,7 @@ _OUTPUT_STRIP_KEYS = {
     "组合",
     "混杂",
     "日柱特殊",
+    "距离",
 }
 
 
@@ -2813,6 +2822,129 @@ def _build_pillar_dynamics(filtered: list) -> list:
                 item["距离"], f"未知距离 ({item['距离']})"
             )
     return filtered
+
+
+def _detect_vault_states(pillars: dict, pillar_dynamics: list[dict]) -> list[dict]:
+    """
+    For each vault branch (丑辰未戌) present in the chart, emit one state object
+    consolidating all active opening mechanisms.
+
+    Opening mechanisms:
+      - 冲开: 六冲 or 天克地冲 on the vault branch (强势主流/显著影响 only)
+      - 刑开: 恃势之刑 or 自刑 on the vault branch (强势主流/显著影响 only)
+      - 透干开: treasure stem appears on any heavenly stem
+
+    Classical basis: "透干为库，不透为墓" — 透干 alone is sufficient to open.
+
+    四库全 (辰戌丑未 all four earth vault branches present):
+    This function implicitly handles the classical 四库全 concept without needing a
+    dedicated interaction type. When all four branches are present:
+      - 辰戌 form a 六冲 → both vaults open via 冲开
+      - 丑未 form a 六冲 → both vaults open via 冲开
+    All four entries will show 是否开库: True, releasing their treasury stems
+    (辰→癸, 戌→丁, 丑→辛, 未→乙). This is more precise than a flat "土局 present"
+    flag: it captures which stems are released and their seasonal states.
+    """
+    month_branch = pillars["月柱"]["地支"]
+    if month_branch in _VAULT_SPRING_BR:
+        season = "spring"
+    elif month_branch in _VAULT_SUMMER_BR:
+        season = "summer"
+    elif month_branch in _VAULT_AUTUMN_BR:
+        season = "autumn"
+    else:
+        season = "winter"
+    seasonal_states = _VAULT_SEASONAL_TABLE[season]
+
+    CLASH_TYPES = {"六冲", "天克地冲"}
+    PENALTY_TYPES = {"恃势之刑", "自刑"}
+    SUFFICIENT = {"强势主流", "显著影响"}
+
+    # Pre-scan pillar_dynamics for clash/penalty hits on vault branches
+    clash_hits: dict[str, set[str]] = {}
+    for ix in pillar_dynamics:
+        if ix.get("强度") not in SUFFICIENT:
+            continue
+        ix_type = ix.get("类型")
+        if ix_type not in CLASH_TYPES | PENALTY_TYPES:
+            continue
+        form = "冲开" if ix_type in CLASH_TYPES else "刑开"
+        for branch in ix.get("组合明细", {}).values():
+            if branch in _VAULT_BRANCHES:
+                clash_hits.setdefault(branch, set()).add(form)
+
+    all_stems = {p: pillars[p]["天干"] for p in _PILLAR_NAMES_CN}
+
+    results = []
+    for pillar_name in _PILLAR_NAMES_CN:
+        branch = pillars[pillar_name]["地支"]
+        if branch not in _VAULT_BRANCHES:
+            continue
+
+        info = _VAULT_BRANCHES[branch]
+        treasure_stem = info["releases"]
+        treasure_elem = info["element"]
+        seasonal_state = seasonal_states.get(treasure_elem, "休")
+
+        revealing_pillar = next(
+            (p for p, s in all_stems.items() if s == treasure_stem), None
+        )
+        tou_gan = {
+            "是否透干": revealing_pillar is not None,
+            "透干柱位": revealing_pillar,
+        }
+
+        mechanisms: list[str] = sorted(clash_hits.get(branch, set()))
+        if revealing_pillar:
+            mechanisms.append("透干开")
+
+        is_open = bool(mechanisms)
+
+        treasure_ten_god = pillars[pillar_name]["藏干"].get("余气", {}).get("十神", "")
+
+        entry: dict = {
+            "库柱": pillar_name,
+            "库支": branch,
+            "标签": info["label"],
+            "元素": treasure_elem,
+            "释放": treasure_stem,
+            "释放十神": treasure_ten_god,
+            "是否开库": is_open,
+            "开库机制": mechanisms,
+            "透干": tou_gan,
+            "季节状态": seasonal_state,
+        }
+
+        if not is_open:
+            bullying = BULLYING_PUNISHMENT["universe"]
+            xing_kai = (
+                sorted(bullying - {branch})
+                if branch in bullying
+                else (["辰"] if branch == "辰" else [])
+            )
+            entry["开库条件"] = {
+                "冲开": clash_map[branch],
+                "刑开": xing_kai,
+                "透干": treasure_stem,
+            }
+
+        if is_open:
+            mech_str = "、".join(mechanisms)
+            tou_str = (
+                f"，{treasure_stem}透于{revealing_pillar}" if revealing_pillar else ""
+            )
+            entry["备注"] = (
+                f"{branch}{info['label']}已开：{mech_str}{tou_str}，库气{seasonal_state}"
+            )
+        else:
+            entry["备注"] = (
+                f"{branch}{info['label']}藏而未开：{treasure_stem}（{treasure_elem}）"
+                f"深藏不出，库气{seasonal_state}"
+            )
+
+        results.append(entry)
+
+    return results
 
 
 def get_natal_interactions(pillars: dict, void: dict) -> dict:
@@ -2833,6 +2965,7 @@ def get_natal_interactions(pillars: dict, void: dict) -> dict:
     """
     gans = [pillars[k]["天干"] for k in _PILLAR_NAMES_CN]
     zhis = [pillars[k]["地支"] for k in _PILLAR_NAMES_CN]
+    na_yins = [pillars[k].get("纳音", "") for k in _PILLAR_NAMES_CN]
 
     # ── Rooting & ten gods — already in pillars (merged by orchestrator) ──
     rooting = {k: {"根基强度": pillars[k]["根基强度"]} for k in _PILLAR_NAMES_CN}
@@ -2847,7 +2980,7 @@ def get_natal_interactions(pillars: dict, void: dict) -> dict:
     # ── Detection ─────────────────────────────────────────────────────────
     _detect_san_hui(zhis, registry)
     _detect_san_he(zhis, registry)
-    _detect_pairwise(zhis, gans, registry, rooting, ten_gods_hidden)
+    _detect_pairwise(zhis, gans, registry, rooting, ten_gods_hidden, na_yins)
 
     # ── Five-pass priority filter ──
     filtered = apply_bazi_master_priority(registry)
@@ -2866,8 +2999,12 @@ def get_natal_interactions(pillars: dict, void: dict) -> dict:
     # ── Output assembly ───────────────────────────────────────────────────
     pillar_dynamics = _build_pillar_dynamics(filtered)
 
+    # ── Vault state detection ─────────────────────────────────────────────
+    # One entry per vault branch: consolidates clash, penalty, and 透干 mechanisms.
+    vault_states = _detect_vault_states(pillars, pillar_dynamics)
+
     summary: list[str] = []
-    for item in filtered:
+    for item in pillar_dynamics:
         if item.get("强度") not in ("强势主流", "显著影响"):
             continue
         combo = item.get("组合明细", {})
@@ -2878,6 +3015,7 @@ def get_natal_interactions(pillars: dict, void: dict) -> dict:
         "作用": {
             "关系总览": summary,
             "柱位动态": pillar_dynamics,
+            "库位状态": vault_states,
         },
     }
 
