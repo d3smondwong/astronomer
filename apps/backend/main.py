@@ -4,6 +4,13 @@ FastAPI app for Astronomer / Celestial Dawn BaZi calculation backend.
 Runs at localhost:8000 in development, Cloud Run in production.
 """
 
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load the repo-root .env (LLM API keys etc.) before any router/provider imports
+# read os.environ. Explicit path so it works regardless of the working directory.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apps.backend.routers import chart
