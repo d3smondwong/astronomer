@@ -1,15 +1,25 @@
 /**
  * Next.js Route Handler: POST /api/chart
  *
- * Accepts birth data from the client, calls FastAPI /v1/chart/natal,
- * and returns the chart JSON with appropriate cache headers.
+ * Accepts birth data, computes (or reuses) the natal chart and its LLM insights,
+ * caches both in Firestore (chartCache / insightsCache), and writes a profile
+ * document that references them by chartKey.
  *
- * In Phase 2, this will verify Firebase ID tokens and cache results in Firestore.
+ * In Phase 2, this will additionally verify Firebase ID tokens.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchNatalChart, BirthInputPayload, ChartResponse } from '@/lib/fastApiClient';
+import {
+  fetchNatalChart,
+  fetchInsights,
+  BirthInputPayload,
+  ChartResponse,
+} from '@/lib/fastApiClient';
 import { createProfile, type ProfileRecord } from '@/lib/profilesDb';
+import { chartCacheKey } from '@/lib/cacheKey';
+import { verifyIdToken } from '@/lib/firebaseAdmin';
+import { getCachedChart, setCachedChart } from '@/lib/chartCacheDb';
+import { getCachedInsights, setCachedInsights } from '@/lib/insightsCacheDb';
 
 interface ChartRequestBody {
   year: number;
@@ -21,9 +31,9 @@ interface ChartRequestBody {
   latitude: number;
   longitude: number;
   use_solar_time_correction?: boolean;
-  // For Phase 2: user metadata
   profileName?: string;
   birthLocation?: string;
+  skipInsights?: boolean;
 }
 
 interface ChartResponseBody {
@@ -33,6 +43,13 @@ interface ChartResponseBody {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
+    // Extract userId from Bearer token (optional — profiles created without auth are anonymous).
+    const authHeader = request.headers.get('Authorization');
+    let userId: string | undefined;
+    if (authHeader?.startsWith('Bearer ')) {
+      userId = (await verifyIdToken(authHeader.slice(7))) ?? undefined;
+    }
+
     // Parse request body
     const body: ChartRequestBody = await request.json();
 
@@ -66,14 +83,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       use_solar_time_correction: body.use_solar_time_correction ?? true,
     };
 
-    // Call FastAPI backend
-    const baziChart = await fetchNatalChart(birthInput);
+    // Deterministic key — identical births reuse the same cached chart/insights.
+    const chartKey = chartCacheKey(birthInput);
 
-    // Generate profile ID (in Phase 2, this will be a Firestore doc ID)
+    // chartCache: get-or-compute the deterministic natal chart.
+    let baziChart: ChartResponse;
+    const cachedChart = await getCachedChart(chartKey);
+    if (cachedChart) {
+      baziChart = { lunar_date: '', gender: '', zodiac: '', data: cachedChart.data };
+    } else {
+      baziChart = await fetchNatalChart(birthInput);
+      await setCachedChart(chartKey, baziChart.data);
+    }
+
+    // insightsCache: only generate LLM insights for authenticated users.
+    if (!body.skipInsights && userId && !(await getCachedInsights(chartKey))) {
+      try {
+        const insights = await fetchInsights(baziChart.data);
+        await setCachedInsights(chartKey, insights);
+      } catch (insightsError) {
+        console.error('Error generating insights (non-fatal):', insightsError);
+      }
+    }
+
+    // Generate profile ID (Firestore doc id)
     const profileId = `profile_${Date.now()}`;
 
-    // Store profile metadata in local JSON database
-    // In Phase 2, this will be replaced by Firestore
     const profileRecord: ProfileRecord = {
       id: profileId,
       name: body.profileName || `Profile ${new Date().toLocaleDateString()}`,
@@ -90,10 +125,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         use_solar_time_correction: body.use_solar_time_correction ?? true,
       },
       createdAt: new Date().toISOString(),
+      chartKey,
+      ...(userId && { userId }),
     };
 
-    // Write profile to local database
-    createProfile(profileRecord);
+    // Write profile document (references chart/insights by chartKey)
+    await createProfile(profileRecord);
 
     // Return response with cache headers
     return NextResponse.json(

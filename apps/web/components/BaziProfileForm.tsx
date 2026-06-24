@@ -1,6 +1,6 @@
 'use client';
 
-import React, { forwardRef, useImperativeHandle } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useEffect } from 'react';
 import dayjs from 'dayjs';
 import { Form, Input, DatePicker, TimePicker, Radio, Switch, Button, Tooltip } from 'antd';
 import { Calendar, Clock, Info } from 'lucide-react';
@@ -8,6 +8,7 @@ import PlacesAutocompleteInput from '@/components/PlacesAutocompleteInput';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
+import { useAuth } from '@/lib/authContext';
 
 const TimePickerWithSolar = ({
   value,
@@ -58,10 +59,26 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
     const [loading, setLoading] = React.useState(false);
     const { language } = useLanguage();
     const tr = translations.form;
+    const { user, openAuthModal } = useAuth();
+
+    // Stores form values when guest tries to submit — auto-submitted once they sign in
+    const pendingValuesRef = useRef<any>(null);
+    const prevUserUidRef = useRef<string | null>(null);
 
     useImperativeHandle(ref, () => ({
-      reset: () => { form.resetFields(); setLoading(false); },
+      reset: () => { form.resetFields(); setLoading(false); pendingValuesRef.current = null; },
     }));
+
+    // When user transitions from null → signed-in with pending values, auto-submit
+    useEffect(() => {
+      const currentUid = user?.uid ?? null;
+      if (prevUserUidRef.current === null && currentUid !== null && pendingValuesRef.current !== null) {
+        const values = pendingValuesRef.current;
+        pendingValuesRef.current = null;
+        void submitChart(values, false);
+      }
+      prevUserUidRef.current = currentUid;
+    }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const loadDemoProfile = () => {
       form.setFieldsValue({
@@ -80,13 +97,12 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
       form.setFieldsValue({ location: address, latitude: String(lat), longitude: String(lng) });
     };
 
-    const onFinish = async (values: any) => {
+    const submitChart = async (values: any, skipInsights: boolean) => {
       setLoading(true);
       try {
-        // Build birth input for FastAPI
         const birthInput = {
           year: values.dob.year(),
-          month: values.dob.month() + 1, // dayjs months are 0-indexed
+          month: values.dob.month() + 1,
           day: values.dob.date(),
           hour: values.time.hour(),
           minute: values.time.minute(),
@@ -96,12 +112,16 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
           use_solar_time_correction: values.solarCorrection ?? true,
           profileName: values.fullName,
           birthLocation: values.location,
+          skipInsights,
         };
 
-        // POST to /api/chart (Next.js Route Handler)
+        const idToken = user ? await user.getIdToken() : null;
         const response = await fetch('/api/chart', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(idToken && { Authorization: `Bearer ${idToken}` }),
+          },
           body: JSON.stringify(birthInput),
         });
 
@@ -113,13 +133,30 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
         const { profileId } = await response.json();
         toast.success(tr.successGenerated[language]);
         form.resetFields();
-        setLoading(false);
         onSuccess(profileId);
       } catch (error) {
         console.error('Error generating Bazi chart:', error);
         toast.error(tr.errorGenerated[language]);
+      } finally {
         setLoading(false);
       }
+    };
+
+    const onFinish = async (values: any) => {
+      if (!user) {
+        // Guest: store values and open auth modal with skip option
+        pendingValuesRef.current = values;
+        openAuthModal({
+          showSkip: true,
+          onSkip: () => {
+            const v = pendingValuesRef.current;
+            pendingValuesRef.current = null;
+            if (v) void submitChart(v, true);
+          },
+        });
+        return;
+      }
+      await submitChart(values, false);
     };
 
     const labelClass = 'text-sm uppercase tracking-widest font-serif text-bronze-muted/60';

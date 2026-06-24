@@ -12,6 +12,13 @@ graphify-out/
 # Node modules
 node_modules/
 
+# Firebase emulator local persistence (dev scratch state, machine-local)
+apps/web/emulator-data/*
+!apps/web/emulator-data/.gitkeep
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
 # Next
 .next/
 

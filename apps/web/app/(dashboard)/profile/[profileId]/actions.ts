@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation';
 
 export async function deleteProfileAction(profileId: string) {
   try {
-    deleteProfile(profileId);
+    await deleteProfile(profileId);
     revalidatePath('/(dashboard)');
     redirect('/');
   } catch (error) {

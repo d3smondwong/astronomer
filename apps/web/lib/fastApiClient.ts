@@ -28,6 +28,20 @@ export interface ChartResponse {
   is_full?: boolean;
 }
 
+export interface Personality {
+  archetype: string;
+  element: string;
+  key_traits: string[];
+  strengths: string[];
+  areas_to_note: string[];
+  lucky_colors: string[];
+  lucky_numbers: string[];
+}
+
+export interface InsightsResponse {
+  personality: Personality;
+}
+
 /**
  * Fetch natal chart (basic 4 pillars).
  */
@@ -45,6 +59,31 @@ export async function fetchNatalChart(input: BirthInputPayload): Promise<ChartRe
   if (!res.ok) {
     const error = await res.text();
     throw new Error(`FastAPI /v1/chart/natal failed: ${res.status} ${error}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Generate personality insights from an already-computed natal chart.
+ *
+ * Pass the `data` object returned by fetchNatalChart. Kept separate from chart
+ * calculation so the slow LLM step never blocks chart rendering.
+ */
+export async function fetchInsights(chartData: Record<string, any>): Promise<InsightsResponse> {
+  const res = await fetch(`${FASTAPI_URL}/v1/chart/insights`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(FASTAPI_BEARER_TOKEN ? { Authorization: `Bearer ${FASTAPI_BEARER_TOKEN}` } : {}),
+    },
+    body: JSON.stringify({ data: chartData }),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    const error = await res.text();
+    throw new Error(`FastAPI /v1/chart/insights failed: ${res.status} ${error}`);
   }
 
   return res.json();

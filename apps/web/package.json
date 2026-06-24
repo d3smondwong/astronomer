@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "emulators": "firebase emulators:start --only firestore,auth --import ./emulator-data --export-on-exit ./emulator-data",
+    "dev:emulated": "firebase emulators:exec --only firestore,auth --import ./emulator-data --export-on-exit ./emulator-data \"next dev\""
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -21,6 +23,8 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.20",
+    "firebase": "^12.15.0",
+    "firebase-admin": "^14.0.0",
     "lucide-react": "^1.8.0",
     "lunar-javascript": "^1.7.7",
     "motion": "^12.38.0",
@@ -45,6 +49,7 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^9.20.0",
     "eslint-config-next": "^16.2.3",
+    "firebase-tools": "^15.22.1",
     "postcss": "^8.5.1",
     "tailwindcss": "^4.2.0",
     "typescript": "^5.8.2"

@@ -4,6 +4,7 @@ import "@/styles/globals.css";
 import "react-day-picker/dist/style.css";
 import { ConfigProvider } from 'antd';
 import { LanguageProvider } from '@/lib/languageContext';
+import { ClientRoot } from '@/components/ClientRoot';
 
 const antdTheme = {
   token: {
@@ -46,7 +47,9 @@ export default function RootLayout({
       <body className="antialiased" suppressHydrationWarning>
         <ConfigProvider theme={antdTheme}>
           <LanguageProvider>
-            {children}
+            <ClientRoot>
+              {children}
+            </ClientRoot>
           </LanguageProvider>
         </ConfigProvider>
       </body>

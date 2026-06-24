@@ -7,9 +7,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { readProfiles, createProfile, type ProfileRecord } from '@/lib/profilesDb';
+import { verifyIdToken } from '@/lib/firebaseAdmin';
 
-export async function GET(): Promise<NextResponse> {
-  const profiles = readProfiles();
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const authHeader = request.headers.get('Authorization');
+  let userId: string | undefined;
+  if (authHeader?.startsWith('Bearer ')) {
+    userId = (await verifyIdToken(authHeader.slice(7))) ?? undefined;
+  }
+  const profiles = await readProfiles(userId);
   return NextResponse.json(profiles);
 }
 
@@ -24,7 +30,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       createdAt: body.createdAt,
     };
 
-    createProfile(profile);
+    await createProfile(profile);
 
     return NextResponse.json(profile, { status: 201 });
   } catch (error) {

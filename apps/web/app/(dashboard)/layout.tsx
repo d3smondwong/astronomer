@@ -10,6 +10,7 @@ import BaziProfileForm, { type BaziProfileFormRef } from '@/components/BaziProfi
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
+import { useAuth } from '@/lib/authContext';
 
 const { Sider, Content } = Layout;
 
@@ -23,10 +24,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { language, setLanguage } = useLanguage();
   const tr = translations.sidebar;
   const formRef = useRef<BaziProfileFormRef>(null);
+  const { user, openAuthModal, signOut } = useAuth();
 
   useEffect(() => {
     loadProfiles();
-  }, []);
+  }, [user?.uid, pathname]); // Reload when user signs in/out or navigates (guest path changes)
 
   useEffect(() => {
     // Set mounted flag and initial state
@@ -40,8 +42,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   const loadProfiles = async () => {
+    // Guests have no userId — fetch the current profile from the URL instead of listing all.
+    if (!user) {
+      const match = pathname.match(/\/profile\/([^/]+)/);
+      if (match) {
+        try {
+          const res = await fetch(`/api/profiles/${match[1]}`);
+          if (res.ok) {
+            const profile = await res.json();
+            setProfiles([profile]);
+          } else {
+            setProfiles([]);
+          }
+        } catch {
+          setProfiles([]);
+        }
+      } else {
+        setProfiles([]);
+      }
+      return;
+    }
+
     try {
-      const res = await fetch('/api/profiles');
+      const idToken = await user.getIdToken();
+      const res = await fetch('/api/profiles', {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
       if (res.ok) {
         const loadedProfiles = await res.json();
         setProfiles(loadedProfiles);
@@ -277,21 +303,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 background: 'linear-gradient(135deg, rgba(115,92,0,0.22), rgba(115,92,0,0.07))',
                 border: '1px solid rgba(115, 92, 0, 0.18)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                fontSize: '16px', fontWeight: 700, color: '#735c00', fontFamily: 'Noto Serif, serif',
               }}>
-                <User className="w-5 h-5" style={{ color: '#735c00' }} />
+                {user ? user.email?.[0]?.toUpperCase() : <User className="w-5 h-5" style={{ color: '#735c00' }} />}
               </div>
-              <p style={{ fontSize: '12px', fontWeight: '500', color: '#4d4635', margin: 0, fontFamily: 'Noto Serif, serif' }}>{tr.guest[language]}</p>
-              <button className="sidebar-login-btn" style={{
-                fontSize: '10px', color: '#735c00', background: 'transparent',
-                border: '1px solid rgba(115, 92, 0, 0.3)', cursor: 'pointer',
-                fontFamily: 'Noto Serif, serif', flexShrink: 0,
-                borderRadius: '4px', padding: '4px 8px',
-                transition: 'all 0.15s ease',
-              }}
+              <p style={{ fontSize: '12px', fontWeight: '500', color: '#4d4635', margin: 0, fontFamily: 'Noto Serif, serif' }}>
+                {user ? user.email?.split('@')[0] : tr.guest[language]}
+              </p>
+              <button
+                className="sidebar-login-btn"
+                onClick={() => user ? signOut() : openAuthModal()}
+                style={{
+                  fontSize: '10px', color: '#735c00', background: 'transparent',
+                  border: '1px solid rgba(115, 92, 0, 0.3)', cursor: 'pointer',
+                  fontFamily: 'Noto Serif, serif', flexShrink: 0,
+                  borderRadius: '4px', padding: '4px 8px',
+                  transition: 'all 0.15s ease',
+                }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(115, 92, 0, 0.08)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(115, 92, 0, 0.5)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(115, 92, 0, 0.3)'; }}
               >
-                {tr.login[language]}
+                {user ? translations.header.signOut[language] : translations.header.loginSignUp[language]}
               </button>
               {/* Language toggle */}
               <div

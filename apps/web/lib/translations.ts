@@ -2,8 +2,22 @@ export type Language = 'en' | 'ch';
 
 export const translations = {
   header: {
-    signIn:     { en: 'Sign In',  ch: '登录' },
-    langToggle: { en: '中文',     ch: 'English' },
+    signIn:      { en: 'Sign In',           ch: '登录' },
+    loginSignUp: { en: 'Log in or sign up', ch: '登录或注册' },
+    signOut:     { en: 'Sign out',          ch: '退出' },
+    langToggle:  { en: '中文',              ch: 'English' },
+  },
+  auth: {
+    loginTitle:          { en: 'Log in or sign up',         ch: '登录或注册' },
+    emailPlaceholder:    { en: 'Email',                     ch: '邮箱' },
+    passwordPlaceholder: { en: 'Password',                  ch: '密码' },
+    continueBtn:         { en: 'Continue',                  ch: '继续' },
+    loading:             { en: 'Loading…',                  ch: '加载中…' },
+    skipForNow:          { en: 'Skip — view chart only →',  ch: '跳过，仅查看图表 →' },
+    unlockInsights:      { en: 'Sign up to reveal your Personality Profile', ch: '注册以解锁个性分析' },
+    createFreeAccount:   { en: 'Create Free Account',       ch: '免费注册' },
+    generatingInsights:  { en: 'Generating your insights…', ch: '正在生成分析…' },
+    generateInsights:    { en: 'Generate Insights',         ch: '生成分析' },
   },
   profile: {
     // Day Master badge

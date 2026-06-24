@@ -3,10 +3,12 @@
 import Image from 'next/image';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
+import { useAuth } from '@/lib/authContext';
 
 export default function Header() {
   const { language, setLanguage } = useLanguage();
   const tr = translations.header;
+  const { user, loading, openAuthModal, signOut } = useAuth();
 
   return (
     <header className="fixed top-0 w-full z-50 shadow-sm" style={{ backgroundColor: '#fbf9f4' }}>
@@ -22,6 +24,7 @@ export default function Header() {
           />
         </div>
         <div className="flex items-center gap-4">
+          {/* Language toggle */}
           <div
             style={{
               display: 'flex',
@@ -56,9 +59,50 @@ export default function Header() {
               </button>
             ))}
           </div>
-          <button className="text-gold-deep font-serif tracking-tight hover:text-gold-light transition-colors duration-300 px-4 py-2">
-            {tr.signIn[language]}
-          </button>
+
+          {/* Auth area — hidden during initial auth state check */}
+          {!loading && (
+            user ? (
+              <div className="flex items-center gap-3">
+                <span style={{ fontSize: '13px', color: '#3d3a5c', fontFamily: 'Noto Serif, serif' }}>
+                  {user.email?.split('@')[0]}
+                </span>
+                <button
+                  onClick={signOut}
+                  style={{
+                    border: '1px solid #3d3a5c',
+                    borderRadius: '8px',
+                    backgroundColor: 'transparent',
+                    color: '#3d3a5c',
+                    fontFamily: 'Noto Serif, serif',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    padding: '6px 14px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {tr.signOut[language]}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={openAuthModal}
+                style={{
+                  border: '1px solid #3d3a5c',
+                  borderRadius: '8px',
+                  backgroundColor: 'transparent',
+                  color: '#3d3a5c',
+                  fontFamily: 'Noto Serif, serif',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  padding: '6px 14px',
+                  cursor: 'pointer',
+                }}
+              >
+                {tr.loginSignUp[language]}
+              </button>
+            )
+          )}
         </div>
       </nav>
     </header>

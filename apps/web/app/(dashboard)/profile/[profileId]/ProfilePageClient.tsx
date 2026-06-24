@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Forest from '@mui/icons-material/Forest';
 import LocalFireDepartment from '@mui/icons-material/LocalFireDepartment';
 import Terrain from '@mui/icons-material/Terrain';
@@ -8,12 +8,14 @@ import StopCircleOutlined from '@mui/icons-material/StopCircleOutlined';
 import Waves from '@mui/icons-material/Waves';
 import { type LifeStageInfo, type NaYinInfo, type VoidInfo, type VoidStatus, type VoidCondition } from '@/types/baziLibraryTypes';
 import { type ProfileRecord } from '@/lib/profilesDb';
+import { type InsightsResponse } from '@/lib/fastApiClient';
 import { Card, Tabs, Button, Popconfirm, Tooltip } from 'antd';
 import { format } from 'date-fns';
 import { Calendar, Clock, MapPin, User, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
+import { useAuth } from '@/lib/authContext';
 import { deleteProfileAction } from './actions';
 import FiveElementsCard from './FiveElementsCard';
 import PillarInteractionsCard from './PillarInteractionsCard';
@@ -43,12 +45,54 @@ const ELEMENT_COLOR: Record<string, string> = {
 interface ProfilePageClientProps {
   profileRecord: ProfileRecord;
   chartData: any;
+  insights?: InsightsResponse | null;
+  chartKey: string;
 }
 
-export default function ProfilePageClient({ profileRecord, chartData }: ProfilePageClientProps) {
+export default function ProfilePageClient({ profileRecord, chartData, insights, chartKey }: ProfilePageClientProps) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [insightsData, setInsightsData] = useState<InsightsResponse | null>(insights ?? null);
+  const [generatingInsights, setGeneratingInsights] = useState(false);
   const { language } = useLanguage();
   const tr = translations.profile;
+  const trAuth = translations.auth;
+  const { user, openAuthModal } = useAuth();
+  const prevUserUidRef = useRef<string | null>(null);
+
+  // When user signs in with no insights, claim the profile and generate insights inline
+  useEffect(() => {
+    const currentUid = user?.uid ?? null;
+    const wasGuest = prevUserUidRef.current === null;
+    prevUserUidRef.current = currentUid;
+
+    if (!wasGuest || !currentUid || insightsData) return;
+
+    setGeneratingInsights(true);
+    (async () => {
+      try {
+        const idToken = await user!.getIdToken();
+        // Claim profile to this user's account
+        await fetch(`/api/profiles/${profileRecord.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ userId: currentUid }),
+        });
+        // Generate insights inline
+        const res = await fetch('/api/insights', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ chartKey }),
+        });
+        if (res.ok) {
+          setInsightsData(await res.json());
+        }
+      } catch (err) {
+        console.error('Inline insights generation failed:', err);
+      } finally {
+        setGeneratingInsights(false);
+      }
+    })();
+  }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reconstruct profile object for rendering
   const profile = {
@@ -1221,9 +1265,113 @@ export default function ProfilePageClient({ profileRecord, chartData }: ProfileP
               label: tr.tabInsights[language],
               children: (
                 <div className="space-y-4">
-                  <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
-                    <p className="text-center text-bronze-muted/70">Coming Soon</p>
-                  </Card>
+                  {!user ? (
+                    /* Guest gate card */
+                    <Card style={{ borderColor: 'rgba(115, 92, 0, 0.15)', background: 'rgba(251,249,244,0.8)' }}>
+                      <div className="flex flex-col items-center gap-4 py-4">
+                        {/* Blurred placeholder rows */}
+                        <div style={{ width: '100%', filter: 'blur(4px)', pointerEvents: 'none', opacity: 0.4 }}>
+                          {[80, 60, 90, 70, 55].map((w, i) => (
+                            <div key={i} style={{
+                              height: '12px', borderRadius: '6px', marginBottom: '10px',
+                              background: 'linear-gradient(90deg, rgba(115,92,0,0.25), rgba(115,92,0,0.1))',
+                              width: `${w}%`,
+                            }} />
+                          ))}
+                        </div>
+                        <div style={{ width: '40px', height: '1px', background: 'rgba(115,92,0,0.2)' }} />
+                        <p className="font-serif text-center text-bronze-muted" style={{ fontSize: '15px', fontWeight: 600 }}>
+                          {trAuth.unlockInsights[language]}
+                        </p>
+                        <button
+                          onClick={() => openAuthModal()}
+                          style={{
+                            padding: '10px 24px',
+                            backgroundColor: '#3d3a5c', color: '#fff',
+                            border: 'none', borderRadius: '8px',
+                            fontSize: '13px', fontWeight: 600,
+                            fontFamily: 'Noto Serif, serif', cursor: 'pointer',
+                          }}
+                        >
+                          {trAuth.createFreeAccount[language]}
+                        </button>
+                      </div>
+                    </Card>
+                  ) : generatingInsights ? (
+                    <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+                      <p className="text-center text-bronze-muted/70">{trAuth.generatingInsights[language]}</p>
+                    </Card>
+                  ) : insightsData?.personality ? (
+                    (() => {
+                      const p = insightsData.personality;
+                      const renderList = (label: string, items: string[]) =>
+                        items && items.length > 0 ? (
+                          <div className="flex flex-wrap gap-x-2 gap-y-1 items-baseline">
+                            <span className="font-semibold text-bronze-muted">{label}</span>
+                            <span className="text-bronze-muted/80">{items.join('、')}</span>
+                          </div>
+                        ) : null;
+                      return (
+                        <Card
+                          title={tr.personalityProfile[language]}
+                          style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}
+                        >
+                          <div className="space-y-3">
+                            {p.archetype && (
+                              <div className="flex flex-wrap gap-x-2 items-baseline">
+                                <span className="font-semibold text-bronze-muted">{tr.yourArchetype[language]}</span>
+                                <span className="text-gold-deep font-serif text-lg">{p.archetype}</span>
+                              </div>
+                            )}
+                            {p.element && (
+                              <div className="flex flex-wrap gap-x-2 items-baseline">
+                                <span className="font-semibold text-bronze-muted">{tr.elementLabel[language]}</span>
+                                <span className="text-bronze-muted/80">{p.element}</span>
+                              </div>
+                            )}
+                            {renderList(tr.keyTraits[language], p.key_traits)}
+                            {renderList(tr.strengths[language], p.strengths)}
+                            {renderList(tr.areasToNote[language], p.areas_to_note)}
+                            {renderList(tr.luckyColors[language], p.lucky_colors)}
+                            {renderList(tr.luckyNumbers[language], p.lucky_numbers)}
+                          </div>
+                        </Card>
+                      );
+                    })()
+                  ) : (
+                    /* Logged in but no insights yet — manual trigger */
+                    <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+                      <div className="flex flex-col items-center gap-3 py-2">
+                        <button
+                          onClick={async () => {
+                            setGeneratingInsights(true);
+                            try {
+                              const idToken = await user.getIdToken();
+                              const res = await fetch('/api/insights', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                                body: JSON.stringify({ chartKey }),
+                              });
+                              if (res.ok) setInsightsData(await res.json());
+                            } catch (err) {
+                              console.error('Failed to generate insights:', err);
+                            } finally {
+                              setGeneratingInsights(false);
+                            }
+                          }}
+                          style={{
+                            padding: '10px 24px',
+                            backgroundColor: '#3d3a5c', color: '#fff',
+                            border: 'none', borderRadius: '8px',
+                            fontSize: '13px', fontWeight: 600,
+                            fontFamily: 'Noto Serif, serif', cursor: 'pointer',
+                          }}
+                        >
+                          {trAuth.generateInsights[language]}
+                        </button>
+                      </div>
+                    </Card>
+                  )}
                 </div>
               ),
             },
