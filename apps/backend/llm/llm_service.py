@@ -157,12 +157,14 @@ def llm_analyse_bazi(llm_data: dict) -> InsightsReport:
             config.model,
         )
         report.raw_by_section[section.key] = raw_text
-        report.sections[section.key] = parser.parse_section(section.key, raw_text)
+        report.sections[section.key] = parser.parse_section(
+            section.key, raw_text, structured=bool(section.categories)
+        )
 
     return report
 
 
-def llm_analyse_section(llm_data: dict, section_key: str) -> str:
+def llm_analyse_section(llm_data: dict, section_key: str) -> str | dict:
     """
     Generate a single insight section — used for progressive/parallel loading
     so the frontend can render each section as soon as it is ready.
@@ -203,12 +205,18 @@ def llm_analyse_section(llm_data: dict, section_key: str) -> str:
         raise LLMError(f"{config.provider} API error: {e}") from e
 
     logger.info("Section '%s' received (%d chars)", section_key, len(raw_text))
-    return ResponseParser().parse_section(section.key, raw_text)
+    return ResponseParser().parse_section(
+        section.key, raw_text, structured=bool(section.categories)
+    )
 
 
 # --- EXECUTION ---
-# python -m apps.backend.llm.llm_service
+# Run ONE section only (saves tokens while iterating on a single prompt):
+#   python -m apps.backend.llm.llm_service              # defaults to "career"
+#   SECTION=wealth python -m apps.backend.llm.llm_service
 if __name__ == "__main__":
+    import json as _json
+    import os
     from datetime import datetime
 
     from dotenv import load_dotenv
@@ -223,6 +231,8 @@ if __name__ == "__main__":
         calculate_natal_chart,
     )
 
+    section_key = os.environ.get("SECTION", "career")
+
     # --- Sample subject (Desmond) ---
     datetime_birthday = datetime(1985, 11, 25, 17, 7, 0)
     latitude, longitude, gender = 1.3253, 103.808053, 1
@@ -235,15 +245,32 @@ if __name__ == "__main__":
         use_solar_time_correction=True,
     )
 
-    logger.info("=== Running LLM Analysis ===")
-    report = llm_analyse_bazi(chart)
-
-    for section in SECTION_REGISTRY:
-        narrative = report.sections.get(section.key, "")
-        logger.info(
-            "\n===== %s (%s) — %d chars =====\n%s",
-            section.title,
-            section.key,
-            len(narrative),
-            narrative or "[empty]",
+    section = next((s for s in SECTION_REGISTRY if s.key == section_key), None)
+    if section is None:
+        raise SystemExit(
+            f"Unknown section '{section_key}'. Choose from: "
+            f"{', '.join(s.key for s in SECTION_REGISTRY)}"
         )
+
+    logger.info("=== Running LLM Analysis — section '%s' only ===", section_key)
+
+    config, system_template, user_template = _load_config()
+    provider = _make_provider(config)
+    system_prompt, user_prompt = PromptBuilder(system_template, user_template).build(
+        section, chart
+    )
+    raw_text = provider.call(system_prompt, user_prompt)
+
+    # Pretty-print if it parses as JSON, otherwise show the raw text verbatim.
+    try:
+        pretty = _json.dumps(_json.loads(raw_text), ensure_ascii=False, indent=2)
+    except _json.JSONDecodeError:
+        pretty = raw_text
+
+    logger.info(
+        "\n===== %s (%s) — %d chars =====\n%s",
+        section.title,
+        section.key,
+        len(raw_text),
+        pretty or "[empty]",
+    )

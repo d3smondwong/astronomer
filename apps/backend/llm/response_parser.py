@@ -54,12 +54,18 @@ def _repair_json_strings(text: str) -> str:
 
 
 class ResponseParser:
-    def parse_section(self, section_key: str, raw_text: str) -> str:
-        """Extract the narrative prose for one section from a JSON LLM response.
+    def parse_section(
+        self, section_key: str, raw_text: str, structured: bool = False
+    ) -> str | dict:
+        """Extract one section's payload from a JSON LLM response.
 
-        Expects ``{"<section_key>": "<narrative>"}``. Falls back gracefully:
-        if the wrapper key is missing, returns the first string value or the
-        cleaned raw text; on total parse failure returns "" so one bad section
+        Prose sections (``structured=False``) expect ``{"<section_key>": "<narrative>"}``
+        and return a string. Structured sections (``structured=True``) expect
+        ``{"<section_key>": {<group>: [{"point", "explanation"}, ...]}}`` and return
+        the inner object dict.
+
+        Both degrade gracefully: on total parse failure a prose section returns the
+        cleaned raw text and a structured section returns ``{}``, so one bad section
         never aborts the whole report.
         """
         text = raw_text.strip()
@@ -89,8 +95,13 @@ class ResponseParser:
                         section_key,
                         e,
                     )
-                    return text
+                    return {} if structured else text
 
+        if structured:
+            return self._extract_structured(section_key, data)
+        return self._extract_prose(section_key, data)
+
+    def _extract_prose(self, section_key: str, data) -> str:
         if isinstance(data, dict):
             # Preferred: the exact section key.
             if section_key in data:
@@ -110,7 +121,28 @@ class ResponseParser:
         else:
             narrative = ""
 
-        logger.debug(
-            "Parsed section [%s] — %d chars", section_key, len(narrative)
-        )
+        logger.debug("Parsed section [%s] — %d chars", section_key, len(narrative))
         return narrative
+
+    def _extract_structured(self, section_key: str, data) -> dict:
+        """Pull the inner groups object out of a structured section response."""
+        if isinstance(data, dict):
+            # Preferred: the wrapper key holds the groups object. If the model
+            # dropped the wrapper and returned the groups directly, use data itself.
+            inner = data.get(section_key, data)
+            if isinstance(inner, dict):
+                groups = sum(len(v) for v in inner.values() if isinstance(v, list))
+                logger.debug(
+                    "Parsed structured section [%s] — %d groups, %d items",
+                    section_key,
+                    len(inner),
+                    groups,
+                )
+                return inner
+
+        logger.warning(
+            "ResponseParser[%s]: expected a structured object, got %s",
+            section_key,
+            type(data).__name__,
+        )
+        return {}

@@ -8,7 +8,7 @@ import StopCircleOutlined from '@mui/icons-material/StopCircleOutlined';
 import Waves from '@mui/icons-material/Waves';
 import { type LifeStageInfo, type NaYinInfo, type VoidInfo, type VoidStatus, type VoidCondition } from '@/types/baziLibraryTypes';
 import { type ProfileRecord } from '@/lib/profilesDb';
-import { type InsightsResponse } from '@/lib/fastApiClient';
+import { type InsightsResponse, type StructuredSection } from '@/lib/fastApiClient';
 import { Card, Tabs, Button, Popconfirm, Tooltip, Collapse } from 'antd';
 import { format } from 'date-fns';
 import { Calendar, Clock, MapPin, User, Trash2 } from 'lucide-react';
@@ -66,6 +66,49 @@ const renderProse = (text: string) =>
       </p>
     ));
 
+// Career group key -> translation key for its structured-section heading.
+const CAREER_LABEL_KEYS: Record<string, keyof typeof translations.profile> = {
+  path_to_success: 'careerPathToSuccess',
+  highlights: 'careerHighlights',
+  challenges: 'careerChallenges',
+  advice: 'careerAdvice',
+};
+
+// Career renders as labelled groups of bulleted point/explanation items.
+const renderCareer = (
+  value: StructuredSection,
+  language: keyof typeof translations.profile.careerAdvice,
+) =>
+  Object.entries(value)
+    .filter(([, items]) => Array.isArray(items) && items.length > 0)
+    .map(([groupKey, items]) => {
+      const labelKey = CAREER_LABEL_KEYS[groupKey];
+      return (
+      <div key={groupKey} className="mb-5 last:mb-0">
+        <h4 className="font-serif text-gold-deep mb-2" style={{ fontWeight: 600 }}>
+          {labelKey ? translations.profile[labelKey][language] : groupKey}
+        </h4>
+        <ul className="list-disc pl-5 space-y-2">
+          {items.map((it, i) => (
+            <li key={i} className="text-bronze-muted/80 leading-relaxed">
+              <span style={{ fontWeight: 600 }}>{it.point}</span>
+              {it.explanation ? <> — {it.explanation}</> : null}
+            </li>
+          ))}
+        </ul>
+      </div>
+      );
+    });
+
+// A section is "ready" when prose has text, or a structured object has ≥1 item.
+const sectionHasContent = (value: string | StructuredSection | undefined): boolean => {
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (value && typeof value === 'object') {
+    return Object.values(value).some((items) => Array.isArray(items) && items.length > 0);
+  }
+  return false;
+};
+
 interface ProfilePageClientProps {
   profileRecord: ProfileRecord;
   chartData: any;
@@ -97,8 +140,8 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
       });
       if (res.ok) {
         const data: InsightsResponse = await res.json();
-        const text = data.sections?.[key] ?? '';
-        setInsightsData((prev) => ({ sections: { ...(prev?.sections ?? {}), [key]: text } }));
+        const value = data.sections?.[key] ?? '';
+        setInsightsData((prev) => ({ sections: { ...(prev?.sections ?? {}), [key]: value } }));
       } else {
         const detail = await res.text().catch(() => '');
         console.error(`Insights section '${key}' failed [req:${requestId}]:`, res.status, detail);
@@ -1405,12 +1448,12 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
                     <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
                       <InsightsLoading language={language} />
                     </Card>
-                  ) : (insightsData?.sections && Object.values(insightsData.sections).some(Boolean)) || generating ? (
+                  ) : (insightsData?.sections && Object.values(insightsData.sections).some(sectionHasContent)) || generating ? (
                     (() => {
                       const sections = insightsData?.sections ?? {};
                       // Show a panel for each section that is ready OR still loading.
                       const panels = INSIGHT_SECTIONS.filter(
-                        (s) => sections[s.key]?.trim() || loadingSections.includes(s.key),
+                        (s) => sectionHasContent(sections[s.key]) || loadingSections.includes(s.key),
                       );
                       const firstKey = panels[0]?.key;
                       return (
@@ -1425,8 +1468,12 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
                                   {tr[s.title][language]}
                                 </span>
                               ),
-                              children: sections[s.key]?.trim() ? (
-                                <div>{renderProse(sections[s.key])}</div>
+                              children: sectionHasContent(sections[s.key]) ? (
+                                <div>
+                                  {typeof sections[s.key] === 'string'
+                                    ? renderProse(sections[s.key] as string)
+                                    : renderCareer(sections[s.key] as StructuredSection, language)}
+                                </div>
                               ) : (
                                 <InsightsLoading language={language} compact />
                               ),

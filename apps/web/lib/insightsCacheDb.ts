@@ -8,7 +8,7 @@
  */
 
 import { getDb } from '@/lib/firebaseAdmin';
-import type { InsightsResponse } from '@/lib/fastApiClient';
+import type { InsightsResponse, StructuredSection } from '@/lib/fastApiClient';
 
 const COLLECTION = 'insightsCache';
 
@@ -41,14 +41,14 @@ export async function setCachedInsights(key: string, insights: InsightsResponse)
 export async function setCachedInsightsSection(
   key: string,
   section: string,
-  text: string,
+  value: string | StructuredSection,
 ): Promise<void> {
   if (!CACHE_ENABLED) return; // disabled → skip writes so testing leaves no stale entries
   await getDb()
     .collection(COLLECTION)
     .doc(key)
     .set(
-      { sections: { [section]: text }, createdAt: new Date().toISOString() },
+      { sections: { [section]: value }, createdAt: new Date().toISOString() },
       { merge: true },
     );
 }

@@ -28,7 +28,9 @@ class InsightsRequest(BaseModel):
 class InsightsResponse(BaseModel):
     """Response from /v1/chart/insights.
 
-    sections: section key (e.g. "personality") -> narrative prose for that domain.
+    sections: section key (e.g. "personality") -> the section payload: narrative
+        prose (str) for most domains, or a structured groups object for sections
+        that define categories (e.g. "career": {group: [{point, explanation}]}).
     """
 
-    sections: Dict[str, str] = Field(default_factory=dict)
+    sections: Dict[str, Any] = Field(default_factory=dict)

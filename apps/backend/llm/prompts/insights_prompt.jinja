@@ -15,7 +15,19 @@ Pay special attention to:
 
 (The full chart above is provided so you can also draw on anything else genuinely relevant to this section — the focus above is guidance, not a limit.)
 
+Timeline: this is a natal chart with no luck-period data, so anchor any timing to the pillar a signal sits on — the year pillar ≈ childhood and family origins; the month pillar ≈ youth and the career-building years (roughly the 20s–40s); the day pillar ≈ midlife; the hour pillar ≈ later life. A void, clash, harm or break on a pillar concentrates turbulence in that phase (e.g. a void month pillar ⇒ an unstable, setback-prone early career that steadies later). Speak in life phases — never invent specific ages or calendar dates.
+
+{% if section.categories %}
+Organise this section into these groups, in order:
+{% for cat in section.categories %}- {{ cat.key }} — {{ cat.label }}
+{% endfor %}
+Each group is a list of items, and each item has a "point" (one crisp claim) and an "explanation" (two to four sentences grounding that claim in this chart's specific evidence, per the guidance above). Include every distinct, well-grounded point this chart genuinely supports — usually four to six per group. Do NOT stop at three: before moving to the next group, scan the whole chart again for further distinct signals you have not yet used. Fall below four only when the chart truly offers no more, and omit a group entirely only if it says nothing at all. Never pad with repetition or generic filler to reach a number — each point must rest on its own distinct chart evidence.
+
+Return ONLY this JSON object, nothing else:
+{"{{ section.key }}": {{ '{' }}{% for cat in section.categories %}"{{ cat.key }}": [{"point": "...", "explanation": "..."}]{% if not loop.last %}, {% endif %}{% endfor %}{{ '}' }}}
+{% else %}
 Write the "{{ section.title }}" section as flowing, connected paragraphs (the person's story for this part of their life). No bullet points, headings, or labelled fields.
 
 Return ONLY this JSON object, nothing else:
 {"{{ section.key }}": "...your paragraphs here..."}
+{% endif %}

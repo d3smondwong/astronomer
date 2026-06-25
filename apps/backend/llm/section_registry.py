@@ -16,11 +16,22 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+class Category:
+    """One labelled group inside a structured section (e.g. career's "challenges")."""
+
+    key: str  # JSON key the model must return, e.g. "path_to_success"
+    label: str  # Human-readable group heading shown in the prompt
+
+
+@dataclass(frozen=True)
 class Section:
     key: str  # JSON wrapper key the model must return, e.g. "personality"
     title: str  # Human-readable section title shown in the prompt
     guidance: str  # What the narrative should cover (story, not field list)
     emphasis: str  # Chart areas to foreground for this domain (soft cue)
+    # When set, the model returns a structured object keyed by these categories
+    # (each a list of {point, explanation}) instead of a single prose string.
+    categories: tuple[Category, ...] | None = None
 
 
 SECTION_REGISTRY: list[Section] = [
@@ -100,11 +111,29 @@ SECTION_REGISTRY: list[Section] = [
     Section(
         key="career",
         title="Career & Talents",
+        categories=(
+            Category(key="path_to_success", label="Path to Success"),
+            Category(key="highlights", label="Career Highlights"),
+            Category(key="challenges", label="Career Challenges"),
+            Category(key="advice", label="Career Advice"),
+        ),
         guidance=(
-            "Describe this person's working life and natural talents — what they are gifted at, "
-            "the kinds of work and environments that suit them, how they handle authority and "
-            "ambition, and where their professional path tends to flow. Tell it as a story of "
-            "vocation and ability."
+            "Tell this person's career story across four groups — path_to_success (the fields, "
+            "roles and working environments their chart actually points to), highlights (their "
+            "professional strengths and peak potentials), challenges (the frictions, "
+            "instabilities and ceilings they must navigate), and advice (concrete, actionable "
+            "guidance that follows directly from the three groups above). "
+            "Each item is a 'point' — one crisp claim — plus an 'explanation' that must do three "
+            "things: (a) ground the claim in the SPECIFIC evidence in this chart — name the actual "
+            "stem(s), branch(es), ten-god(s), star(s) or interaction(s) it rests on, weighed "
+            "together where several bear on the same point, not a generic trait; (b) when "
+            "a classical pattern applies, give the reading in plain English and cite the term once "
+            "in parentheses, e.g. 'wealth and status reinforce each other (财官双美)' or 'the income "
+            "star sits in a weak position (背禄)'; (c) when the evidence sits on a time-bound pillar, "
+            "say which life phase it bears on. Write two to four sentences per explanation — enough "
+            "to teach the 'why', never a bare label. Timing is domain-neutral: wherever a signal "
+            "sits on a time-bound pillar, name the life phase it bears on, across every group "
+            "(early-career instability, a midlife peak, recognition arriving later)."
         ),
         emphasis=(
             "The month pillar as the career palace and the seasonal command (月令) — the chart's "

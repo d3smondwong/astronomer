@@ -53,10 +53,20 @@ export interface ChartResponse {
   chart_key: string;
 }
 
+// One item inside a structured section: a crisp claim plus its grounded explanation.
+export interface InsightPoint {
+  point: string;
+  explanation: string;
+}
+
+// A structured section (currently: career) -> named groups, each a list of points.
+// e.g. { path_to_success: [...], highlights: [...], challenges: [...], advice: [...] }
+export type StructuredSection = Record<string, InsightPoint[]>;
+
 export interface InsightsResponse {
   // section key (personality | family | romance | career | wealth | health)
-  // -> narrative prose for that life domain.
-  sections: Record<string, string>;
+  // -> either narrative prose (string) or a structured groups object (career).
+  sections: Record<string, string | StructuredSection>;
 }
 
 /**

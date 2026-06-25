@@ -71,6 +71,11 @@ export const translations = {
     secCareer:        { en: 'Career & Talents',                   ch: '事业与才能' },
     secWealth:        { en: 'Wealth',                             ch: '财富' },
     secHealth:        { en: 'Health',                             ch: '健康' },
+    // Career section — structured group headings (other Chinese copy is prompt-driven)
+    careerPathToSuccess: { en: 'Path to Success',                 ch: '成功之路' },
+    careerHighlights:    { en: 'Career Highlights',               ch: '事业亮点' },
+    careerChallenges:    { en: 'Career Challenges',               ch: '事业挑战' },
+    careerAdvice:        { en: 'Career Advice',                   ch: '事业建议' },
     personalityProfile: { en: 'Personality Profile',             ch: '性格分析' },
     yourArchetype:    { en: 'Your Archetype:',                   ch: '命盘原型：' },
     elementLabel:     { en: 'Element:',                          ch: '五行：' },
