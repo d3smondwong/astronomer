@@ -1,0 +1,23 @@
+{
+  "_comment": "Reference only. backend_error_alert.sh generates this at runtime with your SERVICE_NAME and notification CHANNEL substituted in. To apply manually: gcloud monitoring policies create --project=YOUR_PROJECT --policy-from-file=this.json (after replacing the placeholders).",
+  "displayName": "Backend errors (Cloud Run FastAPI)",
+  "documentation": {
+    "content": "A FastAPI backend log entry with severity ERROR or higher was written on Cloud Run. Open Logs Explorer and filter by jsonPayload.chart_key, jsonPayload.request_id, jsonPayload.uid, or jsonPayload.profile_id to trace the failing request end-to-end.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Backend log severity>=ERROR",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"SERVICE_NAME\" severity>=ERROR"
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": { "period": "300s" }
+  },
+  "notificationChannels": [
+    "projects/YOUR_PROJECT/notificationChannels/CHANNEL_ID"
+  ]
+}
