@@ -63,7 +63,7 @@ const PlacesAutocompleteInput: FC<PlacesAutocompleteInputProps> = ({
       try {
         const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
           input: text,
-          sessionToken: sessionTokenRef.current!,
+          sessionToken: sessionTokenRef.current ?? undefined,
           locationBias: {
             west:  95.0,   // SW longitude — Western Sumatra
             south: -11.0,  // SW latitude  — Southern Indonesia
@@ -72,15 +72,20 @@ const PlacesAutocompleteInput: FC<PlacesAutocompleteInputProps> = ({
           },
         });
 
-        setOptions(suggestions.map(s => ({
-          value: s.placePrediction.text.text,
+        // Keep only place predictions (query predictions have a null placePrediction).
+        const predictions = suggestions
+          .map(s => s.placePrediction)
+          .filter((p): p is google.maps.places.PlacePrediction => p != null);
+
+        setOptions(predictions.map(p => ({
+          value: p.text.text,
           label: (
             <div className="flex flex-col">
-              <span className="font-serif text-bronze-muted">{s.placePrediction.mainText.text}</span>
-              <span className="text-xs opacity-50">{s.placePrediction.secondaryText?.text}</span>
+              <span className="font-serif text-bronze-muted">{p.mainText?.text}</span>
+              <span className="text-xs opacity-50">{p.secondaryText?.text}</span>
             </div>
           ),
-          suggestion: s,
+          suggestion: p,
         })));
       } catch (err) {
         console.error('Google Places error:', err);
@@ -89,11 +94,16 @@ const PlacesAutocompleteInput: FC<PlacesAutocompleteInputProps> = ({
   };
 
   const handleSelect = async (_: string, option: DefaultOptionType) => {
-    const place = (option as DefaultOptionType & { suggestion: google.maps.places.AutocompleteSuggestion }).suggestion.placePrediction.toPlace();
+    const prediction = (option as DefaultOptionType & { suggestion: google.maps.places.PlacePrediction }).suggestion;
+    const place = prediction.toPlace();
     await place.fetchFields({ fields: ['location', 'formattedAddress', 'displayName'] });
 
-    const lat     = place.location!.lat();
-    const lng     = place.location!.lng();
+    if (!place.location) {
+      console.error('Google Places: selected place has no location');
+      return;
+    }
+    const lat     = place.location.lat();
+    const lng     = place.location.lng();
     const address = place.formattedAddress ?? place.displayName ?? '';
 
     setInputValue(address);
