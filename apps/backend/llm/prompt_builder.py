@@ -9,7 +9,8 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 from lunar_python import Solar
 
-from src.utils.logging import get_logger
+from apps.backend.llm.section_registry import Section
+from apps.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -31,17 +32,26 @@ class PromptBuilder:
         self._system_template = Path(system_template).name
         self._user_template = Path(user_template).name
 
-    def build(self, llm_data: dict) -> tuple[str, str]:
-        """Render templates and return (system_prompt, user_prompt)."""
+    def build(self, section: Section, chart: dict) -> tuple[str, str]:
+        """Render the shared system prompt and the per-section user prompt.
+
+        Args:
+            section: The section being generated (drives title/guidance/emphasis/key).
+            chart:   The full natal chart dict — passed whole, never sliced.
+
+        Returns:
+            (system_prompt, user_prompt)
+        """
         system_prompt = self._env.get_template(self._system_template).render()
-        bazi_json = json.dumps(llm_data, ensure_ascii=False, indent=2)
+        bazi_json = json.dumps(chart, ensure_ascii=False, indent=2)
         user_prompt = self._env.get_template(self._user_template).render(
-            data=llm_data,
+            section=section,
             bazi_json=bazi_json,
             current_year=Solar.fromDate(datetime.now()).getLunar().getYear(),
         )
         logger.debug(
-            "Prompts built — system: %d chars, user: %d chars",
+            "Prompts built [%s] — system: %d chars, user: %d chars",
+            section.key,
             len(system_prompt),
             len(user_prompt),
         )

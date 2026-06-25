@@ -9,7 +9,7 @@ import Waves from '@mui/icons-material/Waves';
 import { type LifeStageInfo, type NaYinInfo, type VoidInfo, type VoidStatus, type VoidCondition } from '@/types/baziLibraryTypes';
 import { type ProfileRecord } from '@/lib/profilesDb';
 import { type InsightsResponse } from '@/lib/fastApiClient';
-import { Card, Tabs, Button, Popconfirm, Tooltip } from 'antd';
+import { Card, Tabs, Button, Popconfirm, Tooltip, Collapse } from 'antd';
 import { format } from 'date-fns';
 import { Calendar, Clock, MapPin, User, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,6 +20,7 @@ import { deleteProfileAction } from './actions';
 import FiveElementsCard from './FiveElementsCard';
 import PillarInteractionsCard from './PillarInteractionsCard';
 import DayMasterStrengthCard from './DayMasterStrengthCard';
+import InsightsLoading from './InsightsLoading';
 
 const STEM_ELEMENT: Record<string, string> = {
   甲: '木', 乙: '木', 丙: '火', 丁: '火',
@@ -42,6 +43,28 @@ const ELEMENT_COLOR: Record<string, string> = {
   '木': '#2d6a2d', '火': '#b42424', '土': '#8a6200', '金': '#666666', '水': '#1e5a9a',
 };
 
+// Ordered insight sections (matches the backend SECTION_REGISTRY) -> title translation key.
+const INSIGHT_SECTIONS: { key: string; title: keyof typeof translations.profile }[] = [
+  { key: 'personality', title: 'secPersonality' },
+  { key: 'family', title: 'secFamily' },
+  { key: 'romance', title: 'secRomance' },
+  { key: 'career', title: 'secCareer' },
+  { key: 'wealth', title: 'secWealth' },
+  { key: 'health', title: 'secHealth' },
+];
+
+// Narratives are plain paragraphs separated by blank lines — render each as a <p>.
+const renderProse = (text: string) =>
+  text
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p, i) => (
+      <p key={i} className="mb-3 text-bronze-muted/80 leading-relaxed">
+        {p}
+      </p>
+    ));
+
 interface ProfilePageClientProps {
   profileRecord: ProfileRecord;
   chartData: any;
@@ -52,12 +75,57 @@ interface ProfilePageClientProps {
 export default function ProfilePageClient({ profileRecord, chartData, insights, chartKey }: ProfilePageClientProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [insightsData, setInsightsData] = useState<InsightsResponse | null>(insights ?? null);
-  const [generatingInsights, setGeneratingInsights] = useState(false);
+  // Section keys whose LLM call is currently in flight (progressive loading).
+  const [loadingSections, setLoadingSections] = useState<string[]>([]);
   const { language } = useLanguage();
   const tr = translations.profile;
   const trAuth = translations.auth;
   const { user, openAuthModal } = useAuth();
   const prevUserUidRef = useRef<string | null>(null);
+
+  const generating = loadingSections.length > 0;
+
+  // Fetch one section and merge its prose into state; always clears its loading flag.
+  // `requestId` correlates all 6 section calls of one generation across browser → Next → FastAPI.
+  const fetchSection = async (idToken: string, key: string, force: boolean, requestId: string) => {
+    try {
+      const res = await fetch('/api/insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ chartKey, section: key, force, requestId }),
+      });
+      if (res.ok) {
+        const data: InsightsResponse = await res.json();
+        const text = data.sections?.[key] ?? '';
+        setInsightsData((prev) => ({ sections: { ...(prev?.sections ?? {}), [key]: text } }));
+      } else {
+        console.error(`Insights section '${key}' failed [req:${requestId}]:`, res.status, await res.text());
+      }
+    } catch (err) {
+      console.error(`Insights section '${key}' failed [req:${requestId}]:`, err);
+    } finally {
+      setLoadingSections((prev) => prev.filter((k) => k !== key));
+    }
+  };
+
+  // Progressive load: Core Personality first (renders immediately), then the
+  // remaining sections in parallel. `force` (dev) bypasses the cache.
+  const generateInsights = async (force = false): Promise<void> => {
+    if (!user) return;
+    const requestId = crypto.randomUUID();
+    const keys = INSIGHT_SECTIONS.map((s) => s.key);
+    setLoadingSections(keys);
+    let idToken: string;
+    try {
+      idToken = await user.getIdToken();
+    } catch (err) {
+      console.error(`Failed to get auth token [req:${requestId}]:`, err);
+      setLoadingSections([]);
+      return;
+    }
+    await fetchSection(idToken, keys[0], force, requestId); // personality first
+    await Promise.all(keys.slice(1).map((k) => fetchSection(idToken, k, force, requestId)));
+  };
 
   // When user signs in with no insights, claim the profile and generate insights inline
   useEffect(() => {
@@ -65,9 +133,8 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
     const wasGuest = prevUserUidRef.current === null;
     prevUserUidRef.current = currentUid;
 
-    if (!wasGuest || !currentUid || insightsData) return;
+    if (!wasGuest || !currentUid || insightsData?.sections) return;
 
-    setGeneratingInsights(true);
     (async () => {
       try {
         const idToken = await user!.getIdToken();
@@ -77,20 +144,11 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
           body: JSON.stringify({ userId: currentUid }),
         });
-        // Generate insights inline
-        const res = await fetch('/api/insights', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-          body: JSON.stringify({ chartKey }),
-        });
-        if (res.ok) {
-          setInsightsData(await res.json());
-        }
       } catch (err) {
-        console.error('Inline insights generation failed:', err);
-      } finally {
-        setGeneratingInsights(false);
+        console.error('Profile claim failed:', err);
       }
+      // Generate insights inline (claim errors shouldn't block this)
+      await generateInsights();
     })();
   }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1265,6 +1323,27 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
               label: tr.tabInsights[language],
               children: (
                 <div className="space-y-4">
+                  {process.env.NODE_ENV !== 'production' && user && (
+                    /* Dev-only: force-regenerate (bypass cache) to iterate on prompt/data edits */
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => generateInsights(true)}
+                        disabled={generating}
+                        style={{
+                          padding: '4px 12px',
+                          border: '1px dashed rgba(115,92,0,0.4)',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          color: '#735c00',
+                          background: 'transparent',
+                          cursor: generating ? 'default' : 'pointer',
+                          opacity: generating ? 0.5 : 1,
+                        }}
+                      >
+                        ↻ Regenerate (dev)
+                      </button>
+                    </div>
+                  )}
                   {!user ? (
                     /* Guest gate card */
                     <Card style={{ borderColor: 'rgba(115, 92, 0, 0.15)', background: 'rgba(251,249,244,0.8)' }}>
@@ -1297,44 +1376,38 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
                         </button>
                       </div>
                     </Card>
-                  ) : generatingInsights ? (
+                  ) : generating && !insightsData?.sections?.personality ? (
+                    /* Personality not ready yet — themed full loader */
                     <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
-                      <p className="text-center text-bronze-muted/70">{trAuth.generatingInsights[language]}</p>
+                      <InsightsLoading language={language} />
                     </Card>
-                  ) : insightsData?.personality ? (
+                  ) : (insightsData?.sections && Object.values(insightsData.sections).some(Boolean)) || generating ? (
                     (() => {
-                      const p = insightsData.personality;
-                      const renderList = (label: string, items: string[]) =>
-                        items && items.length > 0 ? (
-                          <div className="flex flex-wrap gap-x-2 gap-y-1 items-baseline">
-                            <span className="font-semibold text-bronze-muted">{label}</span>
-                            <span className="text-bronze-muted/80">{items.join('、')}</span>
-                          </div>
-                        ) : null;
+                      const sections = insightsData?.sections ?? {};
+                      // Show a panel for each section that is ready OR still loading.
+                      const panels = INSIGHT_SECTIONS.filter(
+                        (s) => sections[s.key]?.trim() || loadingSections.includes(s.key),
+                      );
+                      const firstKey = panels[0]?.key;
                       return (
-                        <Card
-                          title={tr.personalityProfile[language]}
-                          style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}
-                        >
-                          <div className="space-y-3">
-                            {p.archetype && (
-                              <div className="flex flex-wrap gap-x-2 items-baseline">
-                                <span className="font-semibold text-bronze-muted">{tr.yourArchetype[language]}</span>
-                                <span className="text-gold-deep font-serif text-lg">{p.archetype}</span>
-                              </div>
-                            )}
-                            {p.element && (
-                              <div className="flex flex-wrap gap-x-2 items-baseline">
-                                <span className="font-semibold text-bronze-muted">{tr.elementLabel[language]}</span>
-                                <span className="text-bronze-muted/80">{p.element}</span>
-                              </div>
-                            )}
-                            {renderList(tr.keyTraits[language], p.key_traits)}
-                            {renderList(tr.strengths[language], p.strengths)}
-                            {renderList(tr.areasToNote[language], p.areas_to_note)}
-                            {renderList(tr.luckyColors[language], p.lucky_colors)}
-                            {renderList(tr.luckyNumbers[language], p.lucky_numbers)}
-                          </div>
+                        <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+                          <Collapse
+                            accordion
+                            defaultActiveKey={firstKey ? [firstKey] : []}
+                            items={panels.map((s) => ({
+                              key: s.key,
+                              label: (
+                                <span className="font-serif text-gold-deep" style={{ fontWeight: 600 }}>
+                                  {tr[s.title][language]}
+                                </span>
+                              ),
+                              children: sections[s.key]?.trim() ? (
+                                <div>{renderProse(sections[s.key])}</div>
+                              ) : (
+                                <InsightsLoading language={language} compact />
+                              ),
+                            }))}
+                          />
                         </Card>
                       );
                     })()
@@ -1343,22 +1416,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
                     <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
                       <div className="flex flex-col items-center gap-3 py-2">
                         <button
-                          onClick={async () => {
-                            setGeneratingInsights(true);
-                            try {
-                              const idToken = await user.getIdToken();
-                              const res = await fetch('/api/insights', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-                                body: JSON.stringify({ chartKey }),
-                              });
-                              if (res.ok) setInsightsData(await res.json());
-                            } catch (err) {
-                              console.error('Failed to generate insights:', err);
-                            } finally {
-                              setGeneratingInsights(false);
-                            }
-                          }}
+                          onClick={() => generateInsights()}
                           style={{
                             padding: '10px 24px',
                             backgroundColor: '#3d3a5c', color: '#fff',

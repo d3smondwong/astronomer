@@ -64,7 +64,13 @@ export const translations = {
     comparativeView:  { en: 'Comparative View',                   ch: '对比视图' },
     luckyElements:    { en: 'Lucky Elements',                     ch: '用神' },
     luckyElemDesc:    { en: 'Elements that can bring balance to your chart', ch: '可为命盘带来平衡的五行' },
-    // Insights tab
+    // Insights tab — multi-section report titles
+    secPersonality:   { en: 'Core Personality & Character',       ch: '核心性格与品性' },
+    secFamily:        { en: 'Family',                             ch: '家庭' },
+    secRomance:       { en: 'Romance',                            ch: '感情' },
+    secCareer:        { en: 'Career & Talents',                   ch: '事业与才能' },
+    secWealth:        { en: 'Wealth',                             ch: '财富' },
+    secHealth:        { en: 'Health',                             ch: '健康' },
     personalityProfile: { en: 'Personality Profile',             ch: '性格分析' },
     yourArchetype:    { en: 'Your Archetype:',                   ch: '命盘原型：' },
     elementLabel:     { en: 'Element:',                          ch: '五行：' },

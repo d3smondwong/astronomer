@@ -12,10 +12,11 @@ from hydra import compose, initialize_config_dir
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
 
-from apps.backend.llm.base_provider import InsightsResponse, LLMConfig
+from apps.backend.llm.base_provider import InsightsReport, LLMConfig
 from apps.backend.llm.prompt_builder import PromptBuilder
 from apps.backend.llm.response_parser import ResponseParser
-from src.utils.logging import get_logger
+from apps.backend.llm.section_registry import SECTION_REGISTRY
+from apps.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -101,27 +102,96 @@ def get_active_model() -> str:
     return f"{config.provider}/{config.model}"
 
 
-def llm_analyse_bazi(llm_data: dict) -> InsightsResponse:
+def llm_analyse_bazi(llm_data: dict) -> InsightsReport:
     """
-    Run BaZi LLM analysis using the configured provider.
+    Run the multi-section BaZi LLM analysis using the configured provider.
+
+    Makes one LLM call per section in SECTION_REGISTRY (personality, family,
+    romance, career, wealth, health), passing the full chart each time and
+    steering focus via the section's guidance/emphasis. A failure in one
+    section is logged and skipped so the rest of the report still returns.
 
     Args:
         llm_data: The natal chart dict from the orchestrator
             (calculate_natal_chart output) — Chinese-keyed.
 
     Returns:
-        InsightsResponse with the personality contract and raw_text
+        InsightsReport: section key -> narrative prose (+ raw_by_section).
 
     Raises:
-        LLMError: For any configuration, API key, or network failure
+        LLMError: For configuration or API-key failures (raised before any
+            section runs). Per-section network/parse failures degrade gracefully.
     """
     config, system_template, user_template = _load_config()
 
-    logger.info("Calling %s / %s for BaZi analysis", config.provider, config.model)
+    logger.info(
+        "Calling %s / %s for BaZi analysis across %d sections",
+        config.provider,
+        config.model,
+        len(SECTION_REGISTRY),
+    )
+
+    provider = _make_provider(config)
+    builder = PromptBuilder(system_template, user_template)
+    parser = ResponseParser()
+
+    report = InsightsReport()
+
+    for section in SECTION_REGISTRY:
+        system_prompt, user_prompt = builder.build(section, llm_data)
+        try:
+            raw_text = provider.call(system_prompt, user_prompt)
+        except Exception as e:
+            logger.error(
+                "LLM call failed for section '%s': %s", section.key, e, exc_info=True
+            )
+            report.sections[section.key] = ""
+            report.raw_by_section[section.key] = ""
+            continue
+
+        logger.info(
+            "Section '%s' received (%d chars) from %s / %s",
+            section.key,
+            len(raw_text),
+            config.provider,
+            config.model,
+        )
+        report.raw_by_section[section.key] = raw_text
+        report.sections[section.key] = parser.parse_section(section.key, raw_text)
+
+    return report
+
+
+def llm_analyse_section(llm_data: dict, section_key: str) -> str:
+    """
+    Generate a single insight section — used for progressive/parallel loading
+    so the frontend can render each section as soon as it is ready.
+
+    Args:
+        llm_data:    The natal chart dict from the orchestrator.
+        section_key: One of the keys in SECTION_REGISTRY (e.g. "personality").
+
+    Returns:
+        The narrative prose for that section.
+
+    Raises:
+        LLMError: Unknown section key, config/API-key failure, or LLM call failure.
+    """
+    section = next((s for s in SECTION_REGISTRY if s.key == section_key), None)
+    if section is None:
+        raise LLMError(f"Unknown insight section: '{section_key}'")
+
+    config, system_template, user_template = _load_config()
+    logger.info(
+        "Calling %s / %s for insight section '%s'",
+        config.provider,
+        config.model,
+        section_key,
+    )
 
     provider = _make_provider(config)
     system_prompt, user_prompt = PromptBuilder(system_template, user_template).build(
-        llm_data
+        section, llm_data
     )
 
     try:
@@ -129,17 +199,11 @@ def llm_analyse_bazi(llm_data: dict) -> InsightsResponse:
     except LLMError:
         raise
     except Exception as e:
-        logger.error("LLM call failed: %s", e, exc_info=True)
+        logger.error("LLM call failed for section '%s': %s", section_key, e, exc_info=True)
         raise LLMError(f"{config.provider} API error: {e}") from e
 
-    logger.info(
-        "LLM response received (%d chars) from %s / %s",
-        len(raw_text),
-        config.provider,
-        config.model,
-    )
-
-    return ResponseParser().parse(raw_text)
+    logger.info("Section '%s' received (%d chars)", section_key, len(raw_text))
+    return ResponseParser().parse_section(section.key, raw_text)
 
 
 # --- EXECUTION ---
@@ -151,7 +215,7 @@ if __name__ == "__main__":
 
     load_dotenv()
 
-    from src.utils.logging import configure_logging
+    from apps.utils.logging import configure_logging
 
     configure_logging()
 
@@ -172,17 +236,14 @@ if __name__ == "__main__":
     )
 
     logger.info("=== Running LLM Analysis ===")
-    result = llm_analyse_bazi(chart)
+    report = llm_analyse_bazi(chart)
 
-    p = result.personality
-    logger.info(
-        "--- Personality ---\narchetype: %s | element: %s | traits: %d | strengths: %d | areas: %d | colors: %d | numbers: %d",
-        p.archetype,
-        p.element,
-        len(p.key_traits),
-        len(p.strengths),
-        len(p.areas_to_note),
-        len(p.lucky_colors),
-        len(p.lucky_numbers),
-    )
-    logger.info("--- Raw Text ---\n%s", result.raw_text)
+    for section in SECTION_REGISTRY:
+        narrative = report.sections.get(section.key, "")
+        logger.info(
+            "\n===== %s (%s) — %d chars =====\n%s",
+            section.title,
+            section.key,
+            len(narrative),
+            narrative or "[empty]",
+        )

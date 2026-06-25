@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyIdToken } from '@/lib/firebaseAdmin';
-import { getCachedInsights, setCachedInsights } from '@/lib/insightsCacheDb';
+import {
+  getCachedInsights,
+  setCachedInsights,
+  setCachedInsightsSection,
+} from '@/lib/insightsCacheDb';
 import { getCachedChart } from '@/lib/chartCacheDb';
 import { fetchInsights } from '@/lib/fastApiClient';
 
@@ -15,27 +19,77 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const body = await request.json();
-  const { chartKey } = body;
+  const { chartKey, section, force } = body;
+  // Correlation id: reuse the client-supplied one (so a whole report generation shares
+  // an id across its 6 section calls), else mint one. Flows to FastAPI via X-Request-Id.
+  const requestId: string = body.requestId || crypto.randomUUID();
   if (!chartKey) {
     return NextResponse.json({ error: 'chartKey required' }, { status: 400 });
   }
 
-  // Fast path: already cached
-  const cached = await getCachedInsights(chartKey);
-  if (cached) return NextResponse.json(cached);
+  // ── Single-section path (progressive/parallel loading) ──────────────────────
+  // Returns { sections: { [section]: text } }. Reads/writes only that section so
+  // the 6 parallel requests don't clobber each other (Firestore merge).
+  if (section) {
+    if (!force) {
+      const cached = await getCachedInsights(chartKey);
+      const existing = cached?.sections?.[section];
+      if (existing) return NextResponse.json({ sections: { [section]: existing } });
+    }
+    const chart = await getCachedChart(chartKey);
+    if (!chart) {
+      return NextResponse.json({ error: 'Chart not found for this key' }, { status: 404 });
+    }
+    try {
+      const result = await fetchInsights(chart.data, section, requestId);
+      const text = result.sections?.[section] ?? '';
+      await setCachedInsightsSection(chartKey, section, text);
+      return NextResponse.json({ sections: { [section]: text } });
+    } catch (err) {
+      console.error(
+        JSON.stringify({
+          event: 'insights_section_error',
+          requestId,
+          uid,
+          chartKey,
+          section,
+          message: err instanceof Error ? err.message : String(err),
+        }),
+      );
+      return NextResponse.json({ error: 'Failed to generate insights' }, { status: 502 });
+    }
+  }
 
-  // Cache miss: look up chart and generate
+  // ── Full-report path ────────────────────────────────────────────────────────
+  // Fast path: already cached. `force` (dev regenerate) skips the cache read so prompt/data
+  // edits take effect. A doc without populated `sections` is a stale (pre-multi-section) shape
+  // — treat it as a miss so it regenerates and overwrites.
+  if (!force) {
+    const cached = await getCachedInsights(chartKey);
+    if (cached?.sections && Object.keys(cached.sections).length) {
+      return NextResponse.json(cached);
+    }
+  }
+
   const chart = await getCachedChart(chartKey);
   if (!chart) {
     return NextResponse.json({ error: 'Chart not found for this key' }, { status: 404 });
   }
 
   try {
-    const insights = await fetchInsights(chart.data);
+    const insights = await fetchInsights(chart.data, undefined, requestId);
     await setCachedInsights(chartKey, insights);
     return NextResponse.json(insights);
   } catch (err) {
-    console.error('Insights generation error:', err);
+    console.error(
+      JSON.stringify({
+        event: 'insights_report_error',
+        requestId,
+        uid,
+        chartKey,
+        message: err instanceof Error ? err.message : String(err),
+      }),
+    );
     return NextResponse.json({ error: 'Failed to generate insights' }, { status: 502 });
   }
 }

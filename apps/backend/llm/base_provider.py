@@ -16,19 +16,15 @@ class LLMConfig:
 
 
 @dataclass
-class Personality:
-    """The personality section of the Insights contract."""
+class InsightsReport:
+    """The multi-section insight report.
 
-    archetype: str = ""
-    element: str = ""
-    key_traits: list[str] = field(default_factory=list)
-    strengths: list[str] = field(default_factory=list)
-    areas_to_note: list[str] = field(default_factory=list)
+    sections:       section key (e.g. "personality") -> narrative prose string.
+    raw_by_section: section key -> the raw LLM response for that section (for audit).
+    """
 
-@dataclass
-class InsightsResponse:
-    personality: Personality
-    raw_text: str
+    sections: dict[str, str] = field(default_factory=dict)
+    raw_by_section: dict[str, str] = field(default_factory=dict)
 
 
 class BaseProvider(ABC):

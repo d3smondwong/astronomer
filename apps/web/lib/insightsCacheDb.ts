@@ -23,3 +23,22 @@ export async function setCachedInsights(key: string, insights: InsightsResponse)
   const doc: InsightsCacheDoc = { ...insights, createdAt: new Date().toISOString() };
   await getDb().collection(COLLECTION).doc(key).set(doc);
 }
+
+/**
+ * Merge a single section into the cached doc. Uses Firestore's merge so that
+ * concurrent per-section writes (progressive loading fires all sections in
+ * parallel) each set a distinct `sections.<key>` without clobbering siblings.
+ */
+export async function setCachedInsightsSection(
+  key: string,
+  section: string,
+  text: string,
+): Promise<void> {
+  await getDb()
+    .collection(COLLECTION)
+    .doc(key)
+    .set(
+      { sections: { [section]: text }, createdAt: new Date().toISOString() },
+      { merge: true },
+    );
+}

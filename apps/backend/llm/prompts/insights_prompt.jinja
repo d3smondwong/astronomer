@@ -1,7 +1,21 @@
-Here is the person's natal BaZi chart as JSON:
+Study the complete natal BaZi chart below. The specific section to write is described after it.
+
+Here is the person's complete natal BaZi chart as JSON:
 
 {{ bazi_json }}
 
-Using this chart, generate the "personality" insights object described in the system instructions. Base the dominant element and lucky colors on the chart's five-element balance, and derive traits, strengths, and areas to note from the day master strength and ten gods.
+---
 
-Return ONLY the JSON object.
+## Section to write: {{ section.title }}
+
+{{ section.guidance }}
+
+Pay special attention to:
+{{ section.emphasis }}
+
+(The full chart above is provided so you can also draw on anything else genuinely relevant to this section — the focus above is guidance, not a limit.)
+
+Write the "{{ section.title }}" section as flowing, connected paragraphs (the person's story for this part of their life). No bullet points, headings, or labelled fields.
+
+Return ONLY this JSON object, nothing else:
+{"{{ section.key }}": "...your paragraphs here..."}

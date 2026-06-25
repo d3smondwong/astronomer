@@ -2,7 +2,7 @@ active_provider: gemini  # Options: gemini | claude | huggingface | deepseek
 
 providers:
   gemini:
-    model: gemini-3.1-flash-lite
+    model: gemini-2.5-flash
     temperature: 0.7
     max_tokens: 20000
     stream: false

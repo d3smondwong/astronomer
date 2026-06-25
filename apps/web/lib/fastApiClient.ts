@@ -28,18 +28,10 @@ export interface ChartResponse {
   is_full?: boolean;
 }
 
-export interface Personality {
-  archetype: string;
-  element: string;
-  key_traits: string[];
-  strengths: string[];
-  areas_to_note: string[];
-  lucky_colors: string[];
-  lucky_numbers: string[];
-}
-
 export interface InsightsResponse {
-  personality: Personality;
+  // section key (personality | family | romance | career | wealth | health)
+  // -> narrative prose for that life domain.
+  sections: Record<string, string>;
 }
 
 /**
@@ -65,19 +57,26 @@ export async function fetchNatalChart(input: BirthInputPayload): Promise<ChartRe
 }
 
 /**
- * Generate personality insights from an already-computed natal chart.
+ * Generate insights from an already-computed natal chart.
  *
  * Pass the `data` object returned by fetchNatalChart. Kept separate from chart
- * calculation so the slow LLM step never blocks chart rendering.
+ * calculation so the slow LLM step never blocks chart rendering. When `section`
+ * is provided, only that one section is generated (for progressive loading) and
+ * the response's `sections` map contains just that key.
  */
-export async function fetchInsights(chartData: Record<string, any>): Promise<InsightsResponse> {
+export async function fetchInsights(
+  chartData: Record<string, any>,
+  section?: string,
+  requestId?: string,
+): Promise<InsightsResponse> {
   const res = await fetch(`${FASTAPI_URL}/v1/chart/insights`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(FASTAPI_BEARER_TOKEN ? { Authorization: `Bearer ${FASTAPI_BEARER_TOKEN}` } : {}),
+      ...(requestId ? { 'X-Request-Id': requestId } : {}),
     },
-    body: JSON.stringify({ data: chartData }),
+    body: JSON.stringify({ data: chartData, ...(section ? { section } : {}) }),
     cache: 'no-store',
   });
 

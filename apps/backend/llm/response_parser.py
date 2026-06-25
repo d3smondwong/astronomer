@@ -1,5 +1,5 @@
 """
-Parses the raw LLM response into the structured Insights contract (personality).
+Parses a raw per-section LLM response into the narrative string for that section.
 """
 
 import json
@@ -7,38 +7,9 @@ import re
 
 from json_repair import repair_json
 
-from apps.backend.llm.base_provider import InsightsResponse, Personality
-from src.utils.logging import get_logger
+from apps.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-def _as_str_list(value) -> list[str]:
-    """Coerce an LLM value into a clean list of strings.
-
-    Accepts a list (filtered to non-empty strings) or a single string
-    (comma-separated or one item). Anything else becomes an empty list.
-    """
-    if value is None:
-        return []
-    if isinstance(value, str):
-        value = value.strip()
-        if not value:
-            return []
-        # Split comma-separated strings the model sometimes returns instead of a list
-        parts = [p.strip() for p in value.split(",")]
-        return [p for p in parts if p]
-    if isinstance(value, list):
-        out = []
-        for item in value:
-            if isinstance(item, str):
-                item = item.strip()
-                if item:
-                    out.append(item)
-            elif item is not None:
-                out.append(str(item))
-        return out
-    return []
 
 
 def _as_str(value) -> str:
@@ -83,8 +54,14 @@ def _repair_json_strings(text: str) -> str:
 
 
 class ResponseParser:
-    def parse(self, raw_text: str) -> InsightsResponse:
-        """Extract the personality section from a JSON LLM response."""
+    def parse_section(self, section_key: str, raw_text: str) -> str:
+        """Extract the narrative prose for one section from a JSON LLM response.
+
+        Expects ``{"<section_key>": "<narrative>"}``. Falls back gracefully:
+        if the wrapper key is missing, returns the first string value or the
+        cleaned raw text; on total parse failure returns "" so one bad section
+        never aborts the whole report.
+        """
         text = raw_text.strip()
 
         # Unwrap ```json ... ``` if present
@@ -102,37 +79,38 @@ class ResponseParser:
                 # Fall back to json-repair which handles unescaped quotes, missing commas, etc.
                 try:
                     data = json.loads(repair_json(text))
-                    logger.debug("ResponseParser: json-repair recovered malformed JSON")
+                    logger.debug(
+                        "ResponseParser[%s]: json-repair recovered malformed JSON",
+                        section_key,
+                    )
                 except (json.JSONDecodeError, Exception) as e:
                     logger.warning(
-                        "ResponseParser: JSON decode failed (%s) — returning empty personality", e
+                        "ResponseParser[%s]: JSON decode failed (%s) — using raw text",
+                        section_key,
+                        e,
                     )
-                    return InsightsResponse(personality=Personality(), raw_text=raw_text)
+                    return text
 
-        # Support both {"personality": {...}} and a flat top-level object
-        block = data.get("personality") if isinstance(data, dict) else None
-        if not isinstance(block, dict):
-            block = data if isinstance(data, dict) else {}
-
-        personality = Personality(
-            archetype=_as_str(block.get("archetype", "")),
-            element=_as_str(block.get("element", "")),
-            key_traits=_as_str_list(block.get("key_traits")),
-            strengths=_as_str_list(block.get("strengths")),
-            areas_to_note=_as_str_list(block.get("areas_to_note")),
-            lucky_colors=_as_str_list(block.get("lucky_colors")),
-            lucky_numbers=_as_str_list(block.get("lucky_numbers")),
-        )
+        if isinstance(data, dict):
+            # Preferred: the exact section key.
+            if section_key in data:
+                narrative = _as_str(data[section_key]).strip()
+            else:
+                # Model omitted/renamed the wrapper — take the first string value.
+                narrative = next(
+                    (_as_str(v).strip() for v in data.values() if isinstance(v, str)),
+                    "",
+                )
+            if not narrative:
+                logger.warning(
+                    "ResponseParser[%s]: parsed JSON had no narrative string", section_key
+                )
+        elif isinstance(data, str):
+            narrative = data.strip()
+        else:
+            narrative = ""
 
         logger.debug(
-            "Parsed personality — archetype=%r element=%r traits=%d strengths=%d areas=%d colors=%d numbers=%d",
-            personality.archetype,
-            personality.element,
-            len(personality.key_traits),
-            len(personality.strengths),
-            len(personality.areas_to_note),
-            len(personality.lucky_colors),
-            len(personality.lucky_numbers),
+            "Parsed section [%s] — %d chars", section_key, len(narrative)
         )
-
-        return InsightsResponse(personality=personality, raw_text=raw_text)
+        return narrative
