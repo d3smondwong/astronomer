@@ -48,6 +48,9 @@ export interface ChartResponse {
   zodiac: string;
   data: Record<string, any>;
   is_full?: boolean;
+  // 八字-based cache key (8 GanZhi letters + gender) returned by /v1/chart/natal.
+  // Computed server-side from the pillars — the only trustworthy source for the key.
+  chart_key: string;
 }
 
 export interface InsightsResponse {

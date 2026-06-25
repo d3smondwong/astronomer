@@ -1,8 +1,8 @@
 /**
  * profiles collection — user profile metadata.
  *
- * Each profile references its chart/insights via `chartKey` (chartCacheKey of the
- * birth data); the chart and insights themselves live in the chartCache /
+ * Each profile references its chart/insights via `chartKey` (the 八字-based key from
+ * NatalChartResponse.chart_key); the chart and insights themselves live in the chartCache /
  * insightsCache collections. Backed by Firestore via the Admin SDK (local: the
  * Firestore emulator). All functions are async.
  */

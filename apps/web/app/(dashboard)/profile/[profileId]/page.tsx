@@ -1,6 +1,5 @@
 import { findProfile } from '@/lib/profilesDb';
 import { fetchNatalChart, type InsightsResponse } from '@/lib/fastApiClient';
-import { chartCacheKey } from '@/lib/cacheKey';
 import { getCachedChart, setCachedChart } from '@/lib/chartCacheDb';
 import { getCachedInsights } from '@/lib/insightsCacheDb';
 import ProfilePageClient from './ProfilePageClient';
@@ -17,22 +16,26 @@ export default async function ProfilePage({ params }: { params: Promise<{ profil
     );
   }
 
-  const chartKey = profileRecord.chartKey ?? chartCacheKey(profileRecord.birthData);
+  // The 八字 key lives on the profile (computed server-side at creation). The frontend
+  // can't recompute it (no BaZi math in the browser), so a legacy profile missing the key
+  // gets it from the backend, which now returns chart_key alongside the chart.
+  let chartKey = profileRecord.chartKey ?? '';
 
   let chartData: any = null;
   let insights: InsightsResponse | null = null;
   try {
-    // Read the chart from cache; recompute and backfill on a miss (e.g. legacy profiles).
-    const cached = await getCachedChart(chartKey);
+    // Read the chart from cache; recompute and backfill on a miss (or a keyless legacy profile).
+    const cached = chartKey ? await getCachedChart(chartKey) : null;
     if (cached) {
       chartData = cached.data;
     } else {
       const chart = await fetchNatalChart(profileRecord.birthData);
       chartData = chart.data;
+      if (!chartKey) chartKey = chart.chart_key; // legacy profile had no stored key
       await setCachedChart(chartKey, chartData);
     }
 
-    insights = await getCachedInsights(chartKey);
+    if (chartKey) insights = await getCachedInsights(chartKey);
   } catch (error) {
     console.error('Error loading chart/insights:', error);
   }

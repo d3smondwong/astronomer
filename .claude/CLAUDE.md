@@ -66,12 +66,13 @@ class BirthInput(BaseModel):
 ```python
 class NatalChartResponse(BaseModel):
     data: Dict[str, Any]  # Complete Chinese-keyed chart output (see below)
+    chart_key: str        # 八字-based cache key (8 GanZhi letters + gender), e.g. "bBdLiGfJM"
 ```
 
 **Response Structure** — all Chinese-keyed fields from orchestrator:
 ```json
 {
-  "农历生日": "农历日期 HH:MM (时辰)",
+  "农历生日": "农历日期 (时辰)",
   "性别": "男 | 女",
   "生肖": "鼠 | 牛 | ... 猪",
   "生时节气": "节气名称",

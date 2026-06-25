@@ -70,8 +70,8 @@ async def calculate_natal(
             second=0,
         )
 
-        # Call the orchestrator (returns Chinese-keyed dict)
-        natal_chart = calculate_natal_chart(
+        # Call the orchestrator (returns Chinese-keyed dict + the 八字-based cache key)
+        natal_chart, chart_key = calculate_natal_chart(
             birth_datetime=birth_datetime,
             latitude=input_data.latitude,
             longitude=input_data.longitude,
@@ -79,8 +79,12 @@ async def calculate_natal(
             use_solar_time_correction=input_data.use_solar_time_correction,
         )
 
-        # Return the raw orchestrator output
-        return NatalChartResponse(data=natal_chart)
+        # Bind the computed key so this request's log lines carry [chart:…] even though
+        # the natal call is the one that *produces* the key (no X-Chart-Key header inbound).
+        chart_key_var.set(chart_key)
+
+        # Return the raw orchestrator output plus the cache key
+        return NatalChartResponse(data=natal_chart, chart_key=chart_key)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=f"Invalid input: {str(e)}")
     except Exception as e:

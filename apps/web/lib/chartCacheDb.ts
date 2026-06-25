@@ -1,6 +1,6 @@
 /**
  * chartCache collection — the deterministic natal chart, computed once per
- * unique birth input and reused. Keyed by chartCacheKey(birthData).
+ * unique 八字 and reused. Keyed by the 八字 chart key (NatalChartResponse.chart_key).
  */
 
 import { getDb } from '@/lib/firebaseAdmin';

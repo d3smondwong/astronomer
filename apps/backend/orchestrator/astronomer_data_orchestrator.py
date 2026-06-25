@@ -24,6 +24,7 @@ from datetime import datetime
 from lunar_python import Solar
 from apps.backend.astronomer_logic.true_solar_time import get_true_solar_time
 from apps.backend.astronomer_logic.bazi_pillars import get_bazi_pillars
+from apps.backend.astronomer_logic.bazi_key import encode_bazi_key
 from apps.backend.astronomer_logic.twelve_life_stages import get_twelve_life_stages
 from apps.backend.astronomer_logic.void_xun_kong import get_void_xun_kong, check_pillar_void_status
 from apps.backend.astronomer_logic.ten_gods import get_ten_gods, apply_heavenlystem_tranformation_tengods, apply_qi_sha_transformation
@@ -45,7 +46,7 @@ def calculate_natal_chart(
     longitude: float,
     gender: int,
     use_solar_time_correction: bool = False,
-) -> dict:
+) -> tuple[dict, str]:
     """
     Run the full Phase 1 natal chart calculation.
 
@@ -58,8 +59,11 @@ def calculate_natal_chart(
                                   If False, uses standard clock time directly.
 
     Returns:
-        Dict with top-level key 四柱实体 containing 年柱, 月柱, 日柱, 时柱.
-        Each pillar contains all Phase 1 data for that pillar.
+        (chart, chart_key) where:
+          - chart: dict with top-level key 四柱实体 containing 年柱, 月柱, 日柱, 时柱
+                   (each pillar holds all Phase 1 data), plus the other top-level fields.
+          - chart_key: the 八字-based cache key (see bazi_key.encode_bazi_key) — identical
+                   for everyone with the same four pillars + gender.
     """
     # Get lunar date - either via TST conversion or directly from standard time
     if use_solar_time_correction:
@@ -80,6 +84,9 @@ def calculate_natal_chart(
 
     lunar_time = lunar_birthday.getTime()
     bazi = lunar_birthday.getEightChar()
+
+    # 八字-based cache key — identical for everyone with the same four pillars + gender.
+    chart_key = encode_bazi_key(bazi, gender)
 
     # Modules keyed by 年柱/月柱/日柱/时柱
     pillars        = get_bazi_pillars(bazi)
@@ -151,8 +158,11 @@ def calculate_natal_chart(
     }
     natal_interpretations_data = get_natal_interpretations(partial_chart)
 
-    return {
-        "农历生日": lunar_birthday.toString() + f" {birth_datetime.hour:02d}:{birth_datetime.minute:02d} ({lunar_time})",
+    chart = {
+        # No raw wall-clock time here: this dict is shared across everyone with the same
+        # 八字, so it must hold only BaZi-deterministic content (lunar date + 时辰). The
+        # exact birth time is per-profile and shown from the profile record, not from here.
+        "农历生日": f"{lunar_birthday.toString()} ({lunar_time})",
         "性别": "男" if gender == 1 else "女",
         "生肖": lunar_birthday.getYearShengXiao(),
         "生时节气": lunar_birthday.getJieQi() or (lunar_birthday.getPrevJieQi().getName() if lunar_birthday.getPrevJieQi() else ""),
@@ -165,6 +175,8 @@ def calculate_natal_chart(
         **natal_interactions_data,
         **natal_interpretations_data,
     }
+
+    return chart, chart_key
 
 
 # ============================================================================
@@ -193,5 +205,6 @@ if __name__ == "__main__":
         logger.info("=" * 60)
         logger.info("Subject: %s  (%s)", name, birthday.strftime("%Y-%m-%d %H:%M"))
 
-        chart = calculate_natal_chart(birthday, lat, lon, gender=gender, use_solar_time_correction=True)
+        chart, chart_key = calculate_natal_chart(birthday, lat, lon, gender=gender, use_solar_time_correction=True)
+        logger.info("chart_key: %s", chart_key)
         logger.info("Natal chart output:\n%s", json.dumps(chart, ensure_ascii=False, indent=2))

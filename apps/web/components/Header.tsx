@@ -86,7 +86,7 @@ export default function Header() {
               </div>
             ) : (
               <button
-                onClick={openAuthModal}
+                onClick={() => openAuthModal()}
                 style={{
                   border: '1px solid #3d3a5c',
                   borderRadius: '8px',

@@ -28,3 +28,8 @@ class NatalChartResponse(BaseModel):
         ...,
         description="农历生日, 性别, 生肖, 四柱实体, 胎命身, etc.",
     )
+    chart_key: str = Field(
+        ...,
+        description="八字-based cache key (8 GanZhi letters + gender) — identical for "
+                    "everyone with the same four pillars + gender.",
+    )
