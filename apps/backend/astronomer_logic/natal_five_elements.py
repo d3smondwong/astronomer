@@ -550,7 +550,7 @@ if __name__ == "__main__":
     from apps.backend.astronomer_logic.void_xun_kong import get_void_xun_kong, check_pillar_void_status
     from apps.backend.astronomer_logic.ten_gods import get_ten_gods
     from apps.backend.astronomer_logic.natal_interactions import get_natal_interactions
-    from src.utils.logging import configure_logging, get_logger
+    from apps.utils.logging import configure_logging, get_logger
 
     configure_logging()
     logger = get_logger(__name__)

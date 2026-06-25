@@ -247,7 +247,7 @@ Implemented:
 import dataclasses
 
 from lunar_python.util import LunarUtil
-from src.utils.logging import get_logger
+from apps.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -3054,7 +3054,7 @@ if __name__ == "__main__":
     from apps.backend.astronomer_logic.bazi_pillars import get_bazi_pillars
     from apps.backend.astronomer_logic.void_xun_kong import get_void_xun_kong
     from apps.backend.astronomer_logic.ten_gods import get_ten_gods
-    from src.utils.logging import configure_logging, get_logger
+    from apps.utils.logging import configure_logging, get_logger
 
     configure_logging()
     logger = get_logger(__name__)

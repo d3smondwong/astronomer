@@ -5,7 +5,7 @@ Google Gemini LLM provider.
 import os
 
 from apps.backend.llm.base_provider import BaseProvider, LLMConfig
-from src.utils.logging import get_logger
+from apps.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -40,6 +40,17 @@ class GeminiProvider(BaseProvider):
                     max_output_tokens=self.config.max_tokens,
                 ),
             )
+            # Token usage — `cached_content_token_count` reflects implicit-cache hits on the
+            # shared chart+persona prefix (see llm_config gemini model). Fields may be None.
+            usage = getattr(response, "usage_metadata", None)
+            if usage is not None:
+                logger.info(
+                    "Gemini usage: prompt=%s cached=%s output=%s total=%s",
+                    getattr(usage, "prompt_token_count", None),
+                    getattr(usage, "cached_content_token_count", None),
+                    getattr(usage, "candidates_token_count", None),
+                    getattr(usage, "total_token_count", None),
+                )
             return response.text
         except Exception as e:
             logger.error("GeminiProvider error: %s", e, exc_info=True)

@@ -8,7 +8,7 @@ Requires DEEPSEEK_API_KEY in .env.
 import os
 
 from apps.backend.llm.base_provider import BaseProvider, LLMConfig
-from src.utils.logging import get_logger
+from apps.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

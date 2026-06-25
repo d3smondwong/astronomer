@@ -174,7 +174,7 @@ def calculate_natal_chart(
 if __name__ == "__main__":
     # Cross-check output against the TypeScript baziOrchestrator for the same birth date.
 
-    from src.utils.logging import configure_logging, get_logger
+    from apps.utils.logging import configure_logging, get_logger
     from datetime import datetime as dt
 
     logger = configure_logging()

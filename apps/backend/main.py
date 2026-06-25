@@ -11,6 +11,12 @@ from dotenv import load_dotenv
 # read os.environ. Explicit path so it works regardless of the working directory.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
+from apps.utils.logging import configure_logging
+
+# Initialize logging before routers/providers run, so backend INFO logs (e.g. Gemini
+# token usage) and errors are captured to stdout (Cloud Logging) and the app.log file.
+configure_logging()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apps.backend.routers import chart
