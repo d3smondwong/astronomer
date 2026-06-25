@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
 import { useAuth } from '@/lib/authContext';
+import { reportClientError } from '@/lib/errorReporter';
 import { deleteProfileAction } from './actions';
 import FiveElementsCard from './FiveElementsCard';
 import PillarInteractionsCard from './PillarInteractionsCard';
@@ -92,17 +93,30 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
       const res = await fetch('/api/insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ chartKey, section: key, force, requestId }),
+        body: JSON.stringify({ chartKey, section: key, force, requestId, profileId: profileRecord.id }),
       });
       if (res.ok) {
         const data: InsightsResponse = await res.json();
         const text = data.sections?.[key] ?? '';
         setInsightsData((prev) => ({ sections: { ...(prev?.sections ?? {}), [key]: text } }));
       } else {
-        console.error(`Insights section '${key}' failed [req:${requestId}]:`, res.status, await res.text());
+        const detail = await res.text().catch(() => '');
+        console.error(`Insights section '${key}' failed [req:${requestId}]:`, res.status, detail);
+        reportClientError({
+          context: 'insights_section', requestId, chartKey, profileId: profileRecord.id,
+          uid: user?.uid, section: key, status: res.status, message: detail || `HTTP ${res.status}`,
+        });
+        // Stable id collapses parallel section failures into a single toast.
+        toast.error(tr.errorInsights[language], { id: 'insights-error' });
       }
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error(`Insights section '${key}' failed [req:${requestId}]:`, err);
+      reportClientError({
+        context: 'insights_section', requestId, chartKey, profileId: profileRecord.id,
+        uid: user?.uid, section: key, message,
+      });
+      toast.error(tr.errorInsights[language], { id: 'insights-error' });
     } finally {
       setLoadingSections((prev) => prev.filter((k) => k !== key));
     }
@@ -119,7 +133,12 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
     try {
       idToken = await user.getIdToken();
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error(`Failed to get auth token [req:${requestId}]:`, err);
+      reportClientError({
+        context: 'auth_token', requestId, profileId: profileRecord.id, uid: user?.uid, message,
+      });
+      toast.error(tr.errorInsights[language], { id: 'insights-error' });
       setLoadingSections([]);
       return;
     }
@@ -145,7 +164,10 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
           body: JSON.stringify({ userId: currentUid }),
         });
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         console.error('Profile claim failed:', err);
+        // Background op — report for traceability but don't toast the user.
+        reportClientError({ context: 'profile_claim', profileId: profileRecord.id, uid: currentUid, message });
       }
       // Generate insights inline (claim errors shouldn't block this)
       await generateInsights();
@@ -167,10 +189,12 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
     setIsDeleting(true);
     try {
       await deleteProfileAction(profileRecord.id);
-      toast.success('Profile deleted successfully');
+      toast.success(tr.deleteSuccess[language]);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.error('Error deleting profile:', error);
-      toast.error('Failed to delete profile');
+      reportClientError({ context: 'profile_delete', profileId: profileRecord.id, uid: user?.uid, message });
+      toast.error(tr.deleteError[language]);
       setIsDeleting(false);
     }
   };

@@ -8,6 +8,28 @@
 const FASTAPI_URL = process.env.FASTAPI_URL ?? 'http://localhost:8000';
 const FASTAPI_BEARER_TOKEN = process.env.FASTAPI_BEARER_TOKEN ?? '';
 
+/**
+ * Per-request log/trace context, forwarded to FastAPI as X-* headers so its logs
+ * carry the same correlation ids (see apps/utils/logging.py). All fields optional —
+ * a guest has no `uid`; `chartKey` is the cross-path natal↔insights join key.
+ */
+export interface RequestContext {
+  requestId?: string;
+  chartKey?: string;
+  uid?: string;
+  profileId?: string;
+}
+
+function contextHeaders(ctx?: RequestContext): Record<string, string> {
+  if (!ctx) return {};
+  return {
+    ...(ctx.requestId ? { 'X-Request-Id': ctx.requestId } : {}),
+    ...(ctx.chartKey ? { 'X-Chart-Key': ctx.chartKey } : {}),
+    ...(ctx.uid ? { 'X-User-Id': ctx.uid } : {}),
+    ...(ctx.profileId ? { 'X-Profile-Id': ctx.profileId } : {}),
+  };
+}
+
 export interface BirthInputPayload {
   year: number;
   month: number;
@@ -37,12 +59,16 @@ export interface InsightsResponse {
 /**
  * Fetch natal chart (basic 4 pillars).
  */
-export async function fetchNatalChart(input: BirthInputPayload): Promise<ChartResponse> {
+export async function fetchNatalChart(
+  input: BirthInputPayload,
+  ctx?: RequestContext,
+): Promise<ChartResponse> {
   const res = await fetch(`${FASTAPI_URL}/v1/chart/natal`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(FASTAPI_BEARER_TOKEN ? { Authorization: `Bearer ${FASTAPI_BEARER_TOKEN}` } : {}),
+      ...contextHeaders(ctx),
     },
     body: JSON.stringify(input),
     cache: 'no-store',
@@ -67,14 +93,14 @@ export async function fetchNatalChart(input: BirthInputPayload): Promise<ChartRe
 export async function fetchInsights(
   chartData: Record<string, any>,
   section?: string,
-  requestId?: string,
+  ctx?: RequestContext,
 ): Promise<InsightsResponse> {
   const res = await fetch(`${FASTAPI_URL}/v1/chart/insights`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(FASTAPI_BEARER_TOKEN ? { Authorization: `Bearer ${FASTAPI_BEARER_TOKEN}` } : {}),
-      ...(requestId ? { 'X-Request-Id': requestId } : {}),
+      ...contextHeaders(ctx),
     },
     body: JSON.stringify({ data: chartData, ...(section ? { section } : {}) }),
     cache: 'no-store',

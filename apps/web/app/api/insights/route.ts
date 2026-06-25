@@ -6,7 +6,7 @@ import {
   setCachedInsightsSection,
 } from '@/lib/insightsCacheDb';
 import { getCachedChart } from '@/lib/chartCacheDb';
-import { fetchInsights } from '@/lib/fastApiClient';
+import { fetchInsights, type RequestContext } from '@/lib/fastApiClient';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const authHeader = request.headers.get('Authorization');
@@ -19,13 +19,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const body = await request.json();
-  const { chartKey, section, force } = body;
+  const { chartKey, section, force, profileId } = body;
   // Correlation id: reuse the client-supplied one (so a whole report generation shares
   // an id across its 6 section calls), else mint one. Flows to FastAPI via X-Request-Id.
   const requestId: string = body.requestId || crypto.randomUUID();
   if (!chartKey) {
     return NextResponse.json({ error: 'chartKey required' }, { status: 400 });
   }
+
+  // Trace context forwarded to FastAPI so its logs carry the same anchors.
+  const ctx: RequestContext = { requestId, chartKey, uid, profileId };
 
   // ── Single-section path (progressive/parallel loading) ──────────────────────
   // Returns { sections: { [section]: text } }. Reads/writes only that section so
@@ -41,7 +44,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Chart not found for this key' }, { status: 404 });
     }
     try {
-      const result = await fetchInsights(chart.data, section, requestId);
+      const result = await fetchInsights(chart.data, section, ctx);
       const text = result.sections?.[section] ?? '';
       await setCachedInsightsSection(chartKey, section, text);
       return NextResponse.json({ sections: { [section]: text } });
@@ -77,7 +80,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const insights = await fetchInsights(chart.data, undefined, requestId);
+    const insights = await fetchInsights(chart.data, undefined, ctx);
     await setCachedInsights(chartKey, insights);
     return NextResponse.json(insights);
   } catch (err) {

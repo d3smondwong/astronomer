@@ -99,6 +99,11 @@ export const translations = {
     deleteTitle:      { en: 'Delete Profile',   ch: '删除命盘' },
     deleteCancel:     { en: 'Cancel',           ch: '取消' },
     deleteOk:         { en: 'Delete',           ch: '删除' },
+    // Toasts
+    deleteSuccess:    { en: 'Profile deleted successfully', ch: '命盘删除成功' },
+    deleteError:      { en: 'Failed to delete the profile. Please try again.', ch: '删除命盘失败，请重试。' },
+    errorInsights:    { en: "We couldn't generate your reading at this time. Please try regenerating the chart.",
+                        ch: '暂时无法生成您的解读，请重新生成命盘。' },
     profileNotFound:  { en: 'Profile not found', ch: '找不到命盘' },
     loadingProfile:   { en: 'Loading profile...', ch: '加载中...' },
     tdLabel:          { en: 'Coming Soon',      ch: '敬请期待' },
@@ -141,7 +146,7 @@ export const translations = {
     labelFemale:      { en: 'Female',                 ch: '女' },
     btnGenerate:      { en: 'Generate My Bazi Chart', ch: '生成八字命盘' },
     successGenerated: { en: 'Bazi chart generated successfully!', ch: '八字命盘生成成功！' },
-    errorGenerated:   { en: 'Failed to generate Bazi chart. Please try again.', ch: '生成八字命盘失败，请重试。' },
+    errorGenerated:   { en: "We couldn't generate your chart at this time. Please try regenerating the chart.", ch: '暂时无法生成您的命盘，请重新生成命盘。' },
     successDeleted:   { en: 'Profile deleted',        ch: '命盘已删除' },
   },
   landing: {

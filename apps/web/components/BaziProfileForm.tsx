@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
 import { useAuth } from '@/lib/authContext';
+import { reportClientError } from '@/lib/errorReporter';
 
 const TimePickerWithSolar = ({
   value,
@@ -99,6 +100,10 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
 
     const submitChart = async (values: any, skipInsights: boolean) => {
       setLoading(true);
+      // Minted here at the true origin so the same id spans browser → Next → FastAPI,
+      // and ties a failure report to the server-side natal compute logs.
+      const requestId = crypto.randomUUID();
+      let status: number | undefined;
       try {
         const birthInput = {
           year: values.dob.year(),
@@ -113,6 +118,7 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
           profileName: values.fullName,
           birthLocation: values.location,
           skipInsights,
+          requestId,
         };
 
         const idToken = user ? await user.getIdToken() : null;
@@ -124,9 +130,10 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
           },
           body: JSON.stringify(birthInput),
         });
+        status = response.status;
 
         if (!response.ok) {
-          const errorData = await response.json();
+          const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error || `HTTP ${response.status}`);
         }
 
@@ -135,7 +142,9 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
         form.resetFields();
         onSuccess(profileId);
       } catch (error) {
-        console.error('Error generating Bazi chart:', error);
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`Error generating Bazi chart [req:${requestId}]:`, error);
+        reportClientError({ context: 'chart_generation', requestId, uid: user?.uid, status, message });
         toast.error(tr.errorGenerated[language]);
       } finally {
         setLoading(false);

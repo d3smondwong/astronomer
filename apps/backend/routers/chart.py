@@ -7,7 +7,7 @@ POST /v1/chart/insights  — LLM-generated personality insights from a natal cha
 
 from datetime import datetime
 from uuid import uuid4
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
 from apps.backend.data_models.birth_input import BirthInput, NatalChartResponse
 from apps.backend.data_models.insights import (
     InsightsRequest,
@@ -16,15 +16,43 @@ from apps.backend.data_models.insights import (
 from apps.backend.orchestrator.astronomer_data_orchestrator import calculate_natal_chart
 from apps.backend.llm.llm_service import llm_analyse_bazi, llm_analyse_section, LLMError
 from apps.backend.llm.section_registry import SECTION_REGISTRY
-from apps.utils.logging import get_logger, request_id_var
+from apps.utils.logging import (
+    get_logger,
+    request_id_var,
+    profile_id_var,
+    uid_var,
+    chart_key_var,
+)
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/v1/chart", tags=["chart"])
 
 
+def bind_log_context(
+    x_request_id: str | None = Header(default=None, alias="X-Request-Id"),
+    x_chart_key: str | None = Header(default=None, alias="X-Chart-Key"),
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    x_profile_id: str | None = Header(default=None, alias="X-Profile-Id"),
+) -> None:
+    """Bind per-request log context from the incoming X-* headers (set by the Next.js
+    route handlers) so every log line for this request — across modules and the LLM
+    provider — carries the same correlation ids for tracing.
+
+    Sets all four contextvars on every call (defaulting to "-", or a minted id for the
+    request id) so a value never bleeds from a prior request sharing the same context.
+    """
+    request_id_var.set(x_request_id or uuid4().hex[:12])
+    chart_key_var.set(x_chart_key or "-")
+    uid_var.set(x_user_id or "-")
+    profile_id_var.set(x_profile_id or "-")
+
+
 @router.post("/natal", response_model=NatalChartResponse)
-async def calculate_natal(input_data: BirthInput) -> NatalChartResponse:
+async def calculate_natal(
+    input_data: BirthInput,
+    _ctx: None = Depends(bind_log_context),
+) -> NatalChartResponse:
     """
     Calculate natal chart (4 pillars with all Phase 1 modules).
 
@@ -62,7 +90,7 @@ async def calculate_natal(input_data: BirthInput) -> NatalChartResponse:
 @router.post("/insights", response_model=InsightsResponse)
 async def generate_insights(
     request: InsightsRequest,
-    x_request_id: str | None = Header(default=None, alias="X-Request-Id"),
+    _ctx: None = Depends(bind_log_context),
 ) -> InsightsResponse:
     """
     Generate the multi-section insight report from an already-computed natal chart.
@@ -72,11 +100,9 @@ async def generate_insights(
     chart calculation so the slow, non-deterministic LLM step never blocks or
     breaks chart rendering.
 
-    Binds the incoming X-Request-Id (or a generated one) so every log line for this
-    request — across llm_service and the provider — carries the same id for tracing.
+    The X-* headers (bound by ``bind_log_context``) make every log line for this
+    request — across llm_service and the provider — carry the same correlation ids.
     """
-    request_id_var.set(x_request_id or uuid4().hex[:12])
-
     # Single-section path (progressive/parallel loading from the frontend).
     if request.section:
         valid_keys = {s.key for s in SECTION_REGISTRY}

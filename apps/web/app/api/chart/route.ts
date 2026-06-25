@@ -14,6 +14,7 @@ import {
   fetchInsights,
   BirthInputPayload,
   ChartResponse,
+  type RequestContext,
 } from '@/lib/fastApiClient';
 import { createProfile, type ProfileRecord } from '@/lib/profilesDb';
 import { chartCacheKey } from '@/lib/cacheKey';
@@ -34,6 +35,7 @@ interface ChartRequestBody {
   profileName?: string;
   birthLocation?: string;
   skipInsights?: boolean;
+  requestId?: string;
 }
 
 interface ChartResponseBody {
@@ -86,28 +88,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Deterministic key — identical births reuse the same cached chart/insights.
     const chartKey = chartCacheKey(birthInput);
 
+    // Trace context forwarded to FastAPI (X-* headers) so its logs share these ids.
+    // requestId originates in the browser (BaziProfileForm) and spans browser → Next →
+    // FastAPI; profileId is minted up-front so the natal/insights compute logs carry it.
+    const requestId: string = body.requestId || crypto.randomUUID();
+    const profileId = `profile_${Date.now()}`;
+    const ctx: RequestContext = { requestId, chartKey, uid: userId, profileId };
+
     // chartCache: get-or-compute the deterministic natal chart.
     let baziChart: ChartResponse;
     const cachedChart = await getCachedChart(chartKey);
     if (cachedChart) {
       baziChart = { lunar_date: '', gender: '', zodiac: '', data: cachedChart.data };
     } else {
-      baziChart = await fetchNatalChart(birthInput);
+      baziChart = await fetchNatalChart(birthInput, ctx);
       await setCachedChart(chartKey, baziChart.data);
     }
 
     // insightsCache: only generate LLM insights for authenticated users.
     if (!body.skipInsights && userId && !(await getCachedInsights(chartKey))) {
       try {
-        const insights = await fetchInsights(baziChart.data);
+        const insights = await fetchInsights(baziChart.data, undefined, ctx);
         await setCachedInsights(chartKey, insights);
       } catch (insightsError) {
         console.error('Error generating insights (non-fatal):', insightsError);
       }
     }
-
-    // Generate profile ID (Firestore doc id)
-    const profileId = `profile_${Date.now()}`;
 
     const profileRecord: ProfileRecord = {
       id: profileId,
