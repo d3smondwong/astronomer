@@ -66,8 +66,8 @@ export const translations = {
     luckyElemDesc:    { en: 'Elements that can bring balance to your chart', ch: '可为命盘带来平衡的五行' },
     // Insights tab — multi-section report titles
     secPersonality:   { en: 'Core Personality & Character',       ch: '核心性格与品性' },
-    secFamily:        { en: 'Family',                             ch: '家庭' },
-    secRomance:       { en: 'Romance',                            ch: '感情' },
+    secFamily:        { en: 'Family & Upbringing',                ch: '家庭与成长' },
+    secRomance:       { en: 'Love, Marriage & Children',          ch: '爱情、婚姻与子女' },
     secCareer:        { en: 'Career & Talents',                   ch: '事业与才能' },
     secWealth:        { en: 'Wealth',                             ch: '财富' },
     secHealth:        { en: 'Health',                             ch: '健康' },
@@ -76,6 +76,31 @@ export const translations = {
     careerHighlights:    { en: 'Career Highlights',               ch: '事业亮点' },
     careerChallenges:    { en: 'Career Challenges',               ch: '事业挑战' },
     careerAdvice:        { en: 'Career Advice',                   ch: '事业建议' },
+    // Personality section — structured group headings (other Chinese copy is prompt-driven)
+    personalityCore:      { en: 'Core Nature',                    ch: '核心本性' },
+    personalityMind:      { en: 'How You Think & Feel',           ch: '思维与情感' },
+    personalityDrives:    { en: 'What Drives You',                ch: '内在驱动' },
+    personalityStrengths: { en: 'Natural Strengths',              ch: '天赋优势' },
+    personalityWeakness:  { en: 'Things to Look Out For',         ch: '需留意之处' },
+    // Wealth section — structured group headings (other Chinese copy is prompt-driven)
+    wealthSources:       { en: 'How Wealth Comes to You',         ch: '财富来源' },
+    wealthCapacity:      { en: 'Capacity to Build & Keep',        ch: '聚财守财能力' },
+    wealthRisks:         { en: 'Wealth Risks & Leaks',            ch: '破财风险' },
+    wealthTiming:        { en: 'Timing of Prosperity',            ch: '财运时机' },
+    wealthStrategy:      { en: 'Wealth Strategy',                 ch: '理财建议' },
+    // Family section — structured group headings (other Chinese copy is prompt-driven)
+    familyRoots:         { en: 'Roots & Ancestry',               ch: '根源与祖辈' },
+    familyParents:       { en: 'Your Parents',                   ch: '父母' },
+    familySiblings:      { en: 'Siblings & Friends Growing Up',  ch: '手足与成长伙伴' },
+    // Romance section — structured group headings (other Chinese copy is prompt-driven)
+    romancePartner:      { en: 'How You Love & Who Suits You',   ch: '爱的方式与良配' },
+    romanceSpouse:       { en: 'Your Spouse',                    ch: '配偶' },
+    romanceJourney:      { en: 'The Journey & Its Timing',       ch: '情路与时机' },
+    romanceChildren:     { en: 'Children & Your Own Home',       ch: '子女与家庭' },
+    // Health section — structured group headings (other Chinese copy is prompt-driven)
+    healthConstitution:  { en: 'Constitution & Vitality',        ch: '体质与精力' },
+    healthAttention:     { en: 'Where Your Health Needs Attention', ch: '健康需留意之处' },
+    healthCare:          { en: 'Staying Well',                   ch: '养生之道' },
     personalityProfile: { en: 'Personality Profile',             ch: '性格分析' },
     yourArchetype:    { en: 'Your Archetype:',                   ch: '命盘原型：' },
     elementLabel:     { en: 'Element:',                          ch: '五行：' },

@@ -66,23 +66,59 @@ const renderProse = (text: string) =>
       </p>
     ));
 
-// Career group key -> translation key for its structured-section heading.
-const CAREER_LABEL_KEYS: Record<string, keyof typeof translations.profile> = {
-  path_to_success: 'careerPathToSuccess',
-  highlights: 'careerHighlights',
-  challenges: 'careerChallenges',
-  advice: 'careerAdvice',
+type LabelKeyMap = Record<string, keyof typeof translations.profile>;
+
+// Per-section group-key -> heading translation key. A section listed here renders
+// as a structured object (labelled groups); everything else renders as prose.
+const STRUCTURED_LABEL_KEYS: Record<string, LabelKeyMap> = {
+  personality: {
+    core: 'personalityCore',
+    mind: 'personalityMind',
+    drives: 'personalityDrives',
+    strengths: 'personalityStrengths',
+    weakness: 'personalityWeakness',
+  },
+  family: {
+    roots: 'familyRoots',
+    parents: 'familyParents',
+    siblings: 'familySiblings',
+  },
+  romance: {
+    partner: 'romancePartner',
+    spouse: 'romanceSpouse',
+    journey: 'romanceJourney',
+    children: 'romanceChildren',
+  },
+  career: {
+    path_to_success: 'careerPathToSuccess',
+    highlights: 'careerHighlights',
+    challenges: 'careerChallenges',
+    advice: 'careerAdvice',
+  },
+  wealth: {
+    sources: 'wealthSources',
+    capacity: 'wealthCapacity',
+    risks: 'wealthRisks',
+    timing: 'wealthTiming',
+    strategy: 'wealthStrategy',
+  },
+  health: {
+    constitution: 'healthConstitution',
+    attention: 'healthAttention',
+    care: 'healthCare',
+  },
 };
 
-// Career renders as labelled groups of bulleted point/explanation items.
-const renderCareer = (
+// Structured sections render as labelled groups of bulleted point/explanation items.
+const renderStructured = (
   value: StructuredSection,
+  labelKeys: LabelKeyMap,
   language: keyof typeof translations.profile.careerAdvice,
 ) =>
   Object.entries(value)
     .filter(([, items]) => Array.isArray(items) && items.length > 0)
     .map(([groupKey, items]) => {
-      const labelKey = CAREER_LABEL_KEYS[groupKey];
+      const labelKey = labelKeys[groupKey];
       return (
       <div key={groupKey} className="mb-5 last:mb-0">
         <h4 className="font-serif text-gold-deep mb-2" style={{ fontWeight: 600 }}>
@@ -1443,7 +1479,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
                         </button>
                       </div>
                     </Card>
-                  ) : generating && !insightsData?.sections?.personality ? (
+                  ) : generating && !sectionHasContent(insightsData?.sections?.personality) ? (
                     /* Personality not ready yet — themed full loader */
                     <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
                       <InsightsLoading language={language} />
@@ -1472,7 +1508,11 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
                                 <div>
                                   {typeof sections[s.key] === 'string'
                                     ? renderProse(sections[s.key] as string)
-                                    : renderCareer(sections[s.key] as StructuredSection, language)}
+                                    : renderStructured(
+                                        sections[s.key] as StructuredSection,
+                                        STRUCTURED_LABEL_KEYS[s.key] ?? {},
+                                        language,
+                                      )}
                                 </div>
                               ) : (
                                 <InsightsLoading language={language} compact />
