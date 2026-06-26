@@ -24,6 +24,8 @@ class GeminiProvider(BaseProvider):
         self._types = types
 
     def call(self, system_prompt: str, user_prompt: str) -> str:
+        from google.genai import errors
+
         logger.debug(
             "GeminiProvider calling model=%s temperature=%s max_tokens=%s",
             self.config.model,
@@ -40,18 +42,27 @@ class GeminiProvider(BaseProvider):
                     max_output_tokens=self.config.max_tokens,
                 ),
             )
-            # Token usage — `cached_content_token_count` reflects implicit-cache hits on the
-            # shared chart+persona prefix (see llm_config gemini model). Fields may be None.
-            usage = getattr(response, "usage_metadata", None)
-            if usage is not None:
-                logger.info(
-                    "Gemini usage: prompt=%s cached=%s output=%s total=%s",
-                    getattr(usage, "prompt_token_count", None),
-                    getattr(usage, "cached_content_token_count", None),
-                    getattr(usage, "candidates_token_count", None),
-                    getattr(usage, "total_token_count", None),
-                )
-            return response.text
-        except Exception as e:
-            logger.error("GeminiProvider error: %s", e, exc_info=True)
+        except errors.APIError as e:
+            # Base class for client (4xx) and server (5xx) errors. Code bugs
+            # deliberately propagate unmasked.
+            logger.error(
+                "Gemini API error (model=%s, code=%s): %s",
+                self.config.model,
+                getattr(e, "code", None),
+                e,
+                exc_info=True,
+            )
             raise
+
+        # Token usage — `cached_content_token_count` reflects implicit-cache hits on the
+        # shared chart+persona prefix (see llm_config gemini model). Fields may be None.
+        usage = getattr(response, "usage_metadata", None)
+        if usage is not None:
+            logger.info(
+                "Gemini usage: prompt=%s cached=%s output=%s total=%s",
+                getattr(usage, "prompt_token_count", None),
+                getattr(usage, "cached_content_token_count", None),
+                getattr(usage, "candidates_token_count", None),
+                getattr(usage, "total_token_count", None),
+            )
+        return response.text
