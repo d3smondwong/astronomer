@@ -1,7 +1,20 @@
 """
-DeepSeek provider — uses the OpenAI-compatible API.
-Supports deepseek-chat (DeepSeek-V3) and deepseek-reasoner (DeepSeek-R1).
-Model is configured in config/llm_config.yaml under providers.deepseek.model.
+DeepSeek provider — calls deepseek-v4-flash (or deepseek-v4-pro) through the
+OpenAI-compatible Chat Completions API.
+
+Thinking vs. non-thinking is now a *mode* of a single model, not a separate
+model name (the old deepseek-chat / deepseek-reasoner aliases are deprecated):
+toggle it with the DeepSeek-specific ``thinking`` object, passed via the OpenAI
+SDK's ``extra_body``. Both switches live in config/llm_config.yaml under
+providers.deepseek (``thinking`` / ``reasoning_effort``). ``temperature`` only
+takes effect in non-thinking mode — thinking mode silently ignores it.
+
+Context caching is automatic on DeepSeek — no setup. Requests sharing a prefix
+are billed at the cheaper cache-hit rate. Our six section calls per chart share
+the same system prompt and the chart JSON placed first in the user prompt, so
+that whole block is a cache prefix after the first call. The usage log surfaces
+``prompt_cache_hit_tokens`` / ``prompt_cache_miss_tokens`` so we can confirm it.
+
 Requires DEEPSEEK_API_KEY in .env.
 """
 
@@ -27,29 +40,69 @@ class DeepSeekProvider(BaseProvider):
         self._client = OpenAI(api_key=api_key, base_url=_DEEPSEEK_BASE_URL)
 
     def call(self, system_prompt: str, user_prompt: str) -> str:
-        # deepseek-reasoner (R1) does not accept a temperature parameter
-        is_reasoner = self.config.model == "deepseek-reasoner"
+        import openai
+        from openai.types.chat import ChatCompletionMessageParam
+
+        thinking_on = self.config.thinking
         logger.debug(
-            "DeepSeekProvider calling model=%s temperature=%s max_tokens=%s",
+            "DeepSeekProvider calling model=%s thinking=%s temperature=%s max_tokens=%s",
             self.config.model,
-            "n/a (reasoner)" if is_reasoner else self.config.temperature,
+            thinking_on,
+            "n/a (thinking)" if thinking_on else self.config.temperature,
             self.config.max_tokens,
         )
-        try:
-            from openai import Omit
-            from openai.types.chat import ChatCompletionMessageParam
 
-            messages: list[ChatCompletionMessageParam] = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ]
-            response = self._client.chat.completions.create(
-                model=self.config.model,
-                messages=messages,
-                max_tokens=self.config.max_tokens,
-                temperature=Omit() if is_reasoner else self.config.temperature,
+        messages: list[ChatCompletionMessageParam] = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        params: dict = {
+            "model": self.config.model,
+            "messages": messages,
+            "max_tokens": self.config.max_tokens,
+            # `thinking` is DeepSeek-specific → extra_body. `reasoning_effort` is a
+            # native OpenAI param and must stay top-level (nesting it inside
+            # `thinking` gets silently stripped).
+            "extra_body": {"thinking": {"type": "enabled" if thinking_on else "disabled"}},
+        }
+        if thinking_on:
+            params["reasoning_effort"] = self.config.reasoning_effort
+        else:
+            # thinking mode silently ignores temperature, so only send it when off.
+            params["temperature"] = self.config.temperature
+
+        try:
+            response = self._client.chat.completions.create(**params)
+        except openai.APIError as e:
+            # Base class for every API failure (connection, timeout, rate-limit,
+            # 4xx/5xx). Code bugs deliberately propagate unmasked.
+            status = getattr(e, "status_code", None)
+            logger.error(
+                "DeepSeek API error (model=%s, status=%s): %s",
+                self.config.model,
+                status,
+                e,
+                exc_info=True,
             )
-            return response.choices[0].message.content or ""
-        except Exception as e:
-            logger.error("DeepSeekProvider error: %s", e, exc_info=True)
             raise
+
+        self._log_usage(response)
+        return response.choices[0].message.content or ""
+
+    @staticmethod
+    def _log_usage(response) -> None:
+        """Log token usage — cache hit/miss confirms prefix caching is working."""
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return
+        details = getattr(usage, "completion_tokens_details", None)
+        logger.info(
+            "DeepSeek usage: prompt=%s cache_hit=%s cache_miss=%s completion=%s "
+            "reasoning=%s total=%s",
+            getattr(usage, "prompt_tokens", None),
+            getattr(usage, "prompt_cache_hit_tokens", None),
+            getattr(usage, "prompt_cache_miss_tokens", None),
+            getattr(usage, "completion_tokens", None),
+            getattr(details, "reasoning_tokens", None) if details else None,
+            getattr(usage, "total_tokens", None),
+        )
