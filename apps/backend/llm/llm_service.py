@@ -59,6 +59,8 @@ def _load_config() -> tuple[LLMConfig, str, str]:
         temperature=provider_cfg.temperature,
         max_tokens=provider_cfg.max_tokens,
         stream=provider_cfg.get("stream", False),
+        thinking=provider_cfg.get("thinking", False),
+        reasoning_effort=provider_cfg.get("reasoning_effort", "high"),
     )
 
     system_template = OmegaConf.select(

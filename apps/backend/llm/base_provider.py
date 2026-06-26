@@ -14,6 +14,10 @@ class LLMConfig:
     temperature: float
     max_tokens: int
     stream: bool = False
+    # Reasoning controls — honoured by providers whose models support a thinking
+    # mode (e.g. DeepSeek v4). Ignored by providers that don't.
+    thinking: bool = False
+    reasoning_effort: str = "high"
 
 
 @dataclass
