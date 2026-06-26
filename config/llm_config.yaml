@@ -1,4 +1,4 @@
-active_provider: gemini  # Options: gemini | claude | huggingface | deepseek
+active_provider: deepseek  # Options: gemini | claude | huggingface | deepseek
 
 providers:
   gemini:
@@ -20,10 +20,12 @@ providers:
     stream: false
 
   deepseek:
-    model: deepseek-chat
-    temperature: 0.2
-    max_tokens: 8192
+    model: deepseek-v4-flash      # deepseek-v4-flash | deepseek-v4-pro
+    temperature: 0.7              # only applied when thinking: false
+    max_tokens: 20000
     stream: false
+    thinking: false               # true = emit chain-of-thought before answering
+    reasoning_effort: high        # high | max (only used when thinking: true)
 
 templates:
   system: prompts/system_prompt.jinja
