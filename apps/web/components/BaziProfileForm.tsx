@@ -60,26 +60,30 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
     const [loading, setLoading] = React.useState(false);
     const { language } = useLanguage();
     const tr = translations.form;
-    const { user, openAuthModal } = useAuth();
+    const { user, loading: authLoading, openAuthModal, refreshSession } = useAuth();
 
-    // Stores form values when guest tries to submit — auto-submitted once they sign in
+    // Stores form values when a guest is funneled to sign-up — auto-submitted once they upgrade.
     const pendingValuesRef = useRef<any>(null);
-    const prevUserUidRef = useRef<string | null>(null);
+    const prevIsAnonRef = useRef<boolean | null>(null);
 
     useImperativeHandle(ref, () => ({
       reset: () => { form.resetFields(); setLoading(false); pendingValuesRef.current = null; },
     }));
 
-    // When user transitions from null → signed-in with pending values, auto-submit
+    // When the guest (anonymous) upgrades to a permanent account, auto-submit any chart held
+    // behind the sign-up prompt (it's now tied to the new account).
     useEffect(() => {
-      const currentUid = user?.uid ?? null;
-      if (prevUserUidRef.current === null && currentUid !== null && pendingValuesRef.current !== null) {
-        const values = pendingValuesRef.current;
-        pendingValuesRef.current = null;
-        void submitChart(values, false);
+      const wasAnon = prevIsAnonRef.current;
+      const nowAnon = user?.isAnonymous ?? null;
+      prevIsAnonRef.current = nowAnon;
+      if (wasAnon === true && nowAnon === false) {
+        if (pendingValuesRef.current !== null) {
+          const values = pendingValuesRef.current;
+          pendingValuesRef.current = null;
+          void submitChart(values, false);
+        }
       }
-      prevUserUidRef.current = currentUid;
-    }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [user?.isAnonymous]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const loadDemoProfile = () => {
       form.setFieldsValue({
@@ -132,14 +136,32 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
         });
         status = response.status;
 
+        if (response.status === 409) {
+          // Guest's one free chart is already used (server-enforced) → require an account.
+          // Hold the values so the chart auto-submits, tied to the new account, after sign-up.
+          // pendingChart tells AuthModal to stand down from its own routing so this form owns
+          // the post-auth navigation (avoids a competing redirect / dropped chart).
+          pendingValuesRef.current = values;
+          openAuthModal({ reason: 'pendingChart' });
+          return;
+        }
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error || `HTTP ${response.status}`);
         }
 
         const { profileId } = await response.json();
-        toast.success(tr.successGenerated[language]);
         form.resetFields();
+        // Make sure the session cookie reflects the current (owner) identity before navigating —
+        // otherwise the SSR ownership check would bounce us off the chart we just created (e.g.
+        // right after an anonymous→permanent upgrade). If it can't be established even after
+        // retries, don't walk into that redirect loop — the chart was saved; tell the user.
+        if (!(await refreshSession())) {
+          toast.error(translations.auth.sessionError[language]);
+          return;
+        }
+        toast.success(tr.successGenerated[language]);
         onSuccess(profileId);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -152,20 +174,16 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
     };
 
     const onFinish = async (values: any) => {
+      // Auth signs in anonymously on load; in the brief window before that completes (or if it
+      // failed), `user` is null and /api/chart would 401. Guard rather than show a generic error.
       if (!user) {
-        // Guest: store values and open auth modal with skip option
-        pendingValuesRef.current = values;
-        openAuthModal({
-          showSkip: true,
-          onSkip: () => {
-            const v = pendingValuesRef.current;
-            pendingValuesRef.current = null;
-            if (v) void submitChart(v, true);
-          },
-        });
+        toast.error(tr.notReady[language]);
         return;
       }
-      await submitChart(values, false);
+      // Guests (anonymous) get the chart only — skipInsights — and the server enforces the
+      // one-free-chart limit, returning 409 which submitChart turns into a sign-up prompt.
+      // Permanent users always generate, with insights.
+      await submitChart(values, user.isAnonymous);
     };
 
     const labelClass = 'text-sm uppercase tracking-widest font-serif text-bronze-muted/60';
@@ -236,6 +254,7 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
           type="primary"
           htmlType="submit"
           loading={loading}
+          disabled={authLoading}
           className={
             submitClassName ??
             'gold-gradient w-full h-12 text-white font-serif text-base tracking-wide border-none shadow-lg hover:opacity-90 transition-all active:scale-95'

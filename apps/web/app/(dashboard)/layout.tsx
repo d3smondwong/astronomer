@@ -42,27 +42,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   const loadProfiles = async () => {
-    // Guests have no userId — fetch the current profile from the URL instead of listing all.
-    if (!user) {
-      const match = pathname.match(/\/profile\/([^/]+)/);
-      if (match) {
-        try {
-          const res = await fetch(`/api/profiles/${match[1]}`);
-          if (res.ok) {
-            const profile = await res.json();
-            setProfiles([profile]);
-          } else {
-            setProfiles([]);
-          }
-        } catch {
-          setProfiles([]);
-        }
-      } else {
-        setProfiles([]);
-      }
-      return;
-    }
-
+    // Every visitor is a Firebase user now (anonymous guests included), so list by UID.
+    if (!user) return; // auth not bootstrapped yet
     try {
       const idToken = await user.getIdToken();
       const res = await fetch('/api/profiles', {
@@ -77,7 +58,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   };
 
-  const handleAddProfile = () => setIsModalOpen(true);
+  const handleAddProfile = () => {
+    // A guest who already has their one free chart must sign up to add more. profiles is the
+    // authoritative count for the current (anonymous) session.
+    if (user?.isAnonymous && profiles.length >= 1) {
+      openAuthModal({ reason: 'addChart' });
+      return;
+    }
+    setIsModalOpen(true);
+  };
 
   const handleModalClose = () => {
     setIsModalOpen(false);
@@ -90,18 +79,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push(`/profile/${profileId}`);
   };
 
-  const handleDeleteProfile = async (id: string) => {
+  const handleDeleteProfile = async (profileId: string) => {
     try {
-      await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
-      const remaining = profiles.filter((p: any) => p.id !== id);
+      const idToken = user ? await user.getIdToken() : null;
+      await fetch(`/api/profiles/${profileId}`, {
+        method: 'DELETE',
+        headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
+      });
+      const remaining = profiles.filter((p: any) => p.profileId !== profileId);
       setProfiles(remaining);
       toast.success(tr.successDeleted[language]);
 
-      if (pathname.includes(id)) {
+      if (pathname.includes(profileId)) {
         if (remaining.length > 0) {
-        const deletedIndex = profiles.findIndex((p: any) => p.id === id);
+        const deletedIndex = profiles.findIndex((p: any) => p.profileId === profileId);
         const next = remaining[deletedIndex] ?? remaining[deletedIndex - 1];
-        router.push(`/profile/${next.id}`);
+        router.push(`/profile/${next.profileId}`);
       } else {
         handleAddProfile();
       }
@@ -180,31 +173,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   ) : (
                     profiles.map((profile) => (
                       <div
-                        key={profile.id}
+                        key={profile.profileId}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           borderRadius: '6px',
                           marginBottom: '2px',
-                          borderLeft: isActive(profile.id) ? '2px solid #735c00' : '2px solid transparent',
-                          backgroundColor: isActive(profile.id) ? 'rgba(115, 92, 0, 0.07)' : 'transparent',
+                          borderLeft: isActive(profile.profileId) ? '2px solid #735c00' : '2px solid transparent',
+                          backgroundColor: isActive(profile.profileId) ? 'rgba(115, 92, 0, 0.07)' : 'transparent',
                           transition: 'all 0.15s ease',
                         }}
                         className="group"
                       >
-                        <Link href={`/profile/${profile.id}`} style={{ flex: 1 }}>
+                        <Link href={`/profile/${profile.profileId}`} style={{ flex: 1 }}>
                           <button
                             style={{
                               width: '100%', display: 'flex', alignItems: 'center', gap: isMounted && isCollapsed ? '4px' : '8px',
                               padding: '7px 10px', background: 'none', border: 'none', cursor: 'pointer',
-                              fontSize: '14px', color: isActive(profile.id) ? '#735c00' : '#4d4635',
-                              fontWeight: isActive(profile.id) ? '500' : '400',
+                              fontSize: '14px', color: isActive(profile.profileId) ? '#735c00' : '#4d4635',
+                              fontWeight: isActive(profile.profileId) ? '500' : '400',
                               textAlign: 'left', transition: 'color 0.15s ease', justifyContent: isMounted && isCollapsed ? 'center' : 'flex-start',
                             }}
                             title={profile.name}
                           >
-                            <User className="w-3.5 h-3.5" style={{ flexShrink: 0, opacity: isActive(profile.id) ? 1 : 0.6 }} />
+                            <User className="w-3.5 h-3.5" style={{ flexShrink: 0, opacity: isActive(profile.profileId) ? 1 : 0.6 }} />
                             {!(isMounted && isCollapsed) && (
                               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</span>
                             )}
@@ -217,7 +210,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <Popconfirm
                           title={tr.deleteProfile[language]}
                           description={`Are you sure you want to delete "${profile.name}"? This action cannot be undone.`}
-                          onConfirm={() => handleDeleteProfile(profile.id)}
+                          onConfirm={() => handleDeleteProfile(profile.profileId)}
                           okText={tr.deleteOk[language]}
                           cancelText={tr.deleteCancel[language]}
                         >
@@ -305,14 +298,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 fontSize: '16px', fontWeight: 700, color: '#735c00', fontFamily: 'Noto Serif, serif',
               }}>
-                {user ? user.email?.[0]?.toUpperCase() : <User className="w-5 h-5" style={{ color: '#735c00' }} />}
+                {user && !user.isAnonymous ? user.email?.[0]?.toUpperCase() : <User className="w-5 h-5" style={{ color: '#735c00' }} />}
               </div>
               <p style={{ fontSize: '12px', fontWeight: '500', color: '#4d4635', margin: 0, fontFamily: 'Noto Serif, serif' }}>
-                {user ? user.email?.split('@')[0] : tr.guest[language]}
+                {user && !user.isAnonymous ? user.email?.split('@')[0] : tr.guest[language]}
               </p>
               <button
                 className="sidebar-login-btn"
-                onClick={() => user ? signOut() : openAuthModal()}
+                onClick={() => (user && !user.isAnonymous) ? signOut() : openAuthModal()}
                 style={{
                   fontSize: '10px', color: '#735c00', background: 'transparent',
                   border: '1px solid rgba(115, 92, 0, 0.3)', cursor: 'pointer',
@@ -323,7 +316,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(115, 92, 0, 0.08)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(115, 92, 0, 0.5)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(115, 92, 0, 0.3)'; }}
               >
-                {user ? translations.header.signOut[language] : translations.header.loginSignUp[language]}
+                {user && !user.isAnonymous ? translations.header.signOut[language] : translations.header.loginSignUp[language]}
               </button>
               {/* Language toggle */}
               <div

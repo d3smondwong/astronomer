@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyIdToken } from '@/lib/firebaseAdmin';
+import { verifyToken } from '@/lib/firebaseAdmin';
 import {
   getCachedInsights,
   setCachedInsights,
@@ -13,18 +13,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!authHeader?.startsWith('Bearer ')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const uid = await verifyIdToken(authHeader.slice(7));
-  if (!uid) {
+  const caller = await verifyToken(authHeader.slice(7));
+  if (!caller) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  // Insights are an account-only feature; anonymous guests get the chart only.
+  if (caller.isAnonymous) {
+    return NextResponse.json({ error: 'Account required for insights' }, { status: 403 });
+  }
+  const uid = caller.uid;
 
   const body = await request.json();
   const { chartKey, section, force, profileId } = body;
   // Correlation id: reuse the client-supplied one (so a whole report generation shares
   // an id across its 6 section calls), else mint one. Flows to FastAPI via X-Request-Id.
   const requestId: string = body.requestId || crypto.randomUUID();
+  // chartKey identifies the (shared) chart to feed the LLM; profileId is the cache key for the
+  // (per-profile) insights. Both are required: identical inputs share a chart but not insights.
   if (!chartKey) {
     return NextResponse.json({ error: 'chartKey required' }, { status: 400 });
+  }
+  if (!profileId) {
+    return NextResponse.json({ error: 'profileId required' }, { status: 400 });
   }
 
   // Trace context forwarded to FastAPI so its logs carry the same anchors.
@@ -35,7 +45,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // the 6 parallel requests don't clobber each other (Firestore merge).
   if (section) {
     if (!force) {
-      const cached = await getCachedInsights(chartKey);
+      const cached = await getCachedInsights(profileId);
       const existing = cached?.sections?.[section];
       if (existing) return NextResponse.json({ sections: { [section]: existing } });
     }
@@ -46,7 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       const result = await fetchInsights(chart.data, section, ctx);
       const text = result.sections?.[section] ?? '';
-      await setCachedInsightsSection(chartKey, section, text);
+      await setCachedInsightsSection(profileId, section, text);
       return NextResponse.json({ sections: { [section]: text } });
     } catch (err) {
       console.error(
@@ -68,7 +78,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // edits take effect. A doc without populated `sections` is a stale (pre-multi-section) shape
   // — treat it as a miss so it regenerates and overwrites.
   if (!force) {
-    const cached = await getCachedInsights(chartKey);
+    const cached = await getCachedInsights(profileId);
     if (cached?.sections && Object.keys(cached.sections).length) {
       return NextResponse.json(cached);
     }
@@ -81,7 +91,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     const insights = await fetchInsights(chart.data, undefined, ctx);
-    await setCachedInsights(chartKey, insights);
+    await setCachedInsights(profileId, insights);
     return NextResponse.json(insights);
   } catch (err) {
     console.error(

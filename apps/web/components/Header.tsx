@@ -60,9 +60,10 @@ export default function Header() {
             ))}
           </div>
 
-          {/* Auth area — hidden during initial auth state check */}
+          {/* Auth area — hidden during initial auth state check. Anonymous (guest) users see
+              the Login / Sign Up button; only permanent accounts see the account UI. */}
           {!loading && (
-            user ? (
+            user && !user.isAnonymous ? (
               <div className="flex items-center gap-3">
                 <span style={{ fontSize: '13px', color: '#3d3a5c', fontFamily: 'Noto Serif, serif' }}>
                   {user.email?.split('@')[0]}

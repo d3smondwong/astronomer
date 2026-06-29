@@ -17,7 +17,7 @@ export interface ClientErrorReport {
     | 'chart_generation'
     | 'insights_section'
     | 'auth_token'
-    | 'profile_claim'
+    | 'profile_migrate'
     | 'profile_delete';
   /** Human-readable error message (err.message or response text). */
   message: string;

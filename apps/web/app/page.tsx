@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
@@ -14,6 +15,7 @@ import TempleBuddhistIcon from '@mui/icons-material/TempleBuddhist';
 import TimelineOutlinedIcon from '@mui/icons-material/TimelineOutlined';
 import BaziProfileForm from '@/components/BaziProfileForm';
 import { useLanguage } from '@/lib/languageContext';
+import { useAuth } from '@/lib/authContext';
 import { translations } from '@/lib/translations';
 
 
@@ -64,30 +66,55 @@ const Hero = () => {
 const BaziForm = () => {
   const router = useRouter();
   const { language } = useLanguage();
+  const { spotlightCreateForm, setSpotlightCreateForm } = useAuth();
   const tr = translations.landing;
 
+  // Base card shadow (≈ shadow-xl). When spotlit, add a huge spread ring that darkens the
+  // whole page except this form. Always control box-shadow inline so it transitions both ways.
+  const baseShadow = '0 8px 40px rgba(0,0,0,0.18)';
+  const spotlightShadow = `${baseShadow}, 0 0 0 9999px rgba(0,0,0,0.5)`;
+
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.6 }}
-      className="bg-surface-lowest p-8 md:p-10 rounded-lg shadow-xl relative overflow-hidden"
-    >
-      <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full border border-gold-deep/10"></div>
-
-      <div className="relative z-10">
-        <div className="mb-8 text-center">
-          <Stars className="text-gold-deep w-8 h-8 mx-auto mb-3" />
-          <h2 className="text-2xl font-serif text-bronze-muted mb-2">{tr.formHeading[language]}</h2>
-          <p className="text-xs text-bronze-muted/60">{tr.formSubHeading[language]}</p>
-        </div>
-
-        <BaziProfileForm
-          showDemoButton
-          onSuccess={(profileId) => router.push(`/profile/${profileId}`)}
+    <>
+      {/* Transparent catcher over the darkened page — click anywhere outside the form to dismiss. */}
+      {spotlightCreateForm && (
+        <div
+          onClick={() => setSpotlightCreateForm(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 55 }}
+          aria-hidden
         />
-      </div>
-    </motion.div>
+      )}
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.6 }}
+        className="bg-surface-lowest p-8 md:p-10 rounded-lg relative overflow-hidden"
+        style={{
+          boxShadow: spotlightCreateForm ? spotlightShadow : baseShadow,
+          transition: 'box-shadow 0.4s ease',
+          ...(spotlightCreateForm && { zIndex: 60 }),
+        }}
+      >
+        <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full border border-gold-deep/10"></div>
+
+        <div className="relative z-10">
+          <div className="mb-8 text-center">
+            <Stars className="text-gold-deep w-8 h-8 mx-auto mb-3" />
+            <h2 className="text-2xl font-serif text-bronze-muted mb-2">{tr.formHeading[language]}</h2>
+            <p className="text-xs text-bronze-muted/60">{tr.formSubHeading[language]}</p>
+          </div>
+
+          <BaziProfileForm
+            showDemoButton
+            onSuccess={(profileId) => {
+              setSpotlightCreateForm(false);
+              router.push(`/profile/${profileId}`);
+            }}
+          />
+        </div>
+      </motion.div>
+    </>
   );
 };
 
@@ -115,7 +142,21 @@ const FeatureCard = ({ icon: Icon, title, description, label, iconSrc }: any) =>
 
 export default function Home() {
   const { language } = useLanguage();
+  const { openAuthModal, user, loading } = useAuth();
+  const router = useRouter();
   const tr = translations.landing;
+
+  // Arriving with ?login=1 (e.g. redirected here from a profile the visitor can't access):
+  // pop the auth modal for guests, then strip the param. Wait for auth to resolve so a
+  // permanent user who already signed in isn't prompted needlessly.
+  const loginPromptHandledRef = useRef(false);
+  useEffect(() => {
+    if (loginPromptHandledRef.current || loading) return;
+    if (new URLSearchParams(window.location.search).get('login') !== '1') return;
+    loginPromptHandledRef.current = true;
+    router.replace('/');
+    if (!user || user.isAnonymous) openAuthModal();
+  }, [loading, user, router, openAuthModal]);
 
   return (
     <div className="min-h-screen flex flex-col">

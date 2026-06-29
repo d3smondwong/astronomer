@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Forest from '@mui/icons-material/Forest';
 import LocalFireDepartment from '@mui/icons-material/LocalFireDepartment';
 import Terrain from '@mui/icons-material/Terrain';
@@ -17,7 +18,6 @@ import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
 import { useAuth } from '@/lib/authContext';
 import { reportClientError } from '@/lib/errorReporter';
-import { deleteProfileAction } from './actions';
 import FiveElementsCard from './FiveElementsCard';
 import PillarInteractionsCard from './PillarInteractionsCard';
 import DayMasterStrengthCard from './DayMasterStrengthCard';
@@ -161,7 +161,9 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
   const tr = translations.profile;
   const trAuth = translations.auth;
   const { user, openAuthModal } = useAuth();
-  const prevUserUidRef = useRef<string | null>(null);
+  const router = useRouter();
+  // Ensures the auto insights generation fires at most once per mount.
+  const insightsRequestedRef = useRef(false);
 
   const generating = loadingSections.length > 0;
 
@@ -172,7 +174,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
       const res = await fetch('/api/insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ chartKey, section: key, force, requestId, profileId: profileRecord.id }),
+        body: JSON.stringify({ chartKey, section: key, force, requestId, profileId: profileRecord.profileId }),
       });
       if (res.ok) {
         const data: InsightsResponse = await res.json();
@@ -182,7 +184,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
         const detail = await res.text().catch(() => '');
         console.error(`Insights section '${key}' failed [req:${requestId}]:`, res.status, detail);
         reportClientError({
-          context: 'insights_section', requestId, chartKey, profileId: profileRecord.id,
+          context: 'insights_section', requestId, chartKey, profileId: profileRecord.profileId,
           uid: user?.uid, section: key, status: res.status, message: detail || `HTTP ${res.status}`,
         });
         // Stable id collapses parallel section failures into a single toast.
@@ -192,7 +194,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
       const message = err instanceof Error ? err.message : String(err);
       console.error(`Insights section '${key}' failed [req:${requestId}]:`, err);
       reportClientError({
-        context: 'insights_section', requestId, chartKey, profileId: profileRecord.id,
+        context: 'insights_section', requestId, chartKey, profileId: profileRecord.profileId,
         uid: user?.uid, section: key, message,
       });
       toast.error(tr.errorInsights[language], { id: 'insights-error' });
@@ -204,7 +206,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
   // Progressive load: Core Personality first (renders immediately), then the
   // remaining sections in parallel. `force` (dev) bypasses the cache.
   const generateInsights = async (force = false): Promise<void> => {
-    if (!user) return;
+    if (!user || user.isAnonymous) return; // insights require a permanent account
     const requestId = crypto.randomUUID();
     const keys = INSIGHT_SECTIONS.map((s) => s.key);
     setLoadingSections(keys);
@@ -215,7 +217,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
       const message = err instanceof Error ? err.message : String(err);
       console.error(`Failed to get auth token [req:${requestId}]:`, err);
       reportClientError({
-        context: 'auth_token', requestId, profileId: profileRecord.id, uid: user?.uid, message,
+        context: 'auth_token', requestId, profileId: profileRecord.profileId, uid: user?.uid, message,
       });
       toast.error(tr.errorInsights[language], { id: 'insights-error' });
       setLoadingSections([]);
@@ -225,37 +227,20 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
     await Promise.all(keys.slice(1).map((k) => fetchSection(idToken, k, force, requestId)));
   };
 
-  // When user signs in with no insights, claim the profile and generate insights inline
+  // Auto-generate insights once we have a permanent (non-anonymous) owner and none are cached.
+  // Covers a logged-in user landing on a freshly-created chart, and a guest who upgrades to an
+  // account while viewing their chart. Ownership is already enforced server-side (SSR), and the
+  // profile is owned at creation, so there is no "claim" step. Anonymous guests are gated.
   useEffect(() => {
-    const currentUid = user?.uid ?? null;
-    const wasGuest = prevUserUidRef.current === null;
-    prevUserUidRef.current = currentUid;
-
-    if (!wasGuest || !currentUid || insightsData?.sections) return;
-
-    (async () => {
-      try {
-        const idToken = await user!.getIdToken();
-        // Claim profile to this user's account
-        await fetch(`/api/profiles/${profileRecord.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-          body: JSON.stringify({ userId: currentUid }),
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error('Profile claim failed:', err);
-        // Background op — report for traceability but don't toast the user.
-        reportClientError({ context: 'profile_claim', profileId: profileRecord.id, uid: currentUid, message });
-      }
-      // Generate insights inline (claim errors shouldn't block this)
-      await generateInsights();
-    })();
-  }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!user || user.isAnonymous) return;
+    if (insightsData?.sections || insightsRequestedRef.current) return;
+    insightsRequestedRef.current = true;
+    void generateInsights();
+  }, [user?.uid, user?.isAnonymous]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reconstruct profile object for rendering
   const profile = {
-    id: profileRecord.id,
+    id: profileRecord.profileId,
     name: profileRecord.name,
     birthDate: new Date(profileRecord.birthData.year, profileRecord.birthData.month - 1, profileRecord.birthData.day),
     birthTime: `${String(profileRecord.birthData.hour).padStart(2, '0')}:${String(profileRecord.birthData.minute).padStart(2, '0')}`,
@@ -267,12 +252,18 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
   const handleDeleteProfile = async () => {
     setIsDeleting(true);
     try {
-      await deleteProfileAction(profileRecord.id);
+      const idToken = user ? await user.getIdToken() : null;
+      const res = await fetch(`/api/profiles/${profileRecord.profileId}`, {
+        method: 'DELETE',
+        headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       toast.success(tr.deleteSuccess[language]);
+      router.push('/');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error('Error deleting profile:', error);
-      reportClientError({ context: 'profile_delete', profileId: profileRecord.id, uid: user?.uid, message });
+      reportClientError({ context: 'profile_delete', profileId: profileRecord.profileId, uid: user?.uid, message });
       toast.error(tr.deleteError[language]);
       setIsDeleting(false);
     }
@@ -1426,7 +1417,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
               label: tr.tabInsights[language],
               children: (
                 <div className="space-y-4">
-                  {process.env.NODE_ENV !== 'production' && user && (
+                  {process.env.NODE_ENV !== 'production' && user && !user.isAnonymous && (
                     /* Dev-only: force-regenerate (bypass cache) to iterate on prompt/data edits */
                     <div className="flex justify-end">
                       <button
@@ -1447,8 +1438,8 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
                       </button>
                     </div>
                   )}
-                  {!user ? (
-                    /* Guest gate card */
+                  {(!user || user.isAnonymous) ? (
+                    /* Guest gate card — anonymous users must create an account to unlock insights */
                     <Card style={{ borderColor: 'rgba(115, 92, 0, 0.15)', background: 'rgba(251,249,244,0.8)' }}>
                       <div className="flex flex-col items-center gap-4 py-4">
                         {/* Blurred placeholder rows */}
@@ -1466,7 +1457,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
                           {trAuth.unlockInsights[language]}
                         </p>
                         <button
-                          onClick={() => openAuthModal()}
+                          onClick={() => openAuthModal({ reason: 'insights' })}
                           style={{
                             padding: '10px 24px',
                             backgroundColor: '#3d3a5c', color: '#fff',

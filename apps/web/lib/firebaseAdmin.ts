@@ -11,7 +11,7 @@
 
 import { getApps, initializeApp, applicationDefault, cert } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
+import { getAuth, type Auth } from 'firebase-admin/auth';
 
 const PROJECT_ID =
   process.env.FIREBASE_PROJECT_ID ?? process.env.GOOGLE_CLOUD_PROJECT ?? 'demo-astronomer';
@@ -36,6 +36,7 @@ function initAdminApp() {
 }
 
 let _db: Firestore | null = null;
+let _auth: Auth | null = null;
 
 export function getDb(): Firestore {
   if (!_db) {
@@ -44,10 +45,37 @@ export function getDb(): Firestore {
   return _db;
 }
 
+/** The Admin Auth instance — used for token verification and session cookies. */
+export function getAdminAuth(): Auth {
+  if (!_auth) {
+    _auth = getAuth(initAdminApp());
+  }
+  return _auth;
+}
+
 export async function verifyIdToken(token: string): Promise<string | null> {
   try {
-    const decoded = await getAuth(initAdminApp()).verifyIdToken(token);
+    const decoded = await getAdminAuth().verifyIdToken(token);
     return decoded.uid;
+  } catch {
+    return null;
+  }
+}
+
+/** Verified caller identity, including whether the token came from an anonymous sign-in. */
+export interface VerifiedUser {
+  uid: string;
+  isAnonymous: boolean;
+}
+
+/**
+ * Verify an ID token and report whether it is an anonymous sign-in. Anonymous users own their
+ * (guest) profiles but are gated from account-only features (e.g. insights, >1 chart).
+ */
+export async function verifyToken(token: string): Promise<VerifiedUser | null> {
+  try {
+    const decoded = await getAdminAuth().verifyIdToken(token);
+    return { uid: decoded.uid, isAnonymous: decoded.firebase?.sign_in_provider === 'anonymous' };
   } catch {
     return null;
   }

@@ -9,15 +9,24 @@ export const translations = {
   },
   auth: {
     loginTitle:          { en: 'Log in or sign up',         ch: '登录或注册' },
+    // Contextual modal copy, keyed by the reason the auth modal was opened.
+    loginSubtitle:        { en: 'Unlock insights about your life', ch: '解锁专属您的人生洞察' },
+    addChartTitle:        { en: 'Unlock Unlimited Charts', ch: '解锁无限命盘' },
+    addChartSubtitle:     { en: 'Save multiple profiles to your dashboard and claim your free premium insights', ch: '将多个命盘保存至您的仪表板，并领取免费高级解析' },
+    pendingChartTitle:    { en: 'Secure your chart', ch: '保存您的命盘' },
+    pendingChartSubtitle: { en: "Don't lose this chart. Create a free account to instantly save it and claim your free premium insights.", ch: '切勿丢失此命盘。注册免费账户即可立即保存，并领取免费高级解析。' },
+    insightsTitle:        { en: 'Reveal detailed insights about your life', ch: '揭示关于您人生的详细洞察' },
+    insightsSubtitle:     { en: 'Create a free account to reveal insights into your personality, career and wealth paths', ch: '注册免费账户，揭示您的性格、事业与财富之路的洞察' },
     emailPlaceholder:    { en: 'Email',                     ch: '邮箱' },
     passwordPlaceholder: { en: 'Password',                  ch: '密码' },
     continueBtn:         { en: 'Continue',                  ch: '继续' },
     loading:             { en: 'Loading…',                  ch: '加载中…' },
-    skipForNow:          { en: 'Skip — view chart only →',  ch: '跳过，仅查看图表 →' },
     unlockInsights:      { en: 'Sign up to reveal your Personality Profile', ch: '注册以解锁个性分析' },
     createFreeAccount:   { en: 'Create Free Account',       ch: '免费注册' },
     generatingInsights:  { en: 'Generating your insights…', ch: '正在生成分析…' },
     generateInsights:    { en: 'Generate Insights',         ch: '生成分析' },
+    migrateFailed:       { en: "Successfully signed in. We were unable to securely save the chart you made as a guest. Please re-generate it to keep it on your account.", ch: '您已成功登录。未能安全保存您以访客身份生成的命盘，请重新生成以保存至您的账户。' },
+    sessionError:        { en: "We're having trouble keeping you signed in. Please try again.", ch: '登录状态保持遇到问题，请重试。' },
   },
   profile: {
     // Day Master badge
@@ -221,6 +230,7 @@ export const translations = {
     solarTime:          { en: 'Solar Time',             ch: '真太阳时' },
     successGenerated:   { en: 'Bazi chart generated successfully!', ch: '八字命盘生成成功！' },
     errorGenerated:     { en: 'Failed to generate Bazi chart. Please try again.', ch: '生成八字命盘失败，请重试。' },
+    notReady:           { en: 'Just a moment — getting things ready. Please try again.', ch: '正在准备中，请稍候重试。' },
     btnDemo:            { en: "Try Demo (Desmond's Profile)", ch: '试用示例（Desmond 命盘）' },
     newLabel:           { en: 'New?',                   ch: '初次使用？' },
   },

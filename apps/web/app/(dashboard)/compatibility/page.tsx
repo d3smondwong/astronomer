@@ -13,7 +13,10 @@ export default function CompatibilityPage() {
   const [profile2, setProfile2] = useState<string>('');
 
   useEffect(() => {
-    // TODO: Migrate to backend API call in future phase
+    // TODO: Unbuilt feature. This page is stubbed against the old `BaziProfile` shape (with an
+    // inline `.baziChart`), which no longer matches the data layer. Wiring it up requires a
+    // rework against `/api/profiles` (returns ProfileRecord with `profileId`, no chart) plus a
+    // separate chart fetch — not a 1:1 swap. Until then `profiles` stays empty and the page is inert.
     // const loadedProfiles = getProfiles();
     // setProfiles(loadedProfiles);
   }, []);

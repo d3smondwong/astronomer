@@ -1,19 +1,23 @@
+import { redirect } from 'next/navigation';
 import { findProfile } from '@/lib/profilesDb';
 import { fetchNatalChart, type InsightsResponse } from '@/lib/fastApiClient';
 import { getCachedChart, setCachedChart } from '@/lib/chartCacheDb';
 import { getCachedInsights } from '@/lib/insightsCacheDb';
+import { getSessionUser } from '@/lib/session';
 import ProfilePageClient from './ProfilePageClient';
 
 export default async function ProfilePage({ params }: { params: Promise<{ profileId: string }> }) {
   const { profileId } = await params;
 
-  const profileRecord = await findProfile(profileId);
-  if (!profileRecord) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500">Profile not found</p>
-      </div>
-    );
+  // Authorization lives here in the Server Component (the data-access layer), not in a
+  // proxy/middleware — that's the Next.js 16 recommendation. The session cookie (set
+  // client-side after anonymous/permanent sign-in) is the server's only view of who is asking
+  // during SSR. Missing profile, no session, and non-owner all redirect to the home page with
+  // ?login=1 (which pops the auth modal for guests) — identically, so the response never
+  // reveals whether a given profile id exists.
+  const [profileRecord, session] = await Promise.all([findProfile(profileId), getSessionUser()]);
+  if (!profileRecord || !session || session.uid !== profileRecord.userId) {
+    redirect('/?login=1');
   }
 
   // The 八字 key lives on the profile (computed server-side at creation). The frontend
@@ -35,7 +39,10 @@ export default async function ProfilePage({ params }: { params: Promise<{ profil
       await setCachedChart(chartKey, chartData);
     }
 
-    if (chartKey) insights = await getCachedInsights(chartKey);
+    // Insights are cached per-profile (not by chartKey), so two profiles with identical
+    // birth inputs each get their own interpretation. A miss here means the client will
+    // generate them progressively on mount.
+    insights = await getCachedInsights(profileId);
   } catch (error) {
     console.error('Error loading chart/insights:', error);
   }

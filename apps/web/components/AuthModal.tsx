@@ -2,17 +2,54 @@
 
 import { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import {
+  EmailAuthProvider,
+  linkWithCredential,
+  signInWithEmailAndPassword,
+} from 'firebase/auth';
 import { auth } from '@/lib/firebaseClient';
 import { useAuth } from '@/lib/authContext';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
+import { reportClientError } from '@/lib/errorReporter';
+import { toast } from 'sonner';
+
+/**
+ * Move the guest's profiles to the just-signed-in account. Migration failures are usually
+ * transient (a network blip or a momentary server error), so retry a few times with
+ * exponential backoff before giving up. Deterministic client errors (4xx) won't change on
+ * retry, so we stop immediately on those. Returns true once the migration succeeds.
+ */
+async function migrateGuestProfiles(anonIdToken: string): Promise<boolean> {
+  const backoffMs = [1000, 3000]; // waits before the 2nd and 3rd attempts → 3 attempts total
+  for (let attempt = 0; attempt <= backoffMs.length; attempt++) {
+    try {
+      // Re-read the destination token each attempt so it can't go stale across the backoff.
+      const newIdToken = await auth.currentUser?.getIdToken();
+      if (newIdToken) {
+        const res = await fetch('/api/profiles/migrate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${newIdToken}` },
+          body: JSON.stringify({ anonIdToken }),
+        });
+        if (res.ok) return true;
+        // 4xx (bad token / bad request) is deterministic — retrying won't help.
+        if (res.status < 500 && res.status !== 408 && res.status !== 429) return false;
+      }
+    } catch {
+      /* network error → transient, fall through to retry */
+    }
+    if (attempt < backoffMs.length) {
+      await new Promise((resolve) => setTimeout(resolve, backoffMs[attempt]));
+    }
+  }
+  return false;
+}
 
 function friendlyError(code: string): string {
   switch (code) {
     case 'auth/email-already-in-use':
-      // Reached when sign-in failed and create failed because email exists — means wrong password
-      return 'Incorrect password for this account. Please try again.';
+      return 'This email is already registered. Please check your password.';
     case 'auth/weak-password':
       return 'Password must be at least 6 characters.';
     case 'auth/invalid-email':
@@ -28,11 +65,19 @@ function friendlyError(code: string): string {
 }
 
 export default function AuthModal() {
-  const { isAuthModalOpen, closeAuthModal, modalShowSkip, modalOnSkip } = useAuth();
+  const { isAuthModalOpen, closeAuthModal, setSpotlightCreateForm, refreshSession, modalReason } = useAuth();
   const { language } = useLanguage();
   const tr = translations.auth;
   const router = useRouter();
   const pathname = usePathname();
+
+  // Contextual heading/subtitle for why the modal was opened.
+  const copy = {
+    login:        { title: tr.loginTitle,        subtitle: tr.loginSubtitle },
+    addChart:     { title: tr.addChartTitle,     subtitle: tr.addChartSubtitle },
+    pendingChart: { title: tr.pendingChartTitle, subtitle: tr.pendingChartSubtitle },
+    insights:     { title: tr.insightsTitle,     subtitle: tr.insightsSubtitle },
+  }[modalReason];
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,46 +91,86 @@ export default function AuthModal() {
     setError('');
     setSubmitting(true);
 
+    const current = auth.currentUser;
     try {
-      // Try sign-in first
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (signInErr: any) {
-      // On invalid credential / user not found → try creating the account
-      if (['auth/user-not-found', 'auth/invalid-credential', 'auth/wrong-password'].includes(signInErr.code)) {
+      if (current?.isAnonymous) {
+        // Guest creating an account → link the credential so the UID (and all guest
+        // profiles) carry over. No "claim" step needed.
+        const credential = EmailAuthProvider.credential(email, password);
         try {
-          await createUserWithEmailAndPassword(auth, email, password);
-        } catch (signUpErr: any) {
-          setError(friendlyError(signUpErr.code));
-          setSubmitting(false);
-          return;
-        }
-      } else {
-        setError(friendlyError(signInErr.code));
-        setSubmitting(false);
-        return;
-      }
-    }
-
-    // Auth succeeded — redirect to latest profile when on the home page
-    if (pathname === '/') {
-      try {
-        const idToken = await auth.currentUser?.getIdToken();
-        if (idToken) {
-          const res = await fetch('/api/profiles', {
-            headers: { Authorization: `Bearer ${idToken}` },
-          });
-          if (res.ok) {
-            const profiles = await res.json();
-            if (profiles.length > 0) {
-              handleClose();
-              router.push(`/profile/${profiles[0].id}`);
-              return;
+          await linkWithCredential(current, credential);
+        } catch (linkErr: any) {
+          if (['auth/email-already-in-use', 'auth/credential-already-in-use'].includes(linkErr.code)) {
+            // Email belongs to an existing account → sign into it, then migrate this guest's
+            // profiles over. Capture the anon token first to prove control of the anon UID.
+            const anonIdToken = await current.getIdToken();
+            await signInWithEmailAndPassword(auth, email, password); // throws on wrong password
+            // Move the guest's charts to this account, retrying transient failures behind the
+            // scenes. Only surface an error if every attempt fails. Sign-in still succeeds.
+            const migrated = await migrateGuestProfiles(anonIdToken);
+            if (!migrated) {
+              reportClientError({
+                context: 'profile_migrate',
+                uid: auth.currentUser?.uid,
+                message: 'Profile migration failed after retries',
+              });
+              toast.error(tr.migrateFailed[language]);
             }
+          } else {
+            throw linkErr;
           }
         }
-      } catch {
-        // Non-fatal — fall through to close
+      } else {
+        // No anonymous session (unexpected) → plain sign-in.
+        await signInWithEmailAndPassword(auth, email, password);
       }
+    } catch (err: any) {
+      setError(friendlyError(err.code));
+      setSubmitting(false);
+      return;
+    }
+
+    // Re-mint the session cookie with the now-permanent identity before any navigation. If it
+    // can't be established even after retries, keep the modal open with an error instead of
+    // routing into a page the SSR would bounce; the user can hit Continue to retry.
+    if (!(await refreshSession())) {
+      setError(tr.sessionError[language]);
+      setSubmitting(false);
+      return;
+    }
+
+    // If this sign-in was triggered by a chart held pending on the landing form, that form's
+    // auto-submit will create the chart and navigate. Stand down so we don't fire a competing
+    // redirect (which could land them on the wrong profile or drop the pending chart).
+    if (modalReason === 'pendingChart') {
+      handleClose();
+      return;
+    }
+
+    // Auth succeeded — route based on whether the user already has any charts.
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (idToken) {
+        const res = await fetch('/api/profiles', {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (res.ok) {
+          const profiles = await res.json();
+          handleClose();
+          if (profiles.length === 0) {
+            // Brand-new user with no charts → spotlight the landing-page form so they
+            // know the next step. Redirect home first if they signed up elsewhere.
+            setSpotlightCreateForm(true);
+            if (pathname !== '/') router.push('/');
+            return;
+          }
+          // Existing user landing from home → jump straight to their latest chart.
+          if (pathname === '/') router.push(`/profile/${profiles[0].profileId}`);
+          return;
+        }
+      }
+    } catch {
+      // Non-fatal — fall through to close
     }
 
     handleClose();
@@ -97,11 +182,6 @@ export default function AuthModal() {
     setPassword('');
     setError('');
     setSubmitting(false);
-  };
-
-  const handleSkip = () => {
-    handleClose();
-    modalOnSkip?.();
   };
 
   return (
@@ -142,7 +222,7 @@ export default function AuthModal() {
             flex: 1, textAlign: 'center', fontWeight: 600,
             fontSize: '24px', color: '#222', marginRight: '24px',
           }}>
-            {tr.loginTitle[language]}
+            {copy.title[language]}
           </span>
         </div>
 
@@ -151,6 +231,13 @@ export default function AuthModal() {
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
             <img src="/straight_huat_life_logo_svg.svg" alt="Huat Life" style={{ height: '72px', width: 'auto' }} />
           </div>
+
+          <p style={{
+            textAlign: 'center', fontSize: '14px', color: '#666',
+            marginBottom: '20px', fontFamily: 'Noto Serif, serif', lineHeight: 1.4,
+          }}>
+            {copy.subtitle[language]}
+          </p>
 
           <div style={{ marginBottom: '12px' }}>
             <input
@@ -206,23 +293,6 @@ export default function AuthModal() {
           >
             {submitting ? tr.loading[language] : tr.continueBtn[language]}
           </button>
-
-          {modalShowSkip && (
-            <p style={{ textAlign: 'center', marginTop: '16px' }}>
-              <button
-                type="button"
-                onClick={handleSkip}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: '13px', color: '#888',
-                  fontFamily: 'Noto Serif, serif',
-                  textDecoration: 'underline',
-                }}
-              >
-                {tr.skipForNow[language]}
-              </button>
-            </p>
-          )}
         </form>
       </div>
     </div>

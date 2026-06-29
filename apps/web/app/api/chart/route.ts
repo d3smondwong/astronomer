@@ -11,15 +11,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   fetchNatalChart,
-  fetchInsights,
   BirthInputPayload,
   ChartResponse,
   type RequestContext,
 } from '@/lib/fastApiClient';
-import { createProfile, type ProfileRecord } from '@/lib/profilesDb';
-import { verifyIdToken } from '@/lib/firebaseAdmin';
+import { createProfile, readProfiles, type ProfileRecord } from '@/lib/profilesDb';
+import { verifyToken } from '@/lib/firebaseAdmin';
 import { setCachedChart } from '@/lib/chartCacheDb';
-import { getCachedInsights, setCachedInsights } from '@/lib/insightsCacheDb';
 
 interface ChartRequestBody {
   year: number;
@@ -44,12 +42,16 @@ interface ChartResponseBody {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    // Extract userId from Bearer token (optional — profiles created without auth are anonymous).
+    // Every request carries a token now (anonymous guests included). Identify the caller and
+    // own the profile at creation; anonymous tokens are guests.
     const authHeader = request.headers.get('Authorization');
-    let userId: string | undefined;
-    if (authHeader?.startsWith('Bearer ')) {
-      userId = (await verifyIdToken(authHeader.slice(7))) ?? undefined;
+    const caller = authHeader?.startsWith('Bearer ')
+      ? await verifyToken(authHeader.slice(7))
+      : null;
+    if (!caller) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const userId = caller.uid;
 
     // Parse request body
     const body: ChartRequestBody = await request.json();
@@ -68,6 +70,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         { error: 'Invalid input: missing or invalid birth data fields' },
         { status: 400 }
+      );
+    }
+
+    // Guest limit: a guest (anonymous) gets one free chart; further charts require an account.
+    // NOTE: this count-then-create is intentionally non-atomic. The client already disables the
+    // submit button during a request (no single-tab double-submit), so the only way past this is
+    // two tabs/devices firing concurrently — rare, and the worst case is a guest getting 2 free
+    // charts. Not worth a Firestore transaction for that; revisit if it's ever abused.
+    if (caller.isAnonymous && (await readProfiles(userId)).length >= 1) {
+      return NextResponse.json(
+        { error: 'Guest chart limit reached. Please create an account to add more.' },
+        { status: 409 }
       );
     }
 
@@ -100,19 +114,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Cache the deterministic chart so the profile read path renders without recomputing.
     await setCachedChart(chartKey, baziChart.data);
 
-    // insightsCache: only generate LLM insights for authenticated users; gate on the 八字 key
-    // so everyone with the same chart shares one (expensive) interpretation.
-    if (!body.skipInsights && userId && !(await getCachedInsights(chartKey))) {
-      try {
-        const insights = await fetchInsights(baziChart.data, undefined, { ...natalCtx, chartKey });
-        await setCachedInsights(chartKey, insights);
-      } catch (insightsError) {
-        console.error('Error generating insights (non-fatal):', insightsError);
-      }
-    }
+    // Insights are intentionally NOT generated here. The chart compute is fast; the insights
+    // pass is slow and would block this response (and the redirect). Insights are also
+    // per-profile (not shared by chartKey), so the profile page generates them progressively
+    // via /api/insights once it knows the profileId. body.skipInsights is now unused.
 
     const profileRecord: ProfileRecord = {
-      id: profileId,
+      profileId,
       name: body.profileName || `Profile ${new Date().toLocaleDateString()}`,
       birthLocation: body.birthLocation || 'Unknown',
       birthData: {
@@ -128,7 +136,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
       createdAt: new Date().toISOString(),
       chartKey,
-      ...(userId && { userId }),
+      userId, // always owned at creation (anonymous guest or permanent account)
     };
 
     // Write profile document (references chart/insights by chartKey)
