@@ -7,9 +7,9 @@
  * different) interpretation rather than sharing one. The doc id here therefore mirrors the
  * profile doc id 1:1, and is deleted alongside the profile.
  *
- * Toggle: set INSIGHTS_CACHE_ENABLED=false (e.g. in apps/web/.env.local) to disable the
- * cache entirely — reads always miss and writes are skipped, so every request regenerates
- * fresh insights. Useful while iterating on prompts. Defaults to enabled.
+ * Caching is always on: insights are read from the database and only regenerated on a miss.
+ * To force a fresh regeneration during dev (the "re-generate" button), pass `force` in the
+ * /api/insights request — that skips the cache read but still writes the new result back.
  */
 
 import { getDb } from '@/lib/firebaseAdmin';
@@ -17,15 +17,11 @@ import type { InsightsResponse, StructuredSection } from '@/lib/fastApiClient';
 
 const COLLECTION = 'insightsCache';
 
-// Cache is on unless explicitly disabled. Server-side only (no NEXT_PUBLIC needed).
-const CACHE_ENABLED = process.env.INSIGHTS_CACHE_ENABLED !== 'false';
-
 export interface InsightsCacheDoc extends InsightsResponse {
   createdAt: string;
 }
 
 export async function getCachedInsights(profileId: string): Promise<InsightsResponse | null> {
-  if (!CACHE_ENABLED) return null; // disabled → always a miss, forcing regeneration
   const snap = await getDb().collection(COLLECTION).doc(profileId).get();
   if (!snap.exists) return null;
   const { createdAt, ...insights } = snap.data() as InsightsCacheDoc;
@@ -33,7 +29,6 @@ export async function getCachedInsights(profileId: string): Promise<InsightsResp
 }
 
 export async function setCachedInsights(profileId: string, insights: InsightsResponse): Promise<void> {
-  if (!CACHE_ENABLED) return; // disabled → skip writes so testing leaves no stale entries
   const doc: InsightsCacheDoc = { ...insights, createdAt: new Date().toISOString() };
   await getDb().collection(COLLECTION).doc(profileId).set(doc);
 }
@@ -48,7 +43,6 @@ export async function setCachedInsightsSection(
   section: string,
   value: string | StructuredSection,
 ): Promise<void> {
-  if (!CACHE_ENABLED) return; // disabled → skip writes so testing leaves no stale entries
   await getDb()
     .collection(COLLECTION)
     .doc(profileId)
