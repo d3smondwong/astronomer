@@ -177,9 +177,47 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
         body: JSON.stringify({ chartKey, section: key, force, requestId, profileId: profileRecord.profileId }),
       });
       if (res.ok) {
-        const data: InsightsResponse = await res.json();
-        const value = data.sections?.[key] ?? '';
-        setInsightsData((prev) => ({ sections: { ...(prev?.sections ?? {}), [key]: value } }));
+        const contentType = res.headers.get('content-type') ?? '';
+        if (contentType.includes('text/event-stream') && res.body) {
+          // Streaming path: merge each group-delta into the section as it arrives,
+          // so the section's groups fill in progressively (renderStructured already
+          // shows whichever groups have items).
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\n\n');
+            buffer = events.pop() ?? '';
+            for (const evt of events) {
+              const line = evt.split('\n').find((l) => l.startsWith('data:'));
+              if (!line) continue;
+              const payload = line.slice(5).trim();
+              if (payload === '[DONE]') continue;
+              let parsed: { delta?: Record<string, unknown>; error?: string };
+              try { parsed = JSON.parse(payload); } catch { continue; }
+              if (parsed.error) throw new Error(parsed.error);
+              const delta = parsed.delta;
+              if (!delta) continue;
+              if (delta.__prose__ !== undefined) {
+                const text = delta.__prose__ as string;
+                setInsightsData((prev) => ({ sections: { ...(prev?.sections ?? {}), [key]: text } }));
+              } else {
+                setInsightsData((prev) => {
+                  const existing = (prev?.sections?.[key] ?? {}) as StructuredSection;
+                  return { sections: { ...(prev?.sections ?? {}), [key]: { ...existing, ...(delta as StructuredSection) } } };
+                });
+              }
+            }
+          }
+        } else {
+          // Cache hit: a single JSON response with the full section value.
+          const data: InsightsResponse = await res.json();
+          const value = data.sections?.[key] ?? '';
+          setInsightsData((prev) => ({ sections: { ...(prev?.sections ?? {}), [key]: value } }));
+        }
       } else {
         const detail = await res.text().catch(() => '');
         console.error(`Insights section '${key}' failed [req:${requestId}]:`, res.status, detail);

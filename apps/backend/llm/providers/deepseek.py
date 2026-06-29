@@ -19,6 +19,7 @@ Requires DEEPSEEK_API_KEY in .env.
 """
 
 import os
+from typing import AsyncIterator
 
 from apps.backend.llm.base_provider import BaseProvider, LLMConfig
 from apps.utils.logging import get_logger
@@ -31,16 +32,19 @@ _DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 class DeepSeekProvider(BaseProvider):
     def __init__(self, config: LLMConfig):
         super().__init__(config)
-        from openai import OpenAI
+        from openai import AsyncOpenAI, OpenAI
 
         api_key = os.environ.get("DEEPSEEK_API_KEY")
         if not api_key:
             raise KeyError("DEEPSEEK_API_KEY not set in .env")
 
         self._client = OpenAI(api_key=api_key, base_url=_DEEPSEEK_BASE_URL)
+        # Async client used by stream() so the FastAPI event loop is never blocked
+        # (the sync call() blocks it, serializing otherwise-parallel section requests).
+        self._aclient = AsyncOpenAI(api_key=api_key, base_url=_DEEPSEEK_BASE_URL)
 
-    def call(self, system_prompt: str, user_prompt: str) -> str:
-        import openai
+    def _build_params(self, system_prompt: str, user_prompt: str) -> dict:
+        """Assemble the Chat Completions params shared by call() and stream()."""
         from openai.types.chat import ChatCompletionMessageParam
 
         thinking_on = self.config.thinking
@@ -70,6 +74,12 @@ class DeepSeekProvider(BaseProvider):
         else:
             # thinking mode silently ignores temperature, so only send it when off.
             params["temperature"] = self.config.temperature
+        return params
+
+    def call(self, system_prompt: str, user_prompt: str) -> str:
+        import openai
+
+        params = self._build_params(system_prompt, user_prompt)
 
         try:
             response = self._client.chat.completions.create(**params)
@@ -88,6 +98,44 @@ class DeepSeekProvider(BaseProvider):
 
         self._log_usage(response)
         return response.choices[0].message.content or ""
+
+    async def stream(
+        self, system_prompt: str, user_prompt: str
+    ) -> AsyncIterator[str]:
+        """Yield content deltas as the model generates them.
+
+        Uses the async client so the FastAPI event loop stays free — this is what
+        lets the per-section requests actually run concurrently. ``include_usage``
+        makes DeepSeek emit a final usage-only chunk so the cache-hit/miss log line
+        still appears in streaming mode.
+        """
+        import openai
+
+        params = self._build_params(system_prompt, user_prompt)
+        params["stream"] = True
+        params["stream_options"] = {"include_usage": True}
+
+        try:
+            stream = await self._aclient.chat.completions.create(**params)
+            async for chunk in stream:
+                # The terminal usage-only chunk carries no choices.
+                if chunk.usage is not None:
+                    self._log_usage(chunk)
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
+        except openai.APIError as e:
+            status = getattr(e, "status_code", None)
+            logger.error(
+                "DeepSeek streaming API error (model=%s, status=%s): %s",
+                self.config.model,
+                status,
+                e,
+                exc_info=True,
+            )
+            raise
 
     @staticmethod
     def _log_usage(response) -> None:

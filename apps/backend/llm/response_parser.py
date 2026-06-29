@@ -55,7 +55,7 @@ def _repair_json_strings(text: str) -> str:
 
 class ResponseParser:
     def parse_section(
-        self, section_key: str, raw_text: str, structured: bool = False
+        self, section_key: str, raw_text: str, structured: bool = False, quiet: bool = False
     ) -> str | dict:
         """Extract one section's payload from a JSON LLM response.
 
@@ -67,6 +67,10 @@ class ResponseParser:
         Both degrade gracefully: on total parse failure a prose section returns the
         cleaned raw text and a structured section returns ``{}``, so one bad section
         never aborts the whole report.
+
+        ``quiet`` suppresses warning/debug logs — used when parsing the still-growing
+        buffer on every streaming delta, where transient parse failures are expected
+        and would otherwise flood the logs.
         """
         text = raw_text.strip()
 
@@ -85,23 +89,25 @@ class ResponseParser:
                 # Fall back to json-repair which handles unescaped quotes, missing commas, etc.
                 try:
                     data = json.loads(repair_json(text))
-                    logger.debug(
-                        "ResponseParser[%s]: json-repair recovered malformed JSON",
-                        section_key,
-                    )
+                    if not quiet:
+                        logger.debug(
+                            "ResponseParser[%s]: json-repair recovered malformed JSON",
+                            section_key,
+                        )
                 except (json.JSONDecodeError, Exception) as e:
-                    logger.warning(
-                        "ResponseParser[%s]: JSON decode failed (%s) — using raw text",
-                        section_key,
-                        e,
-                    )
+                    if not quiet:
+                        logger.warning(
+                            "ResponseParser[%s]: JSON decode failed (%s) — using raw text",
+                            section_key,
+                            e,
+                        )
                     return {} if structured else text
 
         if structured:
-            return self._extract_structured(section_key, data)
-        return self._extract_prose(section_key, data)
+            return self._extract_structured(section_key, data, quiet=quiet)
+        return self._extract_prose(section_key, data, quiet=quiet)
 
-    def _extract_prose(self, section_key: str, data) -> str:
+    def _extract_prose(self, section_key: str, data, quiet: bool = False) -> str:
         if isinstance(data, dict):
             # Preferred: the exact section key.
             if section_key in data:
@@ -112,7 +118,7 @@ class ResponseParser:
                     (_as_str(v).strip() for v in data.values() if isinstance(v, str)),
                     "",
                 )
-            if not narrative:
+            if not narrative and not quiet:
                 logger.warning(
                     "ResponseParser[%s]: parsed JSON had no narrative string", section_key
                 )
@@ -121,10 +127,11 @@ class ResponseParser:
         else:
             narrative = ""
 
-        logger.debug("Parsed section [%s] — %d chars", section_key, len(narrative))
+        if not quiet:
+            logger.debug("Parsed section [%s] — %d chars", section_key, len(narrative))
         return narrative
 
-    def _extract_structured(self, section_key: str, data) -> dict:
+    def _extract_structured(self, section_key: str, data, quiet: bool = False) -> dict:
         """Pull the inner groups object out of a structured section response."""
         if isinstance(data, dict):
             # Preferred: the wrapper key holds the groups object. If the model
@@ -132,17 +139,19 @@ class ResponseParser:
             inner = data.get(section_key, data)
             if isinstance(inner, dict):
                 groups = sum(len(v) for v in inner.values() if isinstance(v, list))
-                logger.debug(
-                    "Parsed structured section [%s] — %d groups, %d items",
-                    section_key,
-                    len(inner),
-                    groups,
-                )
+                if not quiet:
+                    logger.debug(
+                        "Parsed structured section [%s] — %d groups, %d items",
+                        section_key,
+                        len(inner),
+                        groups,
+                    )
                 return inner
 
-        logger.warning(
-            "ResponseParser[%s]: expected a structured object, got %s",
-            section_key,
-            type(data).__name__,
-        )
+        if not quiet:
+            logger.warning(
+                "ResponseParser[%s]: expected a structured object, got %s",
+                section_key,
+                type(data).__name__,
+            )
         return {}

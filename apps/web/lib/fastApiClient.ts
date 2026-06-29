@@ -128,6 +128,39 @@ export async function fetchInsights(
 }
 
 /**
+ * Stream a single insight section from an already-computed natal chart.
+ *
+ * Returns the raw streaming Response (Server-Sent Events) — the caller reads
+ * `res.body` and parses `data:` lines. Each event is
+ * `{ section, delta: { <group>: [items] } }`, terminated by `data: [DONE]`.
+ * Used by the /api/insights route handler to proxy progressive group-deltas to
+ * the browser while the section generates.
+ */
+export async function fetchInsightsStream(
+  chartData: Record<string, any>,
+  section: string,
+  ctx?: RequestContext,
+): Promise<Response> {
+  const res = await fetch(`${FASTAPI_URL}/v1/chart/insights/stream`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(FASTAPI_BEARER_TOKEN ? { Authorization: `Bearer ${FASTAPI_BEARER_TOKEN}` } : {}),
+      ...contextHeaders(ctx),
+    },
+    body: JSON.stringify({ data: chartData, section }),
+    cache: 'no-store',
+  });
+
+  if (!res.ok || !res.body) {
+    const error = await res.text().catch(() => '');
+    throw new Error(`FastAPI /v1/chart/insights/stream failed: ${res.status} ${error}`);
+  }
+
+  return res;
+}
+
+/**
  * Fetch full chart (natal + five elements).
  */
 export async function fetchFullChart(input: BirthInputPayload): Promise<ChartResponse> {

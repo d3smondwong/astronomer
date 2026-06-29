@@ -2,9 +2,10 @@
 Abstract base class and shared dataclasses for all LLM providers.
 """
 
+import asyncio
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, AsyncIterator
 
 
 @dataclass
@@ -42,3 +43,15 @@ class BaseProvider(ABC):
     def call(self, system_prompt: str, user_prompt: str) -> str:
         """Send the prompts to the LLM and return the raw text response."""
         ...
+
+    async def stream(
+        self, system_prompt: str, user_prompt: str
+    ) -> AsyncIterator[str]:
+        """Yield the response as text deltas.
+
+        Default fallback for providers without a native streaming implementation:
+        run the blocking ``call()`` off the event loop and yield the whole result
+        once. Providers that support real token streaming (e.g. DeepSeek) override this.
+        """
+        text = await asyncio.to_thread(self.call, system_prompt, user_prompt)
+        yield text

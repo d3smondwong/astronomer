@@ -7,6 +7,7 @@ Usage:
 """
 
 from pathlib import Path
+from typing import AsyncIterator
 
 from hydra import compose, initialize_config_dir
 from hydra.core.global_hydra import GlobalHydra
@@ -209,6 +210,96 @@ def llm_analyse_section(llm_data: dict, section_key: str) -> str | dict:
     logger.info("Section '%s' received (%d chars)", section_key, len(raw_text))
     return ResponseParser().parse_section(
         section.key, raw_text, structured=bool(section.categories)
+    )
+
+
+async def llm_analyse_section_stream(
+    llm_data: dict, section_key: str
+) -> AsyncIterator[dict]:
+    """Stream a single insight section as group-deltas.
+
+    Yields ``{group_key: [items]}`` dicts, each group emitted exactly once the
+    moment it is complete. Because the prompt writes the section's groups in the
+    fixed order given by ``section.categories``, a group is done as soon as a LATER
+    group's key appears in the partial parse; the final group(s) are flushed from
+    the complete buffer at stream end. The frontend shallow-merges each delta into
+    the section's object, so groups fill in progressively.
+
+    Prose sections (no ``categories``) cannot be group-streamed — they buffer and
+    yield a single ``{"__prose__": <text>}`` delta at the end.
+
+    Args:
+        llm_data:    The natal chart dict from the orchestrator.
+        section_key: One of the keys in SECTION_REGISTRY.
+
+    Raises:
+        LLMError: Unknown section key, config/API-key failure, or streaming failure.
+    """
+    section = next((s for s in SECTION_REGISTRY if s.key == section_key), None)
+    if section is None:
+        raise LLMError(f"Unknown insight section: '{section_key}'")
+
+    config, system_template, user_template = _load_config()
+    logger.info(
+        "Streaming %s / %s for insight section '%s'",
+        config.provider,
+        config.model,
+        section_key,
+    )
+
+    provider = _make_provider(config)
+    system_prompt, user_prompt = PromptBuilder(system_template, user_template).build(
+        section, llm_data
+    )
+    parser = ResponseParser()
+    chunks: list[str] = []
+
+    try:
+        # Prose fallback: no groups to stream — buffer and emit once.
+        if not section.categories:
+            async for delta in provider.stream(system_prompt, user_prompt):
+                chunks.append(delta)
+            text = parser.parse_section(section_key, "".join(chunks), structured=False)
+            yield {"__prose__": text}
+            return
+
+        order = [c.key for c in section.categories]
+        emitted: set[str] = set()
+
+        async for delta in provider.stream(system_prompt, user_prompt):
+            chunks.append(delta)
+            # quiet=True: the growing buffer fails to parse on most deltas by design.
+            partial = parser.parse_section(
+                section_key, "".join(chunks), structured=True, quiet=True
+            )
+            if not isinstance(partial, dict):
+                continue
+            present_idxs = [order.index(k) for k in order if k in partial]
+            if not present_idxs:
+                continue
+            # Every group before the last-seen one is finished — emit any not yet sent.
+            for k in order[: max(present_idxs)]:
+                if k not in emitted and partial.get(k):
+                    emitted.add(k)
+                    yield {k: partial[k]}
+    except Exception as e:
+        logger.error(
+            "Streaming failed for section '%s': %s", section_key, e, exc_info=True
+        )
+        raise LLMError(f"{config.provider} streaming error: {e}") from e
+
+    # Flush the remaining groups (including the last) from the complete buffer.
+    final = parser.parse_section(section_key, "".join(chunks), structured=True)
+    if isinstance(final, dict):
+        for k in order:
+            if k not in emitted and final.get(k):
+                emitted.add(k)
+                yield {k: final[k]}
+    logger.info(
+        "Section '%s' streamed — %d groups, %d chars",
+        section_key,
+        len(emitted),
+        len("".join(chunks)),
     )
 
 

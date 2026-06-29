@@ -5,16 +5,23 @@ POST /v1/chart/natal     — basic natal chart (4 pillars, 10 gods, life stages,
 POST /v1/chart/insights  — LLM-generated personality insights from a natal chart
 """
 
+import json
 from datetime import datetime
 from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi.responses import StreamingResponse
 from apps.backend.data_models.birth_input import BirthInput, NatalChartResponse
 from apps.backend.data_models.insights import (
     InsightsRequest,
     InsightsResponse,
 )
 from apps.backend.orchestrator.astronomer_data_orchestrator import calculate_natal_chart
-from apps.backend.llm.llm_service import llm_analyse_bazi, llm_analyse_section, LLMError
+from apps.backend.llm.llm_service import (
+    llm_analyse_bazi,
+    llm_analyse_section,
+    llm_analyse_section_stream,
+    LLMError,
+)
 from apps.backend.llm.section_registry import SECTION_REGISTRY
 from apps.utils.logging import (
     get_logger,
@@ -29,7 +36,7 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/v1/chart", tags=["chart"])
 
 
-def bind_log_context(
+async def bind_log_context(
     x_request_id: str | None = Header(default=None, alias="X-Request-Id"),
     x_chart_key: str | None = Header(default=None, alias="X-Chart-Key"),
     x_user_id: str | None = Header(default=None, alias="X-User-Id"),
@@ -137,3 +144,65 @@ async def generate_insights(
         raise HTTPException(status_code=500, detail=f"Insights error: {str(e)}")
 
     return InsightsResponse(sections=report.sections)
+
+
+@router.post("/insights/stream")
+async def stream_insights(
+    request: InsightsRequest,
+    _ctx: None = Depends(bind_log_context),
+) -> StreamingResponse:
+    """Stream one insight section as Server-Sent Events of group-deltas.
+
+    Each event is ``data: {"section": "<key>", "delta": {<group>: [items]}}`` emitted
+    as soon as that group finishes generating, followed by a terminal ``data: [DONE]``.
+    Using the async streaming path keeps the event loop free, so the frontend's
+    parallel per-section requests actually run concurrently.
+    """
+    section = request.section
+    if not section:
+        raise HTTPException(status_code=422, detail="section is required for streaming")
+    valid_keys = {s.key for s in SECTION_REGISTRY}
+    if section not in valid_keys:
+        logger.warning("insights_bad_section | section=%s", section)
+        raise HTTPException(status_code=422, detail=f"Unknown section: {section}")
+
+    # Capture the request context bound by bind_log_context. The SSE body below is
+    # iterated by Starlette *after* this function returns, in a separate execution
+    # context where these contextvar values are not visible — so re-bind them inside
+    # the generator, else every streamed log line falls back to the "-" defaults.
+    log_ctx = (
+        request_id_var.get(),
+        profile_id_var.get(),
+        uid_var.get(),
+        chart_key_var.get(),
+    )
+
+    async def event_source():
+        request_id_var.set(log_ctx[0])
+        profile_id_var.set(log_ctx[1])
+        uid_var.set(log_ctx[2])
+        chart_key_var.set(log_ctx[3])
+        try:
+            async for delta in llm_analyse_section_stream(request.data, section):
+                payload = json.dumps(
+                    {"section": section, "delta": delta}, ensure_ascii=False
+                )
+                yield f"data: {payload}\n\n"
+        except Exception:
+            logger.exception("insights_stream_error | section=%s", section)
+            # Surface a structured error event; the client treats a stream that ends
+            # without [DONE] (or with an error event) as a failure.
+            yield 'data: {"error": "stream_failed"}\n\n'
+            return
+        logger.info("insights_stream_ok | section=%s", section)
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # disable proxy buffering so deltas flush live
+        },
+    )
