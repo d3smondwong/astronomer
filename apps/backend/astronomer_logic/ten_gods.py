@@ -163,90 +163,140 @@ def apply_heavenlystem_tranformation_tengods(
     return ten_gods, si_zhu
 
 
+_ADJACENT_PILLAR_PAIRS: list[tuple[str, str]] = [
+    ("年柱", "月柱"),
+    ("月柱", "日柱"),
+    ("日柱", "时柱"),
+]
+
+_ROOTED_TIERS = ("中根", "深根")
+
+
+def _pillar_gods(ten_gods: dict, pillar: str) -> set[str]:
+    """All Ten God labels (heavenly stem + hidden tiers) present in one pillar."""
+    gods = {ten_gods[pillar]["天干十神"]}
+    gods.update(ten_gods[pillar]["藏干十神"].values())
+    return gods
+
+
+def _adjacent_pillars(pillar: str) -> list[str]:
+    return [
+        other
+        for p1, p2 in _ADJACENT_PILLAR_PAIRS
+        for other in ((p2,) if p1 == pillar else (p1,) if p2 == pillar else ())
+    ]
+
+
+def _qi_sha_occurrences(ten_gods: dict) -> list[tuple[str, str]]:
+    """Every (pillar, position) holding a 七杀; position is '天干' or a 藏干 tier."""
+    occurrences = []
+    for p in _PILLAR_KEYS:
+        if ten_gods[p]["天干十神"] == "七杀":
+            occurrences.append((p, "天干"))
+        for tier, god in ten_gods[p]["藏干十神"].items():
+            if god == "七杀":
+                occurrences.append((p, tier))
+    return occurrences
+
+
 def apply_qi_sha_transformation(
     ten_gods: dict,
     si_zhu: dict,
     day_master_data: dict,
 ) -> tuple[dict, dict]:
     """
-    七杀 → 偏官: transforms all 七杀 occurrences when any classical condition is met.
+    七杀 → 偏官: transforms individual 七杀 occurrences when a classical taming
+    condition reaches them. Different 七杀 in the same chart can end up on
+    different sides — one tamed, one not — depending on which condition is
+    positionally in reach of each one.
 
-    Conditions (any one suffices, checked in priority order):
-      1. 食神克七杀 — any 食神 exists anywhere (heavenly or hidden stem)
-      2. 印化杀     — any 正印 or 偏印 exists anywhere (heavenly or hidden stem)
-      3. 阳刃合杀   — Yang DM only: a 劫财 heavenly stem + a 七杀 heavenly stem form a 天干五合
-      4. 身旺制煞   — DM strength ∈ {旺, 极旺}, exactly 1 七杀 total, 七杀 not month 本气
+    Conditions (checked per-occurrence, in priority order):
+      1. 食神克七杀 — a 食神 (heavenly or hidden, any tier) sits on the same or
+         an adjacent pillar to this 七杀.
+      2. 印化杀     — a 正印/偏印 is available (revealed on a heavenly stem, or
+         a branch's 本气) anywhere in the chart; no proximity needed since the
+         Seal works through the Day Master. A rooted (中根+) or doubled-up
+         Seal tames any number of 七杀. A weak, unrooted, single-occurrence
+         Seal (浅根/无根) can only tame one — with 2+ 七杀 chart-wide it is
+         overwhelmed (杀重印轻) and transforms none.
+      3. 阳刃合杀   — Yang DM only: this 七杀's heavenly stem forms a 天干五合
+         with a 劫财 heavenly stem on the adjacent pillar.
+      4. 身旺制煞   — DM strength ∈ {旺, 极旺}, exactly 1 七杀 in the whole
+         chart, and that 七杀 is not the month pillar's 本气.
 
     Updates both ten_gods and si_zhu (deep-copied internally).
-    Stores '七杀化偏官' metadata on each pillar where a 七杀 was changed.
+    Stores '七杀化偏官' metadata per transformed position, e.g.
+    si_zhu[pillar]["七杀化偏官"] = {"天干": "食神克七杀", "本气": "印化杀"}.
     """
-    # ── Conditions 1 & 2: scan all ten gods (heavenly + hidden) ──────────────
-    all_gods: set[str] = {ten_gods[p]["天干十神"] for p in _PILLAR_KEYS}
-    for p in _PILLAR_KEYS:
-        all_gods.update(ten_gods[p]["藏干十神"].values())
+    occurrences = _qi_sha_occurrences(ten_gods)
+    if not occurrences:
+        return ten_gods, si_zhu
 
-    has_shi_shen = "食神" in all_gods
-    has_yin      = bool({"正印", "偏印"} & all_gods)
-
-    # ── Condition 3: Yang DM + 劫财/七杀 heavenly-stem 五合 ──────────────────
-    dm_stem    = si_zhu["日柱"]["天干"]["天干"]
-    is_yang_dm = dm_stem in _YANG_STEMS
-
-    heavenly  = [(si_zhu[p]["天干"]["天干"], ten_gods[p]["天干十神"]) for p in _PILLAR_KEYS]
-    jie_cai   = [s for s, g in heavenly if g == "劫财"]
-    qi_sha_hs = [s for s, g in heavenly if g == "七杀"]
-
-    has_yang_ren_he = is_yang_dm and any(
-        frozenset({jc, qs}) in _WU_HE_PAIRS
-        for jc in jie_cai
-        for qs in qi_sha_hs
-    )
-
-    # ── Condition 4: strong DM, single 七杀, not month 本气 ──────────────────
-    dm_strength = day_master_data.get("日主", {}).get("强弱", "")
-
-    qi_sha_count = sum(
-        1
-        for p in _PILLAR_KEYS
-        for god in ([ten_gods[p]["天干十神"]] + list(ten_gods[p]["藏干十神"].values()))
-        if god == "七杀"
-    )
+    dm_stem      = si_zhu["日柱"]["天干"]["天干"]
+    is_yang_dm   = dm_stem in _YANG_STEMS
+    dm_strength  = day_master_data.get("日主", {}).get("强弱", "")
     month_ben_qi = ten_gods["月柱"]["藏干十神"].get("本气", "")
 
-    has_strong_dm = (
+    # ── 印化杀 availability: stem-revealed or 本气 only ──────────────────────
+    yin_occurrences = (
+        [(p, "天干") for p in _PILLAR_KEYS if ten_gods[p]["天干十神"] in ("正印", "偏印")]
+        + [(p, "本气") for p in _PILLAR_KEYS if ten_gods[p]["藏干十神"].get("本气") in ("正印", "偏印")]
+    )
+    yin_is_strong = len(yin_occurrences) >= 2 or any(
+        position == "天干" and si_zhu[p]["天干"].get("根基强度") in _ROOTED_TIERS
+        for p, position in yin_occurrences
+    )
+    yin_transforms_all = bool(yin_occurrences) and (yin_is_strong or len(occurrences) == 1)
+
+    # ── 阳刃合杀: Yang DM heavenly-stem 五合 on adjacent pillars ─────────────
+    heavenly = {p: (si_zhu[p]["天干"]["天干"], ten_gods[p]["天干十神"]) for p in _PILLAR_KEYS}
+    yang_ren_he_pillars: set[str] = set()
+    if is_yang_dm:
+        for p1, p2 in _ADJACENT_PILLAR_PAIRS:
+            s1, g1 = heavenly[p1]
+            s2, g2 = heavenly[p2]
+            if frozenset({s1, s2}) in _WU_HE_PAIRS:
+                if g1 == "劫财" and g2 == "七杀":
+                    yang_ren_he_pillars.add(p2)
+                elif g2 == "劫财" and g1 == "七杀":
+                    yang_ren_he_pillars.add(p1)
+
+    # ── 身旺制煞: strong DM, sole 七杀 in chart, not month 本气 ───────────────
+    has_strong_dm_single_sha = (
         dm_strength in ("旺", "极旺")
-        and qi_sha_count == 1
+        and len(occurrences) == 1
         and month_ben_qi != "七杀"
     )
 
-    # ── Determine trigger ─────────────────────────────────────────────────────
-    trigger = (
-        "食神克七杀" if has_shi_shen    else
-        "印化杀"     if has_yin         else
-        "阳刃合杀"   if has_yang_ren_he else
-        "身旺制煞"   if has_strong_dm   else
-        None
-    )
-    if not trigger:
+    def _trigger_for(pillar: str, position: str) -> str | None:
+        reach = {pillar, *_adjacent_pillars(pillar)}
+        if any("食神" in _pillar_gods(ten_gods, p) for p in reach):
+            return "食神克七杀"
+        if yin_transforms_all:
+            return "印化杀"
+        if position == "天干" and pillar in yang_ren_he_pillars:
+            return "阳刃合杀"
+        if has_strong_dm_single_sha:
+            return "身旺制煞"
+        return None
+
+    triggers = {occ: _trigger_for(*occ) for occ in occurrences}
+    if not any(triggers.values()):
         return ten_gods, si_zhu
 
-    # ── Transform all 七杀 → 偏官 ─────────────────────────────────────────────
+    # ── Transform only the qualifying 七杀 occurrences → 偏官 ────────────────
     ten_gods = copy.deepcopy(ten_gods)
     si_zhu   = copy.deepcopy(si_zhu)
 
-    for pillar in _PILLAR_KEYS:
-        changed = False
-        if ten_gods[pillar]["天干十神"] == "七杀":
+    for (pillar, position), trigger in triggers.items():
+        if not trigger:
+            continue
+        if position == "天干":
             ten_gods[pillar]["天干十神"]   = "偏官"
             si_zhu[pillar]["天干"]["十神"] = "偏官"
-            changed = True
-        for tier in ("本气", "中气", "余气"):
-            if ten_gods[pillar]["藏干十神"].get(tier) == "七杀":
-                ten_gods[pillar]["藏干十神"][tier] = "偏官"
-            if tier in si_zhu[pillar]["藏干"] and si_zhu[pillar]["藏干"][tier].get("十神") == "七杀":
-                si_zhu[pillar]["藏干"][tier]["十神"] = "偏官"
-                changed = True
-        if changed:
-            si_zhu[pillar]["七杀化偏官"] = {"触发条件": trigger}
+        else:
+            ten_gods[pillar]["藏干十神"][position]  = "偏官"
+            si_zhu[pillar]["藏干"][position]["十神"] = "偏官"
+        si_zhu[pillar].setdefault("七杀化偏官", {})[position] = trigger
 
     return ten_gods, si_zhu
