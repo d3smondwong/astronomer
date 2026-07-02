@@ -4071,6 +4071,19 @@ def evaluate_rule(rule: dict, context: ChartContext, _depth: int = 0, _prereq_pi
         matched = any(results)
     elif mode == "NOT":
         matched = not any(results)
+        if matched:
+            # Every leaf condition evaluated False for the block to match, so the
+            # per-condition loop above never attached evidence (it only fires on
+            # ok=True). Synthesize a self-documenting entry per leaf condition
+            # describing what was confirmed absent — output enrichment only, does
+            # not change matching semantics or require touching rule data.
+            for cond in conditions:
+                target = cond.get("判定目标")
+                if not target:
+                    continue  # nested AND/OR sub-block: no simple evidence to synthesize
+                t = target.get("类型")
+                if t:
+                    evidence_list.append({f"{t}_取反": target.get("值", target)})
     else:  # "阈值" — single 计数 condition
         matched = bool(results) and results[0]
 
