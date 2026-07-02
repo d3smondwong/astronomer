@@ -146,7 +146,9 @@ def calculate_natal_chart(
     shen_sha = get_shen_sha(bazi, na_yin, gender)
     shen_sha_with_interpretations = get_shen_sha_interpretations(shen_sha)
 
-    # Build partial chart for the classical-text interpretation layer
+    # Build partial chart for the classical-text interpretation layer.
+    # 胎命身 is included so the interpretation engine can address 胎元 as the mother
+    # palace (论六亲); without it build_chart_context would see no 胎元 data.
     partial_chart = {
         "性别": "男" if gender == 1 else "女",
         "四柱实体": si_zhu,
@@ -154,6 +156,7 @@ def calculate_natal_chart(
         **day_master_data,
         **five_elements_data,
         **shen_sha_with_interpretations,
+        **tai_ming_shen,
         **natal_interactions_data,
     }
     natal_interpretations_data = get_natal_interpretations(partial_chart)
@@ -194,10 +197,10 @@ if __name__ == "__main__":
 
     # ── Subjects ──────────────────────────────────────────────────────────────
     subjects = {
-        "Desmond": (dt(1985, 11, 25, 17, 7, 0), 1.3253, 103.808053, 1),
+        # "Desmond": (dt(1985, 11, 25, 17, 7, 0), 1.3253, 103.808053, 1),
         # "Corinne": (dt(1987, 6, 3, 12, 6, 0), 1.4759, 103.808053, 0),
         # "Lara":    (dt(2025,  7, 31,  9, 10, 0), 1.3253,  103.808053, 0),
-        # "Waifu": (dt(1985, 2, 11, 10, 15, 0), 1.3253, 103.808053, 1),
+        "Waifu": (dt(1985, 2, 11, 10, 15, 0), 1.3253, 103.808053, 1),
         # "Ayden": (dt(2020, 2, 23, 00, 34, 0), 1.3253, 103.808053, 1),
     }
 

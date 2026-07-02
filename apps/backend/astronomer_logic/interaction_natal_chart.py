@@ -80,10 +80,24 @@ Each <condition> is a leaf or a nested block:
   "十神_同柱"
     { "类型": "十神_同柱", "主神": [str], "配神": [str] }
     # same pillar contains ≥1 from 主神 AND ≥1 from 配神
+    # pos.柱 scopes which pillars are scanned (default: all four); pos.部分 scopes
+    # the tier list per pillar (default: _DEFAULT_TIERS)
 
   "十神_五行状态"
     { "类型": "十神_五行状态", "目标十神": [str],
-      "值": [str] }         # seasonal states: 旺/相/休/囚/死
+      "值": [str] }         # seasonal states: 旺/相/休/囚/死 — requires the star PRESENT
+
+  "十神元素_五行状态"
+    { "类型": "十神元素_五行状态", "目标十神": [str],
+      "值": [str] }         # like 十神_五行状态 but tests the ten-god's ELEMENT (derived from
+                            # the Day Master) regardless of whether the star is present.
+                            # e.g. wealth element 旺 while no 财 star appears (局中无妻…财旺之乡)
+
+  "十神_五行"
+    部分: tier list (default: _DEFAULT_TIERS = ["天干", "本气", "中气"])
+    { "类型": "十神_五行", "十神": [str] | str, "值": [str] }
+    # finds a ten-god and checks its own stem/hidden-stem 五行 attribute
+    # directly (not the Day-Master-derived element like 十神元素_五行状态)
 
   "十神_阶段在支"
     { "类型": "十神_阶段在支", "十神": str | [str], "阶段": "长生" | "墓" }
@@ -101,10 +115,12 @@ Each <condition> is a leaf or a nested block:
 
  ── Five-elements (五行) ───────────────────────────────────────
 
-  "五行有"
-    部分: "五行"
-    { "类型": "五行有", "值": [str],
+  "五行"
+    部分: "天干"|"地支"|"干支"|None (omit = both 天干+地支)
+    { "类型": "五行", "值": [str],
       "强度": [str]? }      # e.g. ["旺","相"] — filters by seasonal state
+    # 柱 scopes which pillars are scanned (default: all four via "全局";
+    # also works with 位置: {"同柱": True} to test the 前提条件's resolved pillar)
 
   "五行全"
     { "类型": "五行全" }    # all five elements present globally
@@ -136,11 +152,15 @@ Each <condition> is a leaf or a nested block:
     { "类型": "计数_状态", "十神": [str], "值": [str],
       "阈值": int, "比较": "≥"|"≤"|"=" }
     # counts ten-gods whose element has one of the given seasonal states
+    # pos.柱 scopes which pillars are scanned (default: all four); pos.部分 scopes
+    # the tier list per pillar (default: _DEFAULT_TIERS)
 
   "计数_差"
     { "类型": "计数_差",
       "减数十神": [str], "被减数十神": [str],
       "阈值": int, "比较": "≥"|"≤"|"=" }
+    # pos.柱 scopes which pillars are scanned (default: all four); pos.部分 scopes
+    # the tier list per pillar (default: _DEFAULT_TIERS)
 
   "计数_神煞"
     { "类型": "计数_神煞", "神煞": [str], "阈值": int, "比较": "≥"|"≤"|"=" }
@@ -350,6 +370,9 @@ from apps.backend.data.san_ming_tong_hui_v5 import volume_5_rules
 from apps.backend.data.key_rules import key_rules_predictions
 
 _ALL_PILLARS = ["年柱", "月柱", "日柱", "时柱"]
+# Default 强度 floor for interaction matching when a rule doesn't specify its own —
+# excludes 大幅衰减/消融吸收 so heavily-suppressed or fully-dissolved interactions don't count.
+_DEFAULT_INTERACTION_STRENGTH: frozenset[str] = frozenset({"强势主流", "显著影响", "中等衰减"})
 _YANG_REN_XIANG_SHI_PAIRS: frozenset[tuple[str, str]] = frozenset([
     # 甲 series → blade 乙卯
     ("甲寅", "乙卯"), ("甲辰", "乙卯"), ("甲午", "乙卯"), ("甲申", "乙卯"), ("甲戌", "乙卯"),
@@ -385,10 +408,30 @@ class ChartContext:
     tai_yuan_branch: str = field(default="")  # 地支 of 胎元 conception palace
 
 
+def _build_pillars_with_tai_yuan(natal_chart: dict) -> dict:
+    """Four pillars plus a 胎元 (mother-palace) entry addressable via 柱: "胎元".
+
+    胎元 is added to a shallow copy so it never leaks back into the source 四柱实体, and
+    because _ALL_PILLARS lists only the four pillars it is excluded from 全局 sweeps/counts —
+    a rule must opt in explicitly with 柱: "胎元".
+    """
+    pillars = dict(natal_chart.get("四柱实体", {}))
+    tai_yuan = natal_chart.get("胎命身", {}).get("胎元", {})
+    if "天干" in tai_yuan:  # enriched palace entity (see tai_ming_shen._enrich_palace)
+        pillars["胎元"] = {
+            "天干": tai_yuan["天干"],
+            "地支": tai_yuan["地支"],
+            "藏干": tai_yuan.get("藏干", {}),
+            "十二长生": tai_yuan.get("十二长生", {}),
+            "纳音": tai_yuan.get("纳音"),
+        }
+    return pillars
+
+
 def build_chart_context(natal_chart: dict) -> ChartContext:
     return ChartContext(
         gender=natal_chart["性别"],
-        pillars=natal_chart["四柱实体"],
+        pillars=_build_pillars_with_tai_yuan(natal_chart),
         shen_sha=natal_chart.get("神煞", {}),
         interactions=[
             # Only material-strength interactions matter for classical text rules;
@@ -668,80 +711,49 @@ def _resolve_pillars(pos_zhu: str | list | None) -> list[str]:
     return list(pos_zhu)
 
 
-def _get_ten_gods_in_part(pillar: dict, bu_fen: str | None) -> list[str]:
+_DEFAULT_TIERS = ["天干", "本气", "中气"]  # stem + 本气 + 中气, 余气 excluded
+
+
+def _get_ten_gods_in_part(pillar: dict, bu_fen: list | None) -> list[str]:
     """Extract ten-god strings from a pillar's specified section.
 
-    部分 semantics:
-      "天干"              — stem only
-      "地支"              — 本气 only (月令 dominant energy)
-      "藏干"              — 本气 + 中气 (余气 excluded — too weak for pattern matching)
-      "十神"|"柱"|None    — stem + 本气 + 中气
-      "全藏干"            — all three tiers: 本气 + 中气 + 余气 (explicit rooting checks)
+    部分 is an explicit tier selection, e.g. ["天干", "本气"]:
+      "天干"   — heavenly stem
+      "本气"   — 藏干 primary qi (branch dominant energy)
+      "中气"   — 藏干 middle qi
+      "余气"   — 藏干 residual qi (rarely included — too weak for pattern matching)
     """
     result: list[str] = []
-    if bu_fen in ("柱", "十神", "十神计数", None, ""):
+    if not isinstance(bu_fen, list):
+        return result
+    tiers = set(bu_fen)
+    if "天干" in tiers:
         tg = pillar.get("天干", {}).get("十神")
         if tg:
             result.append(tg)
-        for role, info in pillar.get("藏干", {}).items():
-            if role == "余气":
-                continue
-            tg = info.get("十神")
-            if tg:
-                result.append(tg)
-    elif bu_fen == "天干":
-        tg = pillar.get("天干", {}).get("十神")
-        if tg:
-            result.append(tg)
-    elif bu_fen == "地支":
-        # Branch's dominant ten-god = 藏干 本气 only
-        tg = pillar.get("藏干", {}).get("本气", {}).get("十神")
-        if tg:
-            result.append(tg)
-    elif bu_fen == "藏干":
-        for role, info in pillar.get("藏干", {}).items():
-            if role == "余气":
-                continue
-            tg = info.get("十神")
-            if tg:
-                result.append(tg)
-    elif bu_fen == "全藏干":
-        # Explicit: all three tiers including 余气 (use for rooting/通根 checks)
-        for info in pillar.get("藏干", {}).values():
-            tg = info.get("十神")
+    for tier in ("本气", "中气", "余气"):
+        if tier in tiers:
+            tg = pillar.get("藏干", {}).get(tier, {}).get("十神")
             if tg:
                 result.append(tg)
     return result
 
 
-def _get_ten_gods_with_source(pillar: dict, bu_fen: str | None) -> list[tuple[str, str]]:
+def _get_ten_gods_with_source(pillar: dict, bu_fen: list | None) -> list[tuple[str, str]]:
     """Like _get_ten_gods_in_part but returns (ten_god, source_section) pairs."""
     result: list[tuple[str, str]] = []
-    if bu_fen in ("柱", "十神", "十神计数", None, ""):
+    if not isinstance(bu_fen, list):
+        return result
+    tiers = set(bu_fen)
+    if "天干" in tiers:
         tg = pillar.get("天干", {}).get("十神")
         if tg:
             result.append((tg, "天干"))
-        for role, info in pillar.get("藏干", {}).items():
-            if role == "余气":
-                continue
-            tg = info.get("十神")
+    for tier in ("本气", "中气", "余气"):
+        if tier in tiers:
+            tg = pillar.get("藏干", {}).get(tier, {}).get("十神")
             if tg:
-                result.append((tg, f"藏干_{role}"))
-    elif bu_fen == "天干":
-        tg = pillar.get("天干", {}).get("十神")
-        if tg:
-            result.append((tg, "天干"))
-    elif bu_fen == "地支":
-        tg = pillar.get("藏干", {}).get("本气", {}).get("十神")
-        if tg:
-            result.append((tg, "藏干_本气"))
-    elif bu_fen in ("藏干", "全藏干"):
-        for role, info in pillar.get("藏干", {}).items():
-            if bu_fen == "藏干" and role == "余气":
-                continue
-            tg = info.get("十神")
-            if tg:
-                result.append((tg, f"藏干_{role}"))
+                result.append((tg, f"藏干_{tier}"))
     return result
 
 
@@ -771,8 +783,9 @@ def eval_ten_god(ctx: ChartContext, pos: dict, target: dict) -> tuple[bool, dict
     # interaction back to the stem ten-god of the same pillar.
     if bu_fen in ("天干合", "六合"):
         wanted_form: str | None = target.get("形态")  # optional: e.g. "化气格"
+        wanted_strength: set = set(target["强度"]) if "强度" in target else set(_DEFAULT_INTERACTION_STRENGTH)
         for item in ctx.interactions:
-            if item.get("类型") == bu_fen:
+            if item.get("类型") == bu_fen and item.get("强度") in wanted_strength:
                 if wanted_form and item.get("形态") != wanted_form:
                     continue
                 for p_name in item.get("组合明细", {}):
@@ -793,7 +806,7 @@ def eval_ten_god(ctx: ChartContext, pos: dict, target: dict) -> tuple[bool, dict
             # Optional: 来源柱 — ten-god must also appear in the source pillar
             lai_yuan = target.get("来源柱")
             if lai_yuan:
-                src_tgs = _get_ten_gods_in_part(ctx.pillars.get(lai_yuan, {}), None)
+                src_tgs = _get_ten_gods_in_part(ctx.pillars.get(lai_yuan, {}), _DEFAULT_TIERS)
                 if tg not in src_tgs:
                     continue
             # Optional: 月令秉令 — month branch 本气 must be in wanted
@@ -834,8 +847,9 @@ def eval_ten_god_absent(
     bu_fen = pos.get("部分")
 
     if bu_fen in ("天干合", "六合"):
+        wanted_strength: set = set(target["强度"]) if "强度" in target else set(_DEFAULT_INTERACTION_STRENGTH)
         for item in ctx.interactions:
-            if item.get("类型") == bu_fen:
+            if item.get("类型") == bu_fen and item.get("强度") in wanted_strength:
                 for p_name in item.get("组合明细", {}):
                     tg = ctx.pillars.get(p_name, {}).get("天干", {}).get("十神")
                     if tg in excluded:
@@ -1086,7 +1100,9 @@ def eval_huhuan_kong_wang(ctx: ChartContext, pos: dict, target: dict) -> tuple[b
 def eval_interaction(ctx: ChartContext, pos: dict, target: dict) -> tuple[bool, dict]:
     wanted = set(target.get("值", []))
     wanted_form: str | None = target.get("形态")  # optional sub-form filter, e.g. "化气格"
-    wanted_strength: set | None = set(target["强度"]) if "强度" in target else None
+    strength_explicit = "强度" in target
+    wanted_strength: set = set(target["强度"]) if strength_explicit else set(_DEFAULT_INTERACTION_STRENGTH)
+    wanted_element: str | None = target.get("元素")  # optional filter, e.g. "金" for a specific bureau
     pillar_spec = pos.get("柱")
 
     def _item_matches(item: dict) -> bool:
@@ -1094,7 +1110,9 @@ def eval_interaction(ctx: ChartContext, pos: dict, target: dict) -> tuple[bool, 
             return False
         if wanted_form and item.get("形态") != wanted_form:
             return False
-        if wanted_strength and item.get("强度") not in wanted_strength:
+        if item.get("强度") not in wanted_strength:
+            return False
+        if wanted_element and item.get("元素") != wanted_element:
             return False
         return True
 
@@ -1104,8 +1122,10 @@ def eval_interaction(ctx: ChartContext, pos: dict, target: dict) -> tuple[bool, 
                 ev: dict = {"交互类型": item.get("类型")}
                 if wanted_form:
                     ev["形态"] = item.get("形态")
-                if wanted_strength:
+                if strength_explicit:
                     ev["强度"] = item.get("强度")
+                if wanted_element:
+                    ev["元素"] = item.get("元素")
                 return True, ev
         return False, {}
     pillars_to_check = _resolve_pillars(pillar_spec)
@@ -1114,8 +1134,10 @@ def eval_interaction(ctx: ChartContext, pos: dict, target: dict) -> tuple[bool, 
             ev = {"交互类型": item.get("类型"), "涉及柱": pillars_to_check}
             if wanted_form:
                 ev["形态"] = item.get("形态")
-            if wanted_strength:
+            if strength_explicit:
                 ev["强度"] = item.get("强度")
+            if wanted_element:
+                ev["元素"] = item.get("元素")
             return True, ev
     return False, {}
 
@@ -1125,14 +1147,17 @@ def eval_interaction_absent(
 ) -> tuple[bool, dict]:
     """No harmonizing interaction of specified types exists between the specified pillars."""
     wanted_types = set(target.get("值", []))
+    wanted_strength: set = set(target["强度"]) if "强度" in target else set(_DEFAULT_INTERACTION_STRENGTH)
     check_sheng = "五行相生" in wanted_types or "五行生克" in wanted_types
     check_ke = "五行相克" in wanted_types or "五行生克" in wanted_types
     interaction_types = wanted_types - {"五行生克", "五行相生", "五行相克"}
     pillars_to_check = _resolve_pillars(pos.get("柱"))
 
     for item in ctx.interactions:
-        if item.get("类型") in interaction_types and _interaction_matches_pillars(
-            item, pillars_to_check
+        if (
+            item.get("类型") in interaction_types
+            and item.get("强度") in wanted_strength
+            and _interaction_matches_pillars(item, pillars_to_check)
         ):
             return False, {}
 
@@ -1194,7 +1219,7 @@ def eval_counter(ctx: ChartContext, pos: dict, target: dict) -> tuple[bool, dict
     return (ok, {"十神计数": sorted(wanted), "计数": len(matches), "匹配": matches}) if ok else (False, {})
 
 
-def eval_ten_god_count_by_state(ctx: ChartContext, _pos: dict, target: dict) -> tuple[bool, dict]:
+def eval_ten_god_count_by_state(ctx: ChartContext, pos: dict, target: dict) -> tuple[bool, dict]:
     """Count ten-gods whose five-element has one of the wanted seasonal states, compare to threshold."""
     ten_shen_spec = target.get("十神")
     if not ten_shen_spec:
@@ -1211,8 +1236,8 @@ def eval_ten_god_count_by_state(ctx: ChartContext, _pos: dict, target: dict) -> 
     tg_to_element = TEN_GOD_ELEMENT.get(dm_element, {})
 
     matches = []
-    for p in _ALL_PILLARS:
-        for tg, source in _get_ten_gods_with_source(ctx.pillars.get(p, {}), None):
+    for p in _resolve_pillars(pos.get("柱")):
+        for tg, source in _get_ten_gods_with_source(ctx.pillars.get(p, {}), pos.get("部分", _DEFAULT_TIERS)):
             if tg not in wanted_tgs:
                 continue
             element = tg_to_element.get(tg)
@@ -1238,8 +1263,8 @@ def eval_ten_god_count_diff(ctx: ChartContext, pos: dict, target: dict) -> tuple
     comparator: str = target.get("比较", "≥")
     matches_a: list[dict] = []
     matches_b: list[dict] = []
-    for p in _ALL_PILLARS:
-        for tg, source in _get_ten_gods_with_source(ctx.pillars.get(p, {}), None):
+    for p in _resolve_pillars(pos.get("柱")):
+        for tg, source in _get_ten_gods_with_source(ctx.pillars.get(p, {}), pos.get("部分", _DEFAULT_TIERS)):
             if tg in minuend:
                 matches_a.append({"宫位": p, "十神": tg, "来源": source})
             if tg in subtrahend:
@@ -1277,6 +1302,33 @@ def eval_shen_sha_count(
     return (ok, {"神煞计数": sorted(wanted), "计数": count}) if ok else (False, {})
 
 
+def eval_interaction_count(
+    ctx: ChartContext, pos: dict, target: dict
+) -> tuple[bool, dict]:
+    wanted = set(target.get("交互类型", []))
+    if not wanted:
+        return False, {}
+    threshold: int = target.get("阈值", 0)
+    comparator: str = target.get("比较", "≥")
+    wanted_strength: set = set(target["强度"]) if "强度" in target else set(_DEFAULT_INTERACTION_STRENGTH)
+    pillar_spec = pos.get("柱")
+    pillars_to_check = _resolve_pillars(pillar_spec) if pillar_spec else None
+
+    matches = [
+        item
+        for item in ctx.interactions
+        if item.get("类型") in wanted
+        and item.get("强度") in wanted_strength
+        and (pillars_to_check is None or _interaction_matches_pillars(item, pillars_to_check))
+    ]
+    ok = _compare_threshold(len(matches), threshold, comparator)
+    return (
+        (ok, {"交互计数": sorted(wanted), "计数": len(matches), "匹配": [m.get("类型") for m in matches]})
+        if ok
+        else (False, {})
+    )
+
+
 def eval_shen_sha_count_diff(ctx: ChartContext, _pos: dict, target: dict) -> tuple[bool, dict]:
     """计数_神煞_差: count(神煞A) - count(神煞B) compared against threshold."""
     sha_a = set(target.get("神煞A", []))
@@ -1306,7 +1358,12 @@ def eval_stem_harmony_count(
 ) -> tuple[bool, dict]:
     threshold: int = target.get("阈值", 0)
     comparator: str = target.get("比较", "≥")
-    count = sum(1 for item in ctx.interactions if item.get("类型") == "天干合")
+    wanted_strength: set = set(target["强度"]) if "强度" in target else set(_DEFAULT_INTERACTION_STRENGTH)
+    count = sum(
+        1
+        for item in ctx.interactions
+        if item.get("类型") == "天干合" and item.get("强度") in wanted_strength
+    )
     ok = _compare_threshold(count, threshold, comparator)
     return (ok, {"天干合_计数": count}) if ok else (False, {})
 
@@ -1335,7 +1392,7 @@ def _check_ten_god_element_pair(
         return [
             (p, tg, tg_to_element[tg])
             for p in pillars
-            for tg in _get_ten_gods_in_part(ctx.pillars.get(p, {}), None)
+            for tg in _get_ten_gods_in_part(ctx.pillars.get(p, {}), _DEFAULT_TIERS)
             if tg in wanted and tg_to_element.get(tg)
         ]
 
@@ -1463,7 +1520,7 @@ def eval_ten_god_same_pillar(
     pillars = _resolve_pillars(pos.get("柱"))
 
     for p in pillars:
-        tgs = set(_get_ten_gods_in_part(ctx.pillars.get(p, {}), None))
+        tgs = set(_get_ten_gods_in_part(ctx.pillars.get(p, {}), pos.get("部分", _DEFAULT_TIERS)))
         found_zhu = tgs & zhu_shen
         found_pei = tgs & pei_shen
         if found_zhu and found_pei:
@@ -1508,8 +1565,9 @@ def eval_ten_god_wu_xing_state(
         return False, {}
     tg_to_element = TEN_GOD_ELEMENT.get(dm_element, {})
 
+    bu_fen = pos.get("部分")
     for p in _resolve_pillars(pos.get("柱")):
-        for tg in _get_ten_gods_in_part(ctx.pillars.get(p, {}), None):
+        for tg in _get_ten_gods_in_part(ctx.pillars.get(p, {}), bu_fen):
             if tg not in target_tgs:
                 continue
             element = tg_to_element.get(tg)
@@ -1521,26 +1579,63 @@ def eval_ten_god_wu_xing_state(
     return False, {}
 
 
+def eval_ten_god_element_wu_xing_state(
+    ctx: ChartContext, pos: dict, target: dict
+) -> tuple[bool, dict]:
+    """Seasonal state of the *element* a ten-god maps to — independent of whether that
+    ten-god star is actually present in the chart.
+
+    Differs from "十神_五行状态" (which requires the star to appear in a pillar): here the
+    element is derived purely from the Day Master (e.g. 正财→the element the DM controls)
+    and its 五行 seasonal state is read from 五行. Needed for classical conditions like
+    论六亲 "局中无妻…如在财旺之乡" — wealth element prosperous while no 财 star is present.
+
+    target keys:
+      目标十神  list[str]  — ten-gods whose element to test (正财/偏财 share one element)
+      值        list[str]  — seasonal states to match, e.g. ["旺", "相"]
+    """
+    target_tgs = target.get("目标十神", [])
+    wanted_states = set(target.get("值", []))
+    dm_element = ctx.day_master.get("五行")
+    if not dm_element:
+        return False, {}
+    tg_to_element = TEN_GOD_ELEMENT.get(dm_element, {})
+
+    for tg in target_tgs:
+        element = tg_to_element.get(tg)
+        if not element:
+            continue
+        state = ctx.five_elements.get(element, {}).get("状态")
+        if state in wanted_states:
+            return True, {"十神": tg, "五行": element, "状态": state}
+    return False, {}
+
+
 def eval_ten_god_element_attribute(
     ctx: ChartContext, pos: dict, target: dict
 ) -> tuple[bool, dict]:
     """Generic evaluator: finds stems/藏干 with specified ten-gods, checks their 五行 attribute.
 
     Condition target fields:
-        "十神"       list[str]   — ten-gods to scan for (default: ["正官"])
-        "值"         list[str]   — expected element values (e.g. ["金"])
-        "读取来源"   list[str]   — "天干" | "藏干" | both (default: both)
+        "十神"       list[str] | str  — ten-gods to scan for (required)
+        "值"         list[str]        — expected element values (e.g. ["金"])
 
-    Pillar scope is controlled by the "位置" key in the parent condition dict.
+    Pillar scope is controlled by "位置.柱" (default: all four).
+    Tier scope is controlled by "位置.部分" — same tier-list convention as 十神/计数/etc.
+    (default: _DEFAULT_TIERS, i.e. ["天干", "本气", "中气"] — 余气 excluded, same as everywhere
+    else in the ten-god system).
     """
     wanted_elements = set(target.get("值", []))
-    wanted_tg = set(target.get("十神", ["正官"]))
-    sources = set(target.get("读取来源", ["天干", "藏干"]))
+    wanted_tg_spec = target.get("十神")
+    if not wanted_tg_spec:
+        return False, {}
+    wanted_tg = {wanted_tg_spec} if isinstance(wanted_tg_spec, str) else set(wanted_tg_spec)
+    tiers = set(pos.get("部分", _DEFAULT_TIERS))
 
     for p in _resolve_pillars(pos.get("柱")):
         pillar = ctx.pillars.get(p, {})
 
-        if "天干" in sources:
+        if "天干" in tiers:
             tg_info = pillar.get("天干", {})
             if tg_info.get("十神") in wanted_tg:
                 element = tg_info.get("五行")
@@ -1548,15 +1643,14 @@ def eval_ten_god_element_attribute(
                     return True, {"宫位": p, "来源": "天干",
                                   "十神": tg_info.get("十神"), "五行": element}
 
-        if "藏干" in sources:
-            for role, cg_info in pillar.get("藏干", {}).items():
-                if not isinstance(cg_info, dict):
-                    continue
-                if cg_info.get("十神") in wanted_tg:
-                    element = cg_info.get("五行")
-                    if element in wanted_elements:
-                        return True, {"宫位": p, "来源": f"藏干_{role}",
-                                      "十神": cg_info.get("十神"), "五行": element}
+        for role, cg_info in pillar.get("藏干", {}).items():
+            if role not in tiers or not isinstance(cg_info, dict):
+                continue
+            if cg_info.get("十神") in wanted_tg:
+                element = cg_info.get("五行")
+                if element in wanted_elements:
+                    return True, {"宫位": p, "来源": f"藏干_{role}",
+                                  "十神": cg_info.get("十神"), "五行": element}
 
     return False, {}
 
@@ -1663,13 +1757,19 @@ def eval_kong_wang_count(
 
 
 def eval_wu_xing_present(
-    ctx: ChartContext, _pos: dict, target: dict
+    ctx: ChartContext, pos: dict, target: dict
 ) -> tuple[bool, dict]:
     wanted = set(target.get("值", []))
     allowed_states: list[str] | None = target.get("强度")
-    for p in _ALL_PILLARS:
+    bu_fen = pos.get("部分")
+    for p in _resolve_pillars(pos.get("柱")):
         pillar = ctx.pillars.get(p, {})
-        for source, part in (("天干", pillar.get("天干", {})), ("地支", pillar.get("地支", {}))):
+        sources = (
+            (("天干", pillar.get("天干", {})),) if bu_fen == "天干" else
+            (("地支", pillar.get("地支", {})),) if bu_fen == "地支" else
+            (("天干", pillar.get("天干", {})), ("地支", pillar.get("地支", {})))
+        )
+        for source, part in sources:
             element = part.get("五行")
             if element not in wanted:
                 continue
@@ -1842,8 +1942,9 @@ def eval_ten_god_you_he(
     target keys: 十神 — list of ten-god names e.g. ["正官"].
     """
     wanted = set(target.get("十神", []))
+    wanted_strength: set = set(target["强度"]) if "强度" in target else set(_DEFAULT_INTERACTION_STRENGTH)
     for item in ctx.interactions:
-        if item.get("类型") == "天干合":
+        if item.get("类型") == "天干合" and item.get("强度") in wanted_strength:
             for p_name in item.get("组合明细", {}):
                 tg = ctx.pillars.get(p_name, {}).get("天干", {}).get("十神")
                 if tg in wanted:
@@ -2274,14 +2375,19 @@ def eval_yue_ling_zheng_qi(
 
 
 def eval_san_he_guan_ju(
-    ctx: ChartContext, _pos: dict, _target: dict
+    ctx: ChartContext, _pos: dict, target: dict
 ) -> tuple[bool, dict]:
     """三合官局: A 三合 forms the element that controls the day master (正官 element)."""
     dm_element = ctx.day_master.get("五行")
     if not dm_element:
         return False, {}
+    wanted_strength: set = set(target["强度"]) if "强度" in target else set(_DEFAULT_INTERACTION_STRENGTH)
     for item in ctx.interactions:
-        if item.get("类型") == "三合" and _WU_XING_KE.get(item.get("元素")) == dm_element:
+        if (
+            item.get("类型") == "三合"
+            and item.get("强度") in wanted_strength
+            and _WU_XING_KE.get(item.get("元素")) == dm_element
+        ):
             return True, {"三合元素": item.get("元素"), "三合组合": item.get("组合明细", {})}
     return False, {}
 
@@ -2729,15 +2835,15 @@ def eval_jiao_hu_zi_shu_xing(ctx: ChartContext, _pos: dict, target: dict) -> tup
         交互:  interaction 类型 to filter (e.g. "六冲")
         属性:  property key on the interaction dict (e.g. "纳音关系", "同类")
         值:    list of acceptable values (e.g. ["相生"], [True])
-        强度:  optional list of acceptable 强度 values — if omitted, all strengths match
+        强度:  optional list of acceptable 强度 values — defaults to {强势主流, 显著影响, 中等衰减}
     """
     ix_type = target.get("交互")
     attr = target.get("属性")
     wanted = set(map(str, target.get("值", [])))  # normalise to str for comparison
-    wanted_strength: set | None = set(target["强度"]) if "强度" in target else None
+    wanted_strength: set = set(target["强度"]) if "强度" in target else set(_DEFAULT_INTERACTION_STRENGTH)
     for ix in ctx.interactions:
         if ix.get("类型") == ix_type:
-            if wanted_strength and ix.get("强度") not in wanted_strength:
+            if ix.get("强度") not in wanted_strength:
                 continue
             val = ix.get(attr)
             if str(val) in wanted:
@@ -2956,24 +3062,24 @@ def eval_po_cai(ctx: ChartContext, _pos: dict, _target: dict) -> tuple[bool, dic
     return False, {}
 
 
-def eval_po_he(ctx: ChartContext, _pos: dict, _target: dict) -> tuple[bool, dict]:
+def eval_po_he(ctx: ChartContext, _pos: dict, target: dict) -> tuple[bool, dict]:
     """破合: a strong 天干合 exists and a strong 六冲 acts on at least one of its two pillars.
 
     Classical: 干合被支破 — the branch of a 合 pillar is clashed by an outside pillar.
     Both 天干合 and 六冲 store pillar labels as keys in 根基, making overlap detection direct.
     """
-    STRONG = {"强势主流", "显著影响"}
+    wanted_strength: set = set(target["强度"]) if "强度" in target else set(_DEFAULT_INTERACTION_STRENGTH)
 
     he_pillar_pairs: list[frozenset[str]] = [
         frozenset(ix.get("根基", {}).keys())
         for ix in ctx.interactions
-        if ix.get("类型") == "天干合" and ix.get("强度") in STRONG
+        if ix.get("类型") == "天干合" and ix.get("强度") in wanted_strength
     ]
     if not he_pillar_pairs:
         return False, {}
 
     for ix in ctx.interactions:
-        if ix.get("类型") != "六冲" or ix.get("强度") not in STRONG:
+        if ix.get("类型") != "六冲" or ix.get("强度") not in wanted_strength:
             continue
         chong_pillars = frozenset(ix.get("根基", {}).keys())
         for he_ps in he_pillar_pairs:
@@ -2999,8 +3105,9 @@ def eval_jiao_hu_ban_shen_sha(ctx: ChartContext, pos: dict, target: dict) -> tup
         return False, {}
     wanted_sha = set(target.get("值", []))
     jiao_hu_types = set(target.get("交互类型", ["六合", "三合"]))
+    wanted_strength: set = set(target["强度"]) if "强度" in target else set(_DEFAULT_INTERACTION_STRENGTH)
     for item in ctx.interactions:
-        if item.get("类型") not in jiao_hu_types:
+        if item.get("类型") not in jiao_hu_types or item.get("强度") not in wanted_strength:
             continue
         combo = item.get("组合明细", {})
         if bound_pillar not in combo:
@@ -3762,10 +3869,12 @@ CONDITION_EVALUATORS: dict[str, Callable] = {
     "计数_状态": eval_ten_god_count_by_state,
     "计数_差": eval_ten_god_count_diff,
     "计数_神煞": eval_shen_sha_count,
+    "计数_交互": eval_interaction_count,
     "计数_神煞_差": eval_shen_sha_count_diff,
     "计数_天干合": eval_stem_harmony_count,
     "五行生克": eval_wu_xing_relation,
     "十神_五行状态": eval_ten_god_wu_xing_state,
+    "十神元素_五行状态": eval_ten_god_element_wu_xing_state,
     "十神_克": eval_ten_god_ke,
     "十神_生": eval_ten_god_sheng,
     "神煞支_五行关系": eval_sha_zhi_wu_xing_relation,
@@ -3779,7 +3888,7 @@ CONDITION_EVALUATORS: dict[str, Callable] = {
     "天干值": eval_stem_value,
     "天干阴阳": eval_stem_yinyang,
     "空亡计数": eval_kong_wang_count,
-    "五行有": eval_wu_xing_present,
+    "五行": eval_wu_xing_present,
     "纳音_五行有": eval_na_yin_wu_xing_present,
     "五行全": eval_wu_xing_complete,
     "天干全部相同": eval_stems_all_same,
