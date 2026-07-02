@@ -27,7 +27,7 @@ from apps.backend.astronomer_logic.bazi_pillars import get_bazi_pillars
 from apps.backend.astronomer_logic.bazi_key import encode_bazi_key
 from apps.backend.astronomer_logic.twelve_life_stages import get_twelve_life_stages
 from apps.backend.astronomer_logic.void_xun_kong import get_void_xun_kong, check_pillar_void_status
-from apps.backend.astronomer_logic.ten_gods import get_ten_gods, apply_heavenlystem_tranformation_tengods, apply_qi_sha_transformation
+from apps.backend.astronomer_logic.ten_gods import get_ten_gods, apply_heavenlystem_tranformation_tengods, apply_qi_sha_transformation, apply_shi_shen_transformation
 from apps.backend.astronomer_logic.na_yin import get_na_yin
 from apps.backend.astronomer_logic.tai_ming_shen import get_san_yuan
 from apps.backend.astronomer_logic.classical_texts import get_classical_texts
@@ -141,6 +141,7 @@ def calculate_natal_chart(
     ten_gods, si_zhu = apply_heavenlystem_tranformation_tengods(ten_gods, si_zhu, natal_interactions_data, pillars["日柱"]["天干"])
     day_master_data = get_day_master_strength(bazi, pillars, ten_gods, natal_interactions_data, pillar_void)
     ten_gods, si_zhu = apply_qi_sha_transformation(ten_gods, si_zhu, day_master_data)
+    ten_gods, si_zhu = apply_shi_shen_transformation(ten_gods, si_zhu)
     five_elements_data = QualitativeFiveElementsClassifier(si_zhu, natal_interactions_data, lunar_birthday=lunar_birthday).classify_all()
     tai_ming_shen = get_san_yuan(lunar_birthday)
     shen_sha = get_shen_sha(bazi, na_yin, gender)
