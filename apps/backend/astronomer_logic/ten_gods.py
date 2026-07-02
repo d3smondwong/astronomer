@@ -187,14 +187,14 @@ def _adjacent_pillars(pillar: str) -> list[str]:
     ]
 
 
-def _qi_sha_occurrences(ten_gods: dict) -> list[tuple[str, str]]:
-    """Every (pillar, position) holding a 七杀; position is '天干' or a 藏干 tier."""
+def _ten_god_occurrences(ten_gods: dict, god: str) -> list[tuple[str, str]]:
+    """Every (pillar, position) holding the given Ten God label; position is '天干' or a 藏干 tier."""
     occurrences = []
     for p in _PILLAR_KEYS:
-        if ten_gods[p]["天干十神"] == "七杀":
+        if ten_gods[p]["天干十神"] == god:
             occurrences.append((p, "天干"))
-        for tier, god in ten_gods[p]["藏干十神"].items():
-            if god == "七杀":
+        for tier, tier_god in ten_gods[p]["藏干十神"].items():
+            if tier_god == god:
                 occurrences.append((p, tier))
     return occurrences
 
@@ -228,7 +228,7 @@ def apply_qi_sha_transformation(
     Stores '七杀化偏官' metadata per transformed position, e.g.
     si_zhu[pillar]["七杀化偏官"] = {"天干": "食神克七杀", "本气": "印化杀"}.
     """
-    occurrences = _qi_sha_occurrences(ten_gods)
+    occurrences = _ten_god_occurrences(ten_gods, "七杀")
     if not occurrences:
         return ten_gods, si_zhu
 
@@ -298,5 +298,102 @@ def apply_qi_sha_transformation(
             ten_gods[pillar]["藏干十神"][position]  = "偏官"
             si_zhu[pillar]["藏干"][position]["十神"] = "偏官"
         si_zhu[pillar].setdefault("七杀化偏官", {})[position] = trigger
+
+    return ten_gods, si_zhu
+
+
+# Unified occurrence-strength scale — lower rank is stronger. Interleaves stem
+# rooting depth with hidden-tier depth: a stem needs both 透干 (surfacing) and
+# 通根 (rooting) to lead; a merely shallow-rooted stem is weaker than a
+# branch's undisturbed 本气, and a wholly unrooted (无根) stem is the weakest
+# occurrence of all — weaker even than a trace 余气.
+_STRENGTH_RANK: dict[tuple[str, str], int] = {
+    ("天干", "深根"): 1,
+    ("天干", "中根"): 2,
+    ("藏干", "本气"): 3,
+    ("天干", "浅根"): 4,
+    ("藏干", "中气"): 5,
+    ("藏干", "余气"): 6,
+    ("天干", "无根"): 7,
+}
+
+
+def _occurrence_rank(si_zhu: dict, pillar: str, position: str) -> int:
+    """Lower is stronger. position is '天干' or a 藏干 tier."""
+    if position == "天干":
+        return _STRENGTH_RANK[("天干", si_zhu[pillar]["天干"].get("根基强度", "无根"))]
+    return _STRENGTH_RANK[("藏干", position)]
+
+
+def _has_wealth_rescue(ten_gods: dict, pillar: str) -> bool:
+    """A 正财/偏财 on this pillar or an adjacent one restrains a 偏印 sitting here (财克印)."""
+    reach = {pillar, *_adjacent_pillars(pillar)}
+    return any({"正财", "偏财"} & _pillar_gods(ten_gods, p) for p in reach)
+
+
+def apply_shi_shen_transformation(
+    ten_gods: dict,
+    si_zhu: dict,
+) -> tuple[dict, dict]:
+    """
+    食神 → 伤官: transforms individual 食神 occurrences under two classical
+    conditions, checked in priority order.
+
+      1. 食神重逢 — 3+ 食神 chart-wide (heavenly stem + every hidden tier,
+         counted individually). Global, no proximity or strength check: too
+         much of a good thing tips every 食神 into 伤官.
+      2. 枭神夺食 — a 偏印 on the same or an adjacent pillar strictly
+         outranks this 食神 on the unified strength scale (see
+         _STRENGTH_RANK). A 正财/偏财 on that 偏印's own pillar or an
+         adjacent one restrains it (财克印), so a rescued 偏印 cannot trigger
+         the transformation even if it would otherwise outrank the 食神.
+
+    Note: 食神 meeting 七杀 does NOT transform the food god — that encounter
+    is handled by apply_qi_sha_transformation, which tames the 七杀 into 偏官
+    while the 食神 stays 食神 (食神制杀); transforming both sides of that
+    encounter would be self-contradictory.
+
+    Updates both ten_gods and si_zhu (deep-copied internally).
+    Stores '食神化伤官' metadata per transformed position, e.g.
+    si_zhu[pillar]["食神化伤官"] = {"天干": "食神重逢", "本气": "枭神夺食"}.
+    """
+    occurrences = _ten_god_occurrences(ten_gods, "食神")
+    if not occurrences:
+        return ten_gods, si_zhu
+
+    is_excess = len(occurrences) >= 3
+    pian_yin_occurrences = _ten_god_occurrences(ten_gods, "偏印")
+
+    def _trigger_for(pillar: str, position: str) -> str | None:
+        if is_excess:
+            return "食神重逢"
+        reach = {pillar, *_adjacent_pillars(pillar)}
+        shi_shen_rank = _occurrence_rank(si_zhu, pillar, position)
+        surviving_ranks = [
+            _occurrence_rank(si_zhu, py_pillar, py_position)
+            for py_pillar, py_position in pian_yin_occurrences
+            if py_pillar in reach and not _has_wealth_rescue(ten_gods, py_pillar)
+        ]
+        if surviving_ranks and min(surviving_ranks) < shi_shen_rank:
+            return "枭神夺食"
+        return None
+
+    triggers = {occ: _trigger_for(*occ) for occ in occurrences}
+    if not any(triggers.values()):
+        return ten_gods, si_zhu
+
+    ten_gods = copy.deepcopy(ten_gods)
+    si_zhu   = copy.deepcopy(si_zhu)
+
+    for (pillar, position), trigger in triggers.items():
+        if not trigger:
+            continue
+        if position == "天干":
+            ten_gods[pillar]["天干十神"]   = "伤官"
+            si_zhu[pillar]["天干"]["十神"] = "伤官"
+        else:
+            ten_gods[pillar]["藏干十神"][position]  = "伤官"
+            si_zhu[pillar]["藏干"][position]["十神"] = "伤官"
+        si_zhu[pillar].setdefault("食神化伤官", {})[position] = trigger
 
     return ten_gods, si_zhu
