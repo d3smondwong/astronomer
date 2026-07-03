@@ -42,6 +42,8 @@ The project is a secure, hybrid server-side rendering model to protect IP and en
 
 Use the `lunar-python` library if a mapping or function is available.
 
+**七杀 → 偏官 transformation:** `apply_qi_sha_transformation()` in `apps/backend/astronomer_logic/ten_gods.py` relabels individual 七杀 occurrences to the distinct stored ten-god string `"偏官"` when a classical taming condition is met (食神制杀, 印化杀, etc.). Different 七杀 in the same chart can end up tamed or not independently. Any rule condition (`san_ming_tong_hui_v*.py`) that counts or matches on `["正官", "七杀"]` must also include `"偏官"`, or it will silently undercount charts with tamed killings.
+
 ---
 
 ## 📡 API Schema & Response Contract
