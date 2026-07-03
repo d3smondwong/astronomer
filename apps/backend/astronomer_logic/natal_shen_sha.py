@@ -10,6 +10,7 @@ Key Methodology:
                        勾绞煞, 披头, 披麻, 元辰, 卷舌, 六厄
                        暗金的煞 → 吟呻 (子午卯酉年), 破碎 (寅申巳亥年), 白衣 (辰戌丑未年)
                          └─ checked on Day & Hour Pillars only
+                       飞廉 ("天瞽") → checked on Day & Hour Pillars only
 - Month Branch (月系) → 天德贵人, 月德贵人, 天医, 月空, 血刃, 天赦, 天转, 地转, 季节性退神
                         天德合, 月德合, 天月德合, 德秀贵人
 - Day & Year Branch (日/年系) → 将星, 华盖, 驿马, 劫煞, 亡神, 桃花, 灾煞
@@ -346,6 +347,25 @@ an_jin_de_sha_map = {
     "戌": ("丑", "白衣"),
     "丑": ("丑", "白衣"),
     "未": ("丑", "白衣"),
+}
+
+# --- 飞廉 (FEI LIAN / "Heavenly Blindness" Star) ---
+# Year Branch Method (Primary — San Ming Tong Hui health chapter: "飞廉名天瞽")
+# Year Branch → Fei Lian target branch. Star is placed only on Day/Hour Pillar
+# (checked the same way as 暗金的煞, not via the generic all-4-pillar loop).
+fei_lian_map = {
+    "子": "申",
+    "丑": "酉",
+    "寅": "戌",
+    "卯": "巳",
+    "辰": "午",
+    "巳": "未",
+    "午": "寅",
+    "未": "卯",
+    "申": "辰",
+    "酉": "亥",
+    "戌": "子",
+    "亥": "丑",
 }
 
 # --- 词馆 (Literary Academy Star) Lookup Tables ---
@@ -1265,6 +1285,21 @@ class ShenShaCalculator:
             if self.zhis[i] == target_branch:
                 self._add_shen(i, star_name, source="年支")
 
+    def _calc_fei_lian(self) -> None:
+        """
+        飞廉 ("Heavenly Blindness" Star) - Year Branch Method, Day/Hour Pillar only.
+
+        San Ming Tong Hui health chapter: "飞廉名天瞽".
+        Year Branch → target branch; star placed only if the target appears
+        in the Day or Hour Pillar (not Year or Month).
+        """
+        target_branch = fei_lian_map.get(self.zhis[0])
+        if not target_branch:
+            return
+        for i in (2, 3):  # Day and Hour Pillars only
+            if self.zhis[i] == target_branch:
+                self._add_shen(i, "飞廉", source="年支")
+
     # ========================================================================
     # SECTION 2: MONTH BRANCH DERIVED STARS (月系)
     # ========================================================================
@@ -1910,6 +1945,7 @@ class ShenShaCalculator:
         self._calc_juan_she()
         self._calc_pi_ma()
         self._calc_an_jin_de_sha()
+        self._calc_fei_lian()
 
         # MONTH BRANCH (Month系)
         self._calc_month_branch_shens()

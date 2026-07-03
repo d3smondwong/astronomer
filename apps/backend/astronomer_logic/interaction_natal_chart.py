@@ -360,6 +360,7 @@ from apps.backend.data.san_ming_tong_hui_v7 import (
     family_prediction_论六亲,
     female_prediction_论女命,
     children_predictions_论小儿,
+    volume_7_论疾病先知五脏六腑所属干支_predictions_health,
 )
 from apps.backend.data.san_ming_tong_hui_v4 import (
     volume_4_stems_prediction,
@@ -4131,6 +4132,15 @@ def analyse_children_prediction(context: ChartContext) -> dict:
     return {"论小儿": matched}
 
 
+def analyse_volume7_health_prediction(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_7_论疾病先知五脏六腑所属干支_predictions_health:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"论疾病": matched}
+
+
 def analyse_juan_liu_patterns(context: ChartContext) -> dict:
     matched = []
     for rule in special_patterns_卷六:
@@ -4854,6 +4864,7 @@ ANALYZERS: list[Callable[[ChartContext], dict]] = [
     analyse_family_prediction,
     analyse_female_prediction,
     analyse_children_prediction,
+    # analyse_volume7_health_prediction,
     analyse_juan_liu_patterns,
     analyse_volume4_stems_prediction,
     analyse_volume4_month_day_stem,

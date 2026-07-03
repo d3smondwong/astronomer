@@ -227,6 +227,11 @@ def apply_qi_sha_transformation(
     Updates both ten_gods and si_zhu (deep-copied internally).
     Stores '七杀化偏官' metadata per transformed position, e.g.
     si_zhu[pillar]["七杀化偏官"] = {"天干": "食神克七杀", "本气": "印化杀"}.
+
+    Note for rule authors (san_ming_tong_hui_v*.py): a tamed 七杀 is stored as
+    the literal ten-god string "偏官", not "七杀". Any 十神 count/match condition
+    meant to catch 正官/七杀 must also list "偏官" or it will undercount charts
+    with tamed killings.
     """
     occurrences = _ten_god_occurrences(ten_gods, "七杀")
     if not occurrences:

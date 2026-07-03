@@ -355,6 +355,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
     '披麻': 'Mourning Attire', '披头': 'Disheveled Head',
     '吟呻': 'Groaning Malefic', '破碎': 'Shattering Malefic', '白衣': 'White Garment Malefic',
     '元辰': 'Star of Separation and Discord', '六厄': 'Six Adversities',
+    '飞廉': 'Flying Scythe',
     // Month branch stars
     '天德贵人': 'Heavenly Virtue Noble', '月德贵人': 'Monthly Virtue Noble', '天医': 'Heavenly Doctor',
     '月空': 'Monthly Void', '血刃': 'Blood Blade', '天赦': 'Heavenly Pardon',
