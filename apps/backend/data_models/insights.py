@@ -2,7 +2,7 @@
 Pydantic models for the LLM-generated Insights contract.
 
 The report is multi-section narrative prose: one string per life domain
-(personality, family, romance, career, wealth, health).
+(personality, family, romance, career, wealth).
 """
 
 from pydantic import BaseModel, Field

@@ -110,7 +110,7 @@ def llm_analyse_bazi(llm_data: dict) -> InsightsReport:
     Run the multi-section BaZi LLM analysis using the configured provider.
 
     Makes one LLM call per section in SECTION_REGISTRY (personality, family,
-    romance, career, wealth, health), passing the full chart each time and
+    romance, career, wealth), passing the full chart each time and
     steering focus via the section's guidance/emphasis. A failure in one
     section is logged and skipped so the rest of the report still returns.
 

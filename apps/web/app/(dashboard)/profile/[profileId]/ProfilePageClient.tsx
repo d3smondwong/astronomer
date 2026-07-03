@@ -51,7 +51,6 @@ const INSIGHT_SECTIONS: { key: string; title: keyof typeof translations.profile 
   { key: 'romance', title: 'secRomance' },
   { key: 'career', title: 'secCareer' },
   { key: 'wealth', title: 'secWealth' },
-  { key: 'health', title: 'secHealth' },
 ];
 
 // Narratives are plain paragraphs separated by blank lines — render each as a <p>.
@@ -101,11 +100,6 @@ const STRUCTURED_LABEL_KEYS: Record<string, LabelKeyMap> = {
     risks: 'wealthRisks',
     timing: 'wealthTiming',
     strategy: 'wealthStrategy',
-  },
-  health: {
-    constitution: 'healthConstitution',
-    attention: 'healthAttention',
-    care: 'healthCare',
   },
 };
 

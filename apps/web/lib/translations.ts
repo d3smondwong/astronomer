@@ -79,7 +79,6 @@ export const translations = {
     secRomance:       { en: 'Love, Marriage & Children',          ch: '爱情、婚姻与子女' },
     secCareer:        { en: 'Career & Talents',                   ch: '事业与才能' },
     secWealth:        { en: 'Wealth',                             ch: '财富' },
-    secHealth:        { en: 'Health',                             ch: '健康' },
     // Career section — structured group headings (other Chinese copy is prompt-driven)
     careerPathToSuccess: { en: 'Path to Success',                 ch: '成功之路' },
     careerHighlights:    { en: 'Career Highlights',               ch: '事业亮点' },
@@ -106,10 +105,6 @@ export const translations = {
     romanceSpouse:       { en: 'Your Spouse',                    ch: '配偶' },
     romanceJourney:      { en: 'The Journey & Its Timing',       ch: '情路与时机' },
     romanceChildren:     { en: 'Children & Your Own Home',       ch: '子女与家庭' },
-    // Health section — structured group headings (other Chinese copy is prompt-driven)
-    healthConstitution:  { en: 'Constitution & Vitality',        ch: '体质与精力' },
-    healthAttention:     { en: 'Where Your Health Needs Attention', ch: '健康需留意之处' },
-    healthCare:          { en: 'Staying Well',                   ch: '养生之道' },
     personalityProfile: { en: 'Personality Profile',             ch: '性格分析' },
     yourArchetype:    { en: 'Your Archetype:',                   ch: '命盘原型：' },
     elementLabel:     { en: 'Element:',                          ch: '五行：' },
