@@ -2044,6 +2044,25 @@ def _pass6_xun_kong(filtered: list, xun_kong_data: dict, zhis: list) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _closest_cross_pair(zhis: list, val_a: str, val_b: str) -> tuple[int, int, int]:
+    """Return (distance, lo_idx, hi_idx) for the closest pair of pillars whose
+    branches are val_a and val_b (one each), scanning ALL occurrences of each.
+
+    Partial-frame detection (半合/拱合/残会/拱会) gates on pillar adjacency. When
+    a branch value is duplicated, the first occurrence of each value can be far
+    apart while another occurrence is adjacent — so keying off first-occurrence
+    indices silently drops a valid adjacent partial. Taking the minimum-distance
+    cross pair fixes that and reports the pillars that actually combine. For
+    charts with no duplicate branches this returns the same pair as the
+    first-occurrence pick, so their output is unchanged.
+    """
+    a_idxs = [k for k, z in enumerate(zhis) if z == val_a]
+    b_idxs = [k for k, z in enumerate(zhis) if z == val_b]
+    dist, i, j = min((abs(a - b), a, b) for a in a_idxs for b in b_idxs)
+    lo, hi = sorted((i, j))
+    return dist, lo, hi
+
+
 def _detect_san_hui(zhis: list, registry: InteractionRegistry) -> None:
     """
     Detect full 三会 and partial 拱会/残会.
@@ -2109,11 +2128,16 @@ def _detect_san_hui(zhis: list, registry: InteractionRegistry) -> None:
         elif len(matched) == 2:
             cardinal = cardinal_branches.get(element)
             cardinal_present = cardinal in matched
-            idxs = list(matched.values())
+            # Duplicate-safe adjacency: use the closest occurrence across the two
+            # branch values, and report the pillars that actually form the partial.
+            val_a, val_b = list(matched.keys())
+            dist_partial, lo, hi = _closest_cross_pair(zhis, val_a, val_b)
+            combo_detail = {_PILLAR_NAMES_CN[lo]: zhis[lo], _PILLAR_NAMES_CN[hi]: zhis[hi]}
+            partial_combo = f"{_PILLAR_NAMES_CN[lo]}-{_PILLAR_NAMES_CN[hi]}"
 
             if not cardinal_present:
                 # 拱会: enforce adjacency — classical arching requires adjacent pillars
-                if abs(idxs[0] - idxs[1]) != 1:
+                if dist_partial != 1:
                     continue
                 itype_partial = "拱会"
                 branch_list = list(matched.keys())
@@ -2124,18 +2148,17 @@ def _detect_san_hui(zhis: list, registry: InteractionRegistry) -> None:
             else:
                 itype_partial = "残会"
                 clashed = False
-                if abs(idxs[0] - idxs[1]) == 3:
+                if dist_partial == 3:
                     continue
 
             missing = next((b for b in group if b not in matched), None)
-            dist_partial = abs(idxs[0] - idxs[1])
             item = {
                 "类型": itype_partial,
                 "组合明细": combo_detail,
                 "距离": dist_partial,
                 "元素": element_from_direction,
                 "缺失支": missing or "无",
-                "组合": "-".join(match_names),
+                "组合": partial_combo,
             }
             if itype_partial == "拱会":
                 item["混杂"] = clashed
@@ -2178,8 +2201,12 @@ def _detect_san_he(zhis: list, registry: InteractionRegistry) -> None:
         elif len(matched) == 2:
             cardinal = cardinal_branches.get(element)
             cardinal_present = cardinal in matched
-            idxs = sorted(matched.values())
-            distance = idxs[1] - idxs[0]
+            # Duplicate-safe adjacency: use the closest occurrence across the two
+            # branch values, and report the pillars that actually form the partial.
+            val_a, val_b = list(matched.keys())
+            distance, lo, hi = _closest_cross_pair(zhis, val_a, val_b)
+            combo_detail = {_PILLAR_NAMES_CN[lo]: zhis[lo], _PILLAR_NAMES_CN[hi]: zhis[hi]}
+            combo = f"{_PILLAR_NAMES_CN[lo]}-{_PILLAR_NAMES_CN[hi]}"
 
             if cardinal_present:
                 # 半合: cardinal present, one satellite missing — adjacency required
