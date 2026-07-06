@@ -355,7 +355,77 @@ from apps.backend.data.san_ming_tong_hui_v3 import (
     # volume_3_fu_chen_sha_predictions,
     # volume_3_tun_xian_sha_predictions,
 )
-from apps.backend.data.san_ming_tong_hui_v6 import special_patterns_卷六
+from apps.backend.data.san_ming_tong_hui_v6 import (
+    volume_6_壬骑龙背,
+    volume_6_子遥巳禄,
+    volume_6_丑遥巳禄,
+    volume_6_冲合禄马,
+    volume_6_破官,
+    volume_6_飞财,
+    volume_6_破财,
+    volume_6_虎午奔巳,
+    volume_6_羊击猪蛇,
+    volume_6_六阴朝阳,
+    volume_6_六乙鼠贵,
+    volume_6_日禄归时,
+    volume_6_拱禄拱贵,
+    volume_6_冲禄,
+    volume_6_六壬趋艮,
+    volume_6_六甲趋乾,
+    volume_6_财官双美,
+    volume_6_日贵,
+    volume_6_日德,
+    volume_6_魁罡,
+    volume_6_福德秀气,
+    volume_6_禄元互换,
+    volume_6_子午双包,
+    volume_6_青龙伏形,
+    volume_6_白虎持势,
+    volume_6_朱雀乘风,
+    volume_6_玄武当权,
+    volume_6_勾陈得位,
+    volume_6_还魂借气,
+    volume_6_八专禄旺,
+    volume_6_曲直,
+    volume_6_炎上,
+    volume_6_从革,
+    volume_6_润下,
+    volume_6_稼穑,
+    volume_6_土局润下,
+    volume_6_金白水清,
+    volume_6_木火交辉,
+    volume_6_火金铸印,
+    volume_6_火土夹杂,
+    volume_6_墓煞,
+    volume_6_四位纯全,
+    volume_6_一气生成,
+    volume_6_背禄逐马,
+    volume_6_十干十二年生大贵人例,
+    volume_6_论正财,
+    volume_6_岁带正马,
+    volume_6_时带正马,
+    volume_6_财旺生官,
+    volume_6_论偏财,
+    volume_6_弃命从财,
+    volume_6_日坐天财,
+    volume_6_偏正财合论,
+    volume_6_论印绶,
+    volume_6_时逢生印,
+    volume_6_胞胎逢印绶,
+    volume_6_弃印就财,
+    volume_6_论倒食,
+    volume_6_论杂气,
+    volume_6_附论墓运,
+    volume_6_论伤官,
+    volume_6_论食神,
+    volume_6_飞天禄马,
+    volume_6_倒冲禄马,
+    volume_6_福星贵人,
+    volume_6_红鸾天印,
+    volume_6_墨池涌泉,
+    volume_6_论阳刃,
+    volume_6_论建禄,
+)
 from apps.backend.data.san_ming_tong_hui_v7 import (
     family_prediction_论六亲,
     female_prediction_论女命,
@@ -367,7 +437,10 @@ from apps.backend.data.san_ming_tong_hui_v4 import (
     volume_4_month_day_stem_prediction,
     volume_4_elements_combo_prediction,
 )
-from apps.backend.data.san_ming_tong_hui_v5 import volume_5_rules
+from apps.backend.data.san_ming_tong_hui_v5 import (
+    volume_5_direct_officer,
+    volume_5_seven_killings,
+)
 from apps.backend.data.key_rules import key_rules_predictions
 
 _ALL_PILLARS = ["年柱", "月柱", "日柱", "时柱"]
@@ -4141,13 +4214,625 @@ def analyse_volume7_health_prediction(context: ChartContext) -> dict:
     return {"论疾病": matched}
 
 
-def analyse_juan_liu_patterns(context: ChartContext) -> dict:
+def analyse_volume6_壬骑龙背(context: ChartContext) -> dict:
     matched = []
-    for rule in special_patterns_卷六:
+    for rule in volume_6_壬骑龙背:
         ok, evidence = evaluate_rule(rule, context)
         if ok:
             matched.append(_format_rule_match(rule, evidence))
-    return {"特殊格局": matched}
+    return {"壬骑龙背": matched}
+
+
+def analyse_volume6_子遥巳禄(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_子遥巳禄:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"子遥巳禄": matched}
+
+
+def analyse_volume6_丑遥巳禄(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_丑遥巳禄:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"丑遥巳禄": matched}
+
+
+def analyse_volume6_冲合禄马(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_冲合禄马:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"冲合禄马": matched}
+
+
+def analyse_volume6_破官(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_破官:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"破官": matched}
+
+
+def analyse_volume6_飞财(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_飞财:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"飞财": matched}
+
+
+def analyse_volume6_破财(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_破财:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"破财": matched}
+
+
+def analyse_volume6_虎午奔巳(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_虎午奔巳:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"虎午奔巳": matched}
+
+
+def analyse_volume6_羊击猪蛇(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_羊击猪蛇:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"羊击猪蛇": matched}
+
+
+def analyse_volume6_六阴朝阳(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_六阴朝阳:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"六阴朝阳": matched}
+
+
+def analyse_volume6_六乙鼠贵(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_六乙鼠贵:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"六乙鼠贵": matched}
+
+
+def analyse_volume6_日禄归时(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_日禄归时:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"日禄归时": matched}
+
+
+def analyse_volume6_拱禄拱贵(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_拱禄拱贵:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"拱禄拱贵": matched}
+
+
+def analyse_volume6_冲禄(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_冲禄:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"冲禄": matched}
+
+
+def analyse_volume6_六壬趋艮(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_六壬趋艮:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"六壬趋艮": matched}
+
+
+def analyse_volume6_六甲趋乾(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_六甲趋乾:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"六甲趋乾": matched}
+
+
+def analyse_volume6_财官双美(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_财官双美:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"财官双美": matched}
+
+
+def analyse_volume6_日贵(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_日贵:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"日贵": matched}
+
+
+def analyse_volume6_日德(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_日德:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"日德": matched}
+
+
+def analyse_volume6_魁罡(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_魁罡:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"魁罡": matched}
+
+
+def analyse_volume6_福德秀气(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_福德秀气:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"福德秀气": matched}
+
+
+def analyse_volume6_禄元互换(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_禄元互换:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"禄元互换": matched}
+
+
+def analyse_volume6_子午双包(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_子午双包:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"子午双包": matched}
+
+
+def analyse_volume6_青龙伏形(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_青龙伏形:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"青龙伏形": matched}
+
+
+def analyse_volume6_白虎持势(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_白虎持势:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"白虎持势": matched}
+
+
+def analyse_volume6_朱雀乘风(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_朱雀乘风:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"朱雀乘风": matched}
+
+
+def analyse_volume6_玄武当权(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_玄武当权:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"玄武当权": matched}
+
+
+def analyse_volume6_勾陈得位(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_勾陈得位:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"勾陈得位": matched}
+
+
+def analyse_volume6_还魂借气(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_还魂借气:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"还魂借气": matched}
+
+
+def analyse_volume6_八专禄旺(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_八专禄旺:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"八专禄旺": matched}
+
+
+def analyse_volume6_曲直(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_曲直:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"曲直": matched}
+
+
+def analyse_volume6_炎上(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_炎上:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"炎上": matched}
+
+
+def analyse_volume6_从革(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_从革:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"从革": matched}
+
+
+def analyse_volume6_润下(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_润下:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"润下": matched}
+
+
+def analyse_volume6_稼穑(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_稼穑:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"稼穑": matched}
+
+
+def analyse_volume6_土局润下(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_土局润下:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"土局润下": matched}
+
+
+def analyse_volume6_金白水清(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_金白水清:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"金白水清": matched}
+
+
+def analyse_volume6_木火交辉(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_木火交辉:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"木火交辉": matched}
+
+
+def analyse_volume6_火金铸印(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_火金铸印:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"火金铸印": matched}
+
+
+def analyse_volume6_火土夹杂(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_火土夹杂:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"火土夹杂": matched}
+
+
+def analyse_volume6_墓煞(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_墓煞:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"墓煞": matched}
+
+
+def analyse_volume6_四位纯全(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_四位纯全:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"四位纯全": matched}
+
+
+def analyse_volume6_一气生成(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_一气生成:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"一气生成": matched}
+
+
+def analyse_volume6_背禄逐马(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_背禄逐马:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"背禄逐马": matched}
+
+
+def analyse_volume6_十干十二年生大贵人例(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_十干十二年生大贵人例:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"十干十二年生大贵人例": matched}
+
+
+def analyse_volume6_论正财(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_论正财:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"论正财": matched}
+
+
+def analyse_volume6_岁带正马(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_岁带正马:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"岁带正马": matched}
+
+
+def analyse_volume6_时带正马(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_时带正马:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"时带正马": matched}
+
+
+def analyse_volume6_财旺生官(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_财旺生官:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"财旺生官": matched}
+
+
+def analyse_volume6_论偏财(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_论偏财:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"论偏财": matched}
+
+
+def analyse_volume6_弃命从财(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_弃命从财:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"弃命从财": matched}
+
+
+def analyse_volume6_日坐天财(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_日坐天财:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"日坐天财": matched}
+
+
+def analyse_volume6_偏正财合论(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_偏正财合论:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"偏正财合论": matched}
+
+
+def analyse_volume6_论印绶(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_论印绶:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"论印绶": matched}
+
+
+def analyse_volume6_时逢生印(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_时逢生印:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"时逢生印": matched}
+
+
+def analyse_volume6_胞胎逢印绶(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_胞胎逢印绶:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"胞胎逢印绶": matched}
+
+
+def analyse_volume6_弃印就财(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_弃印就财:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"弃印就财": matched}
+
+
+def analyse_volume6_论倒食(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_论倒食:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"论倒食": matched}
+
+
+def analyse_volume6_论杂气(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_论杂气:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"论杂气": matched}
+
+
+def analyse_volume6_附论墓运(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_附论墓运:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"附论墓运": matched}
+
+
+def analyse_volume6_论伤官(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_论伤官:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"论伤官": matched}
+
+
+def analyse_volume6_论食神(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_论食神:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"论食神": matched}
+
+
+def analyse_volume6_飞天禄马(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_飞天禄马:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"飞天禄马": matched}
+
+
+def analyse_volume6_倒冲禄马(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_倒冲禄马:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"倒冲禄马": matched}
+
+
+def analyse_volume6_福星贵人(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_福星贵人:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"福星贵人": matched}
+
+
+def analyse_volume6_红鸾天印(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_红鸾天印:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"红鸾天印": matched}
+
+
+def analyse_volume6_墨池涌泉(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_墨池涌泉:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"墨池涌泉": matched}
+
+
+def analyse_volume6_论阳刃(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_论阳刃:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"论阳刃": matched}
+
+
+def analyse_volume6_论建禄(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_6_论建禄:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"论建禄": matched}
 
 
 def analyse_volume4_stems_prediction(context: ChartContext) -> dict:
@@ -4337,13 +5022,22 @@ def analyse_volume3_lu_shen(context: ChartContext) -> dict:
     return {"论禄神": matched}
 
 
-def analyse_volume5_guan_sha(context: ChartContext) -> dict:
+def analyse_volume5_direct_officer(context: ChartContext) -> dict:
     matched = []
-    for rule in volume_5_rules:
+    for rule in volume_5_direct_officer:
         ok, evidence = evaluate_rule(rule, context)
         if ok:
             matched.append(_format_rule_match(rule, evidence))
-    return {"论官煞格局": matched}
+    return {"论正官": matched}
+
+
+def analyse_volume5_seven_killings(context: ChartContext) -> dict:
+    matched = []
+    for rule in volume_5_seven_killings:
+        ok, evidence = evaluate_rule(rule, context)
+        if ok:
+            matched.append(_format_rule_match(rule, evidence))
+    return {"论七杀": matched}
 
 
 def analyse_key_rules(context: ChartContext) -> dict:
@@ -4865,11 +5559,80 @@ ANALYZERS: list[Callable[[ChartContext], dict]] = [
     analyse_female_prediction,
     analyse_children_prediction,
     # analyse_volume7_health_prediction,
-    analyse_juan_liu_patterns,
+    analyse_volume6_壬骑龙背,
+    analyse_volume6_子遥巳禄,
+    analyse_volume6_丑遥巳禄,
+    analyse_volume6_冲合禄马,
+    analyse_volume6_破官,
+    analyse_volume6_飞财,
+    analyse_volume6_破财,
+    analyse_volume6_虎午奔巳,
+    analyse_volume6_羊击猪蛇,
+    analyse_volume6_六阴朝阳,
+    analyse_volume6_六乙鼠贵,
+    analyse_volume6_日禄归时,
+    analyse_volume6_拱禄拱贵,
+    analyse_volume6_冲禄,
+    analyse_volume6_六壬趋艮,
+    analyse_volume6_六甲趋乾,
+    analyse_volume6_财官双美,
+    analyse_volume6_日贵,
+    analyse_volume6_日德,
+    analyse_volume6_魁罡,
+    analyse_volume6_福德秀气,
+    analyse_volume6_禄元互换,
+    analyse_volume6_子午双包,
+    analyse_volume6_青龙伏形,
+    analyse_volume6_白虎持势,
+    analyse_volume6_朱雀乘风,
+    analyse_volume6_玄武当权,
+    analyse_volume6_勾陈得位,
+    analyse_volume6_还魂借气,
+    analyse_volume6_八专禄旺,
+    analyse_volume6_曲直,
+    analyse_volume6_炎上,
+    analyse_volume6_从革,
+    analyse_volume6_润下,
+    analyse_volume6_稼穑,
+    analyse_volume6_土局润下,
+    analyse_volume6_金白水清,
+    analyse_volume6_木火交辉,
+    analyse_volume6_火金铸印,
+    analyse_volume6_火土夹杂,
+    analyse_volume6_墓煞,
+    analyse_volume6_四位纯全,
+    analyse_volume6_一气生成,
+    analyse_volume6_背禄逐马,
+    analyse_volume6_十干十二年生大贵人例,
+    analyse_volume6_论正财,
+    analyse_volume6_岁带正马,
+    analyse_volume6_时带正马,
+    analyse_volume6_财旺生官,
+    analyse_volume6_论偏财,
+    analyse_volume6_弃命从财,
+    analyse_volume6_日坐天财,
+    analyse_volume6_偏正财合论,
+    analyse_volume6_论印绶,
+    analyse_volume6_时逢生印,
+    analyse_volume6_胞胎逢印绶,
+    analyse_volume6_弃印就财,
+    analyse_volume6_论倒食,
+    analyse_volume6_论杂气,
+    analyse_volume6_附论墓运,
+    analyse_volume6_论伤官,
+    analyse_volume6_论食神,
+    analyse_volume6_飞天禄马,
+    analyse_volume6_倒冲禄马,
+    analyse_volume6_福星贵人,
+    analyse_volume6_红鸾天印,
+    analyse_volume6_墨池涌泉,
+    analyse_volume6_论阳刃,
+    analyse_volume6_论建禄,
     analyse_volume4_stems_prediction,
     analyse_volume4_month_day_stem,
     analyse_volume4_elements_combo,
-    analyse_volume5_guan_sha,
+    analyse_volume5_direct_officer,
+    analyse_volume5_seven_killings,
     analyse_volume2_tian_gan,
     analyse_volume2_di_zhi,
     analyse_volume2_di_zhi_geography,
