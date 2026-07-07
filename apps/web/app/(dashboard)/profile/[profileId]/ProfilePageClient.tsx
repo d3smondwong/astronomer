@@ -378,6 +378,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
     '申命自禄': 'Shen Self-Lu', '酉命自禄': 'You Self-Lu',
     // Pillar formations
     '阴阳差错': 'Yin-Yang Discord', '十恶大败': 'Ten Great Failures',
+    '魁罡': 'Chief Star',
     '进神': 'Advancing Spirit', '六秀': 'Six Elegance', '八专': 'Eight Specialty',
     '九丑': 'Nine Ugly', '孤鸾': 'Lone Phoenix', '退气神煞': 'Retreating Qi Sha',
     '四废': 'Four Wastes', '金神': 'Golden Deity', '十灵': 'Ten Spirits',

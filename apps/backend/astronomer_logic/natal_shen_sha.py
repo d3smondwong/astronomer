@@ -820,6 +820,7 @@ pillar_shens = {
         "癸亥",
     ],
     "金神": ["癸酉", "己巳", "乙丑"],
+    "魁罡": ["庚辰", "庚戌", "壬辰", "戊戌"],
     "进神": ["甲子", "甲午", "己卯", "己酉"],
     "六秀": ["丙午", "丁未", "戊子", "戊午", "己丑", "己未"],
     "八专": ["甲寅", "乙卯", "丁未", "戊戌", "己未", "庚申", "辛酉", "癸丑"],
@@ -912,6 +913,42 @@ ge_jiao_sha_map_year_day = {
     "巳": "午",
     "午": "巳",
 }
+
+# ---------------------------------------------------------------------------
+# Hoisted set/structural constants — module level so the cycle "guest pillar"
+# evaluator (cycles/cycle_shen_sha.py) can import the SAME definitions. These
+# were previously inline locals inside their _calc_* methods; hoisting is a
+# pure refactor (natal behavior unchanged).
+# ---------------------------------------------------------------------------
+
+# 三奇贵人 — three consecutive stems (forward or reverse)
+THREE_WONDERS_TRIOS: list[tuple[list[str], str]] = [
+    (["乙", "丙", "丁"], "天上三奇"),
+    (["甲", "戊", "庚"], "地下三奇"),
+    (["辛", "壬", "癸"], "人间三奇"),
+]
+
+# 挂剑煞 (从革) — full-metal branch sets
+GUA_JIAN_METAL_FULL: set[str] = {"巳", "酉", "丑", "申"}
+GUA_JIAN_METAL_TRIO: set[str] = {"巳", "酉", "丑"}
+
+# 天火煞 — fire frame + water veto
+TIAN_HUO_FIRE_TRINE: set[str] = {"寅", "午", "戌"}
+TIAN_HUO_FIRE_STEMS: set[str] = {"丙", "丁"}
+TIAN_HUO_WATER_STEMS: set[str] = {"壬", "癸"}
+TIAN_HUO_WATER_BRANCHES: set[str] = {"子", "亥"}
+
+# 学堂 — year-nayin element → branch, day-stem → branch
+XUE_TANG_NAYIN_MAP: dict[str, str] = {"金": "巳", "木": "亥", "水": "申", "土": "申", "火": "寅"}
+XUE_TANG_STEM_MAP: dict[str, str] = {
+    "甲": "亥", "乙": "午", "丙": "寅", "丁": "酉", "戊": "寅",
+    "己": "酉", "庚": "巳", "辛": "子", "壬": "申", "癸": "卯",
+}
+
+# 60 甲子 cycle (used by 文誉贵 ±2 lookup)
+_SIXTY_GAN = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
+_SIXTY_ZHI = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+SIXTY_JIAZI: list[str] = [_SIXTY_GAN[i % 10] + _SIXTY_ZHI[i % 12] for i in range(60)]
 
 # --- VIRTUES & ELEGANCE STARS ---
 # 德秀贵人 - Virtue & Elegance Noble
@@ -1539,11 +1576,8 @@ class ShenShaCalculator:
           甲→亥, 乙→午, 丙→寅, 丁→酉, 戊→寅,
           己→酉, 庚→巳, 辛→子, 壬→申, 癸→卯   source="日干"
         """
-        _nayin_map = {"金": "巳", "木": "亥", "水": "申", "土": "申", "火": "寅"}
-        _stem_map = {
-            "甲": "亥", "乙": "午", "丙": "寅", "丁": "酉", "戊": "寅",
-            "己": "酉", "庚": "巳", "辛": "子", "壬": "申", "癸": "卯",
-        }
+        _nayin_map = XUE_TANG_NAYIN_MAP
+        _stem_map = XUE_TANG_STEM_MAP
         # Method 1: Year Nayin → Month/Day/Hour pillars only (skip Year pillar)
         branch1 = _nayin_map.get(self.year_nayin, "")
         if branch1:
@@ -1574,9 +1608,7 @@ class ShenShaCalculator:
 
     def _calc_wen_yu_gui(self) -> None:
         """文誉贵: mark any pillar whose ganzhi is ±2 positions in the 60-cycle from day pillar."""
-        _s = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
-        _b = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
-        sixty = [_s[i % 10] + _b[i % 12] for i in range(60)]
+        sixty = SIXTY_JIAZI
         day_gz = self.me + self.zhis[2]
         try:
             day_pos = sixty.index(day_gz)
@@ -1600,11 +1632,7 @@ class ShenShaCalculator:
         - 甲 戊 庚 (地下三奇 - Earth's Three Wonders: wood/earth/metal per 《三车一览》)
         - 辛 壬 癸 (人间三奇 - Human's Three Wonders: consecutive stems 8→9→10 per 《太乙经》)
         """
-        trios = [
-            (["乙", "丙", "丁"], "天上三奇"),
-            (["甲", "戊", "庚"], "地下三奇"),
-            (["辛", "壬", "癸"], "人间三奇"),
-        ]
+        trios = THREE_WONDERS_TRIOS
 
         # Check Year-Month-Day (indices 0,1,2) and Month-Day-Hour (indices 1,2,3)
         # Both forward and reverse order are valid (顺排或逆排)
@@ -1638,6 +1666,7 @@ class ShenShaCalculator:
         """
         day_checks = {
             "十恶大败": pillar_shens.get("十恶大败", []),
+            "魁罡": pillar_shens.get("魁罡", []),
             "六秀": pillar_shens.get("六秀", []),
             "八专": pillar_shens.get("八专", []),
             "九丑": pillar_shens.get("九丑", []),
@@ -1752,8 +1781,8 @@ class ShenShaCalculator:
         Trigger 2 (重带): ≥ 3 occurrences of branches from {巳,酉,丑} across the 4 pillars.
         Star placed on every pillar whose branch ∈ {巳,酉,丑,申}.
         """
-        metal_full = {"巳", "酉", "丑", "申"}
-        metal_trio = {"巳", "酉", "丑"}
+        metal_full = GUA_JIAN_METAL_FULL
+        metal_trio = GUA_JIAN_METAL_TRIO
         all_in_metal = all(z in metal_full for z in self.zhis)
         heavy_trio = sum(1 for z in self.zhis if z in metal_trio) >= 3
         if all_in_metal or heavy_trio:
@@ -1769,11 +1798,11 @@ class ShenShaCalculator:
         """
         all_zhis = set(self.zhis)
         all_gans = set(self.gans)
-        if not ({"寅", "午", "戌"} <= all_zhis):
+        if not (TIAN_HUO_FIRE_TRINE <= all_zhis):
             return
-        if not (all_gans & {"丙", "丁"}):
+        if not (all_gans & TIAN_HUO_FIRE_STEMS):
             return
-        if (all_gans & {"壬", "癸"}) or (all_zhis & {"子", "亥"}):
+        if (all_gans & TIAN_HUO_WATER_STEMS) or (all_zhis & TIAN_HUO_WATER_BRANCHES):
             return
         for i in range(4):
             if self.zhis[i] in ("寅", "午", "戌"):
