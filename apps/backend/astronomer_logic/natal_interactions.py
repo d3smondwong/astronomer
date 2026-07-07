@@ -1360,7 +1360,11 @@ def _pass2_dual(registry: InteractionRegistry) -> None:
     """
     Pass 2 — Dual Lock (two strict rounds + one sub-round).
 
-    Round 1:  All 六合 locked greedily (贪合忘冲).
+    Round 1:  Only adjacent 六合 (距离 == 1, 紧贴) locked greedily (贪合忘冲).
+              Classical principle: only a 紧贴 六合 has true binding power;
+              a 遥合 (距离 > 1) is an attractive tendency, not a bond, and must
+              not absorb a 六冲 — mirrors the adjacent-only rule already
+              enforced for stems in _pass3_stems.
               Each 六合 lock immediately emits a Broken Link signal:
                 → every 六冲 on that branch is absorbed
                 → the 六冲 partner is marked VACANT
@@ -1368,19 +1372,21 @@ def _pass2_dual(registry: InteractionRegistry) -> None:
               a bijection on the 12 branches), so he_candidates always has
               0 or 1 entries. The `[0]` selection is always unambiguous.
 
-    Round 1b: Branches still unlocked after Round 1 (had no 六合) claim
-              their 六冲 as PRIMARY_六冲. Processed only after all 六合 locks
-              are finalised so Broken Link signals have fully propagated.
+    Round 1b: Branches still unlocked after Round 1 (had no adjacent 六合)
+              claim their 六冲 as PRIMARY_六冲. Processed only after all 六合
+              locks are finalised so Broken Link signals have fully propagated.
 
     Round 2:  VACANT branches (freed by Broken Link) resolve to a next-best
               secondary lock from _SECONDARY_ORDER. New 六合 is forbidden here
               to prevent circular standoffs between two freed branches.
     """
-    # Round 1 — Greedy 六合
+    # Round 1 — Greedy 六合 (adjacent only; 遥合 has no binding power)
     for idx, actor in registry.branch_actors.items():
         if actor.lock_type is not None:
             continue
-        he_candidates = registry.get_by_type(["六合"], idx)
+        he_candidates = [
+            h for h in registry.get_by_type(["六合"], idx) if h.get("距离") == 1
+        ]
         if not he_candidates:
             continue
         winner = he_candidates[0]  # always exactly one; see docstring
