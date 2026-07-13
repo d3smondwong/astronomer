@@ -44,6 +44,16 @@ Use the `lunar-python` library if a mapping or function is available.
 
 **七杀 → 偏官 transformation:** `apply_qi_sha_transformation()` in `apps/backend/astronomer_logic/ten_gods.py` relabels individual 七杀 occurrences to the distinct stored ten-god string `"偏官"` when a classical taming condition is met (食神制杀, 印化杀, etc.). Different 七杀 in the same chart can end up tamed or not independently. Any rule condition (`san_ming_tong_hui_v*.py`) that counts or matches on `["正官", "七杀"]` must also include `"偏官"`, or it will silently undercount charts with tamed killings.
 
+**Cycle-pillar ten gods are RAW:** 大运/流年 pillar ten gods (`apps/backend/astronomer_logic/cycles/cycle_pillars.py`) are pure `LunarUtil.SHI_SHEN` lookups — the natal 七杀→偏官 / 食神→伤官 relabeling is adjacency-based and adjacency is undefined for a transiting pillar. Rules matching cycle-pillar gods use `["正官", "七杀"]` WITHOUT `"偏官"`; natal-side matching still requires `"偏官"`. When taming gods are revealed in the natal chart, the cycle pillar carries a `制化` annotation instead of a relabel.
+
+**格局 decides where 喜忌 come from — 强弱 does NOT:** `astronomer_logic/ge_ju.py` classifies every chart as 正格 / 从财格 / 从杀格 / 从儿格 / 从势格 / 专旺格 / 化气格 *before* `yong_shen.py` computes 喜忌. For 正格 → 调候 + 扶抑. For everything else the **structure** dictates 喜忌 and **调候 is not applied**: a surrendered day master follows its dominant force, so 印比 — which 扶抑 would call 喜 for a weak DM — are in fact **忌** (they 破格). Same 强弱, inverted verdict. Never infer 从格 from 强弱: **极弱 does NOT imply 从格** (a weak-but-rooted chart wants support).
+
+Detection gate (all must hold): 得令 = 0, 得地 = 无根, 得势 = 0, **and 印星 力量 ≈ 0**. That last condition is load-bearing — 得地 sees only the DM's own (clash-aware) 比劫 root and 得势 only 印比 in the *stems*, so 印星 buried in the **branches** is invisible to all three. Without it the detector fires on ~9% of charts instead of ~5%, inverting ordinary charts. Do NOT add 比劫 力量 to that gate: it double-counts roots 得地 has already ruled dead by 冲/空亡. 真从 = no 印 at all; 假从 = a trace survives (keeps the 从格 *direction*, flagged fragile — the residue is exactly what a 印比 运 revives to 破格). Calibration is pinned by `TestGeJu::test_cong_ge_rate_is_classically_rare`; 正格 must stay ≈95%.
+
+**假化 never gets 化气格 用神:** `ten_gods.py` applies the DM element change for `形态 == "化气格"` ONLY. If 用神 treated 假化 as transformed, the 十神 layer would label every god against the ORIGINAL day master while 用神 reasoned about the 化神 — the two layers would disagree about what the day master *is*. 假化 falls through to normal detection and carries an advisory.
+
+**Cycle interaction engine is separate but shares definitions:** `cycles/cycle_interactions.py` runs a 1×4 scan (one transiting pillar vs 4 natal pillars) — `natal_interactions.py` is hard-wired to exactly 4 pillars and must not be extended. All relation maps, `PRIORITY_RULE_TABLE`, and strength tables are imported from `natal_interactions.py`; never redefine what counts as a 冲/合/刑. Every cycle-natal pairing uses the constant `距离: "紧贴"` (no distance decay).
+
 ---
 
 ## 📡 API Schema & Response Contract
@@ -95,6 +105,40 @@ class NatalChartResponse(BaseModel):
 
 **Rule:** Frontend reads directly from the `data` object using Chinese keys. Map these to TypeScript interfaces at `apps/web/types/baziChart.ts` but preserve the Chinese structure—do not transform keys to camelCase. Chinese keys maintain domain accuracy and bridge backend-frontend seamlessly.
 
+### Endpoint: POST `/v1/chart/cycles`
+
+**Request (CyclesInput = BirthInput +):**
+```python
+class CyclesInput(BirthInput):
+    da_yun_index: Optional[int]   # 0-9; when set, that decade's 流年 list is populated
+```
+
+**Response (CyclesResponse):** `{data: Dict[str, Any], chart_key: str}` where `data`:
+```json
+{
+  "起运": { "顺逆": "顺推|逆推", "起运阳历": "...", "起运计岁": "...", "性别": "..." },
+  "用神": { "强弱", "格局", "格局详情", "调候用神", "调候喜五行", "喜用", "忌", "大运喜", "大运忌", "五行", "经典" },
+  "大运": [
+    { "序号": 0, "阶段": "未行大运", "干支": "", "开始年份", "结束年份", "开始年龄", "结束年龄", "流年": [] },
+    { "序号": 1, "干支": "丙戌", "周期": "7-16岁", ...,
+      "运柱": { 天干/地支/藏干/十二长生/纳音/空亡/季节状态/制化 },
+      "作用": { "关系总览": [...], "柱位动态": [...] },
+      "神煞": [ { "名称", "来源", "解读" } ],
+      "运势": { "评级": "喜运|平运|忌运", "依据": "...", "来源": "金不换|用神五行" },
+      "五行动态": { "五行构成", "季节状态", "对日主", "引动" },
+      "流年": [ { "年份", "虚岁", "周岁", "干支", "生肖", "运柱", "作用", "神煞", "运势", "五行动态", "太岁", "流月": [] } ] }
+  ]
+}
+```
+
+**运势 (per-decade / per-year verdict):** the holistic 喜运/平运/忌运 headline the per-element `五行动态` breakdown cannot give (five elements each move their own way). Sourced from the hand-curated `大运喜`/`大运忌` branch table in `data/climate_data.py` (金不换), keyed `日干+月支` — 运支 ∈ 大运喜 → 喜运, ∈ 大运忌 → 忌运, else 平运. These branch lists are **curated, not derived**: mechanically expanding 喜用 五行 to branches would flag ~7 of 12 branches favorable and say nothing. For the handful of charts with no curated table, the verdict degrades to the branch's 本气 五行 read against the chart's 用神, and reports `来源: "用神五行"` so callers can tell the two apart. Invariant (locked by tests): every 大运喜/大运忌 list holds only pure branch chars, and no branch appears in both.
+
+**The 方位表 is 正格-authored — 非正格 charts bypass it entirely.** It assumes the day master stands and must be balanced, so for a 从格/专旺格/化气格 its directions are not merely unhelpful but *backwards*. `get_cycle_yun_shi` therefore skips it whenever `格局 != 正格` and reads the structure-derived 用神 instead (`来源: "从格用神"`). This is the general form of a real bug: 癸午's source clause (`喜从火财 忌申(无根夭)`) is **从格-conditional, not a 方位 judgment**, and encoding its `忌申` rated 庚金 — the very element 癸午's 经典 calls 必须庚辛为生身之本 — as 忌运 for ordinary charts. Both `大运喜`/`大运忌` there are deliberately empty; do not "restore" them from the raw source string.
+
+**流年 are lazy:** default request returns all 10 大运 fully analysed with empty `流年` lists (~40KB); pass `da_yun_index` to expand one decade (~84KB). Every 流年 carries an empty `流月` seam for the future monthly layer. TypeScript interfaces: `apps/web/types/cyclesChart.ts`.
+
+**Caching rule (critical):** cycle timing (起运) depends on the exact birth instant, which `chart_key` deliberately excludes — **never cache cycle data under `chart_key`**. The response is deterministic per (birth fields, lat/lon, TST flag, gender, da_yun_index); cache at the Next.js layer per `profileId + daYunIndex` if needed. `chart_key` in the cycles response is for log correlation only. The `/api/cycles` route handler reads birth data from the profile record (owner-enforced), never from the client.
+
 ## 📂 Project Structure
 Maintain strict boundary separation between frontend and backend in the monorepo:
 
@@ -105,7 +149,8 @@ apps/
 │   ├── routers/
 │   │   └── chart.py — Chart calculation endpoint
 │   ├── data_models/
-│   │   └── birth_input.py — Input validation schemas
+│   │   ├── birth_input.py — Input validation schemas
+│   │   └── cycles.py — CyclesInput / CyclesResponse
 │   ├── astronomer_logic/ — All production BaZi calculation modules
 │   │   ├── bazi_pillars.py — Four pillars extraction
 │   │   ├── wu_xing.py — Five elements calculations
@@ -118,9 +163,17 @@ apps/
 │   │   ├── na_yin.py — Nayin element mappings
 │   │   ├── true_solar_time.py — TST calculations
 │   │   ├── tai_ming_shen.py — Six Relatives stars
+│   │   ├── cycles/ — 大运/流年 cycle modules (1×4 scan vs natal pillars)
+│   │   │   ├── cycle_pillars.py — NatalContext + per-pillar 运柱 enrichment
+│   │   │   ├── cycle_interactions.py — Cycle-vs-natal interaction engine
+│   │   │   ├── cycle_shen_sha.py — Single-pillar shen sha (imports natal tables)
+│   │   │   └── cycle_wu_xing.py — Qualitative elemental dynamics + 引动
 │   │   └── (other calculation modules)
 │   ├── orchestrator/
-│   │   └── astronomer_data_orchestrator.py — Orchestrates calculation pipeline
+│   │   ├── astronomer_data_orchestrator.py — Natal calculation pipeline
+│   │   └── cycles_orchestrator.py — 大运/流年 pipeline (lazy 流年, 太岁)
+│   ├── tests/
+│   │   └── test_cycles.py — Cycles test suite (pytest)
 │   └── data/ — Reference data files
 │       ├── qiong_tong_bao_jian.py
 │       ├── san_ming_tong_hui.py
@@ -132,6 +185,7 @@ apps/
     │   ├── page.tsx — Landing page
     │   ├── api/
     │   │   ├── chart/route.ts — Route handler calling FastAPI backend
+    │   │   ├── cycles/route.ts — 大运/流年 (reads profile birthData, owner-only)
     │   │   └── profiles/[id]/route.ts — Profile API endpoints
     │   └── (dashboard)/ — Protected dashboard routes
     │       ├── layout.tsx — Dashboard layout

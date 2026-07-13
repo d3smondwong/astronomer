@@ -53,6 +53,21 @@ export interface ChartResponse {
   chart_key: string;
 }
 
+export interface CyclesInputPayload extends BirthInputPayload {
+  /** 大运 index (0-9); when set, that decade's 流年 list is populated. */
+  da_yun_index?: number;
+}
+
+export interface CyclesApiResponse {
+  /** 起运 + 大运 list — Chinese-keyed; see types/cyclesChart.ts CyclesData. */
+  data: Record<string, any>;
+  /**
+   * Log-correlation key ONLY. Cycles depend on the exact birth instant, which
+   * this 八字-based key excludes — never cache cycle data under it.
+   */
+  chart_key: string;
+}
+
 // One item inside a structured section: a crisp claim plus its grounded explanation.
 export interface InsightPoint {
   point: string;
@@ -90,6 +105,36 @@ export async function fetchNatalChart(
   if (!res.ok) {
     const error = await res.text();
     throw new Error(`FastAPI /v1/chart/natal failed: ${res.status} ${error}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Fetch 大运/流年 cycles for a birth input.
+ *
+ * All 10 大运 come back fully analysed; 流年 are lazy — pass da_yun_index to
+ * populate one decade's 流年 list. Deterministic per (birth, gender, index),
+ * so callers may cache per profileId + daYunIndex (never per chartKey).
+ */
+export async function fetchCycles(
+  input: CyclesInputPayload,
+  ctx?: RequestContext,
+): Promise<CyclesApiResponse> {
+  const res = await fetch(`${FASTAPI_URL}/v1/chart/cycles`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(FASTAPI_BEARER_TOKEN ? { Authorization: `Bearer ${FASTAPI_BEARER_TOKEN}` } : {}),
+      ...contextHeaders(ctx),
+    },
+    body: JSON.stringify(input),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    const error = await res.text();
+    throw new Error(`FastAPI /v1/chart/cycles failed: ${res.status} ${error}`);
   }
 
   return res.json();

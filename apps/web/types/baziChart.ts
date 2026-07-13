@@ -5,6 +5,9 @@
  * under the 'data' key with Chinese-keyed structures.
  */
 
+// 用神 (调候 + 扶抑) is chart-fixed and shared with the cycles response.
+import type { YongShen } from "./cyclesChart";
+
 /**
  * Ten Gods for a pillar stem.
  */
@@ -161,6 +164,8 @@ export interface BaziChartData {
     地支: string;
   };
   五行?: FiveElements;
+  /** 用神 verdict (调候用神 + 扶抑用神) — favorable/unfavorable elements for this chart. */
+  用神?: YongShen;
   [key: string]: any; // Allow other keys for future expansion
 }
 

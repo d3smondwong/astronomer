@@ -2,6 +2,7 @@
 Chart calculation endpoints.
 
 POST /v1/chart/natal     — basic natal chart (4 pillars, 10 gods, life stages, na yin, void, 3 palaces)
+POST /v1/chart/cycles    — 大运/流年 cycle analysis (起运, per-decade pillars, lazy 流年)
 POST /v1/chart/insights  — LLM-generated personality insights from a natal chart
 """
 
@@ -11,11 +12,13 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Header, Depends
 from fastapi.responses import StreamingResponse
 from apps.backend.data_models.birth_input import BirthInput, NatalChartResponse
+from apps.backend.data_models.cycles import CyclesInput, CyclesResponse
 from apps.backend.data_models.insights import (
     InsightsRequest,
     InsightsResponse,
 )
 from apps.backend.orchestrator.astronomer_data_orchestrator import calculate_natal_chart
+from apps.backend.orchestrator.cycles_orchestrator import calculate_cycles
 from apps.backend.llm.llm_service import (
     llm_analyse_bazi,
     llm_analyse_section,
@@ -92,6 +95,51 @@ async def calculate_natal(
 
         # Return the raw orchestrator output plus the cache key
         return NatalChartResponse(data=natal_chart, chart_key=chart_key)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Invalid input: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Calculation error: {str(e)}")
+
+
+@router.post("/cycles", response_model=CyclesResponse)
+async def calculate_cycles_endpoint(
+    input_data: CyclesInput,
+    _ctx: None = Depends(bind_log_context),
+) -> CyclesResponse:
+    """
+    Calculate 大运/流年 cycles: 起运 timing plus all 10 大运 fully analysed
+    (运柱/作用/神煞/五行动态). 流年 are lazy — only the decade selected by
+    da_yun_index carries a populated 流年 list.
+
+    Caching: cycle timing depends on the exact birth instant, which chart_key
+    deliberately excludes — responses must NOT be cached under chart_key.
+    The response is deterministic given (birth fields, lat/lon, tst flag,
+    gender, da_yun_index); the Next.js layer may cache per
+    profileId + da_yun_index. This backend does no caching.
+    """
+    try:
+        birth_datetime = datetime(
+            year=input_data.year,
+            month=input_data.month,
+            day=input_data.day,
+            hour=input_data.hour,
+            minute=input_data.minute,
+            second=0,
+        )
+
+        cycles, chart_key = calculate_cycles(
+            birth_datetime=birth_datetime,
+            latitude=input_data.latitude,
+            longitude=input_data.longitude,
+            gender=input_data.gender,
+            use_solar_time_correction=input_data.use_solar_time_correction,
+            da_yun_index=input_data.da_yun_index,
+        )
+
+        # Log correlation only — cycles are never cached under this key.
+        chart_key_var.set(chart_key)
+
+        return CyclesResponse(data=cycles, chart_key=chart_key)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=f"Invalid input: {str(e)}")
     except Exception as e:
