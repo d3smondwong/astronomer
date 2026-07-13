@@ -26,10 +26,10 @@ Output structure:
             "五行": "火",        # transformed element if 化气格; original otherwise
             "阴阳": "阴",
             "十二长生": "墓",
-            "得令": { "状态": str, "分数": int },           # 分数: 0 | 2 | 4
+            "得令": { "状态": str, "分数": float },         # graded 旺4 相3 休1.5 囚1 死0 (+1 得生)
             "得地": { "通根": str, "分数": float },          # 分数: 0 | 1.0 | 2.0 | 4.0
             "得势": { "得势层级": str, "分数": float },      # 分数: 0 | 1.0 | 2.0 | 4.0
-            "强弱分数": float,   # weighted 0–4: 得令×50% + 得地×25% + 得势×12.5% + combo×12.5%
+            "强弱分数": float,   # weighted 0–4: 得令×40% + 得地×30% + 得势×17.5% + combo×12.5%
             "强弱": "极旺"|"旺"|"中和"|"弱"|"极弱",
         }
     }
@@ -39,6 +39,10 @@ from dataclasses import dataclass
 from typing import Dict, List
 from lunar_python.util import LunarUtil
 from apps.backend.astronomer_logic.bazi_pillars import _YANG_STEMS
+from apps.backend.astronomer_logic.wu_xing_relations import (
+    CONTROLS as _CONTROLS,
+    GENERATES as _GENERATES,
+)
 
 # ─────────────────────────────────────────────
 # Hidden stems — single source of truth
@@ -156,22 +160,62 @@ def get_seasonal_factors(month_branch: str) -> SeasonalFactors:
 # Scoring constants
 # ─────────────────────────────────────────────
 
-# 得令 quantitative scores (旺/相 = in-season; rest = out-of-season)
-_SEASONAL_SCORES: dict[str, int] = {"旺": 4, "相": 2, "休": 0, "囚": 0, "死": 0}
-
-# Five-element generation cycle: key generates value
-_GENERATES: dict[str, str] = {
-    "木": "火",
-    "火": "土",
-    "土": "金",
-    "金": "水",
-    "水": "木",
-}
+# 得令 quantitative scores — GRADED, following the classical ordering 旺 > 相 > 休 > 囚 > 死.
+#
+# These were {旺:4, 相:2, 休:0, 囚:0, 死:0} — collapsing THREE distinct states into a single
+# zero, in the term that carries the most weight. 休 (the DM generates the ruler — merely
+# drained) is not the same condition as 死 (the ruler controls the DM — actively attacked),
+# and flattening them discarded real signal: 55% of charts scored 得令 0, which is why half
+# of all charts came out 极弱.
+#
+#   相 raised 2 → 3: 相 is the element the ruler generates — "prime minister", next in line.
+#                    Scoring it at half of 旺 undervalued it.
+#   死 stays 0:      得令 measures SEASONAL SUPPORT, and a season that is controlling the day
+#                    master supplies none. A nonzero floor would hand credit to charts with
+#                    genuinely nothing (甲 in 酉月: pure 辛金, no 印, no root) purely to flatter
+#                    the average. Strength for a 死-month chart must come from real 通根 /
+#                    党众 / 局 — which, after Phases 1–2, it now can.
+_SEASONAL_SCORES: dict[str, float] = {"旺": 4.0, "相": 3.0, "休": 1.5, "囚": 1.0, "死": 0.0}
 
 # Ten-god categories for 得势 analysis
 _SUPPORTING_GODS: frozenset = frozenset({"比肩", "劫财", "偏印", "正印"})
 _OPPOSING_GODS: frozenset = frozenset({"正官", "七杀"})
 _DRAINING_GODS: frozenset = frozenset({"食神", "伤官", "正财", "偏财"}) # Not used due to else state, but defined for clarity
+
+# ── 燥土 / 湿土 — the four earth branches are NOT equivalent roots for an EARTH day master ──
+#
+# For 木/火/金/水 a 墓库 root is ALREADY scored 0.1 (余气) by the table above — "stored qi is
+# weak" is baked in. The over-credit exists only for a 土 day master, where 辰戌丑未 本气 土
+# scores a full 0.6 apiece. And 辰/丑 are not even 戊's 墓 (戌 is): for 土 these are its own
+# seats (土旺四季). So the weakness is not structural 墓库 — it is CLIMATIC, and the branches
+# say so themselves:
+#
+#     燥土 未 / 戌  — carry 丁火. Warm, dry. Sound footing.
+#     湿土 辰 / 丑  — carry 癸水. Waterlogged; in a WINTER month, 冻土 — frozen solid.
+#
+# 墓库根，如物之入库，虽存而无力 — a vault root exists but cannot act. Frozen wet earth is
+# present on the chart and inert in practice, which is exactly why 戊 born in 亥 has 调候
+# 甲丙: 丙 to thaw the ground and 甲 to break it open. Scoring 丑/辰 at full 本气 weight in a
+# water month credits the day master with a foundation the classics say cannot hold him up.
+#
+# This is 身弱 caused BY 寒湿 — the two axes are orthogonal, and this is where they meet.
+_WET_EARTH = frozenset({"辰", "丑"})            # hold 癸水
+_COLD_MONTHS = frozenset({"亥", "子", "丑"})     # winter — 冻土
+_WET_EARTH_FACTOR = 0.7                         # 湿土: soft, waterlogged footing
+_FROZEN_EARTH_FACTOR = 0.5                      # 冻土: present but inert
+
+
+def earth_root_factor(branch: str, day_elem: str, month_branch: str) -> float:
+    """Potency multiplier for an EARTH day master's 土 qi in a 湿土 branch (辰/丑).
+
+    Returns 1.0 for every other day master and for the 燥土 branches (未/戌) — this narrows
+    strictly to the one case the weight table over-credits. Applied to 得地 (can it root me?)
+    AND 得势 (can it stand with me?): earth too frozen to root is equally too frozen to ally.
+    """
+    if day_elem != "土" or branch not in _WET_EARTH:
+        return 1.0
+    return _FROZEN_EARTH_FACTOR if month_branch in _COLD_MONTHS else _WET_EARTH_FACTOR
+
 
 # 得地 root depth thresholds on raw weighted score (evaluated top-down)
 _ROOT_DEPTH_THRESHOLDS: list[tuple[float, str]] = [
@@ -223,9 +267,6 @@ _STRENGTH_VERDICTS: list[tuple[float, str]] = [
 ]
 
 _PILLAR_LABELS = ["年柱", "月柱", "日柱", "时柱"]
-
-# Five-element control cycle: key controls value (木→土→水→火→金→木)
-_CONTROLS: dict[str, str] = {"木": "土", "土": "水", "水": "火", "火": "金", "金": "木"}
 
 
 def _classify_for_dm(elem: str, day_elem: str) -> str:
@@ -298,10 +339,25 @@ def apply_interactions(
         elem = ix.get("元素", "")
         branches = set(ix.get("组合明细", {}).values())
 
+        # 已合支 (consumed) strips a branch's rooting contribution in compute_de_di. That is
+        # right ONLY when the combo transmutes the branches into a DIFFERENT element:
+        # 申子辰 三合水局 genuinely consumes 辰's 乙木 余气 into 水, so 辰 can no longer root
+        # a 甲 day master.
+        #
+        # It is BACKWARDS when the combo IS the day master's own element. 寅卯辰 三会东方木
+        # does not stop those branches being wood — it makes them MORE wood. Consuming them
+        # deleted 得地 (weight 25%) and repaid it only through combo_bonus (12.5%), a net
+        # LOSS: completing the strongest possible formation scored WEAKER than leaving it as
+        # two loose roots. That inverted 滴天髓's 活法 case — 甲木 born 申月 with 支成寅卯辰 is
+        # 身旺 — into a 弱 verdict, and is why no 失令 chart could ever reach 旺.
+        #
+        # Corroboration: 六合/半合 below never consumed, so WEAKER formations were already
+        # being treated better than the strongest one. A 局 is more than the sum of its
+        # roots, not a substitute for them — so same-element combos now keep their roots and
+        # the bonus rides on top.
         if ix_type == "三会":
             if elem == day_elem:
                 combo_bonus += 4.0
-                consumed |= branches
                 summaries.append(f"三会{elem}局 (+4.0)")
             elif _GENERATES.get(elem) == day_elem:
                 combo_bonus += 2.0
@@ -311,7 +367,6 @@ def apply_interactions(
         elif ix_type == "三合":
             if elem == day_elem:
                 combo_bonus += 3.0
-                consumed |= branches
                 summaries.append(f"三合{elem}局 (+3.0)")
             elif _GENERATES.get(elem) == day_elem:
                 combo_bonus += 1.5
@@ -458,6 +513,10 @@ def compute_de_di(
     root_score = 0.0  # Accumulator for total root weight across all branches
     detail = {}  # Stores per-pillar root info for debugging/transparency
 
+    # all_branches is ordered [年, 月, 日, 时] — the 月令 governs whether 湿土 is merely wet
+    # or frozen solid (see earth_root_factor).
+    month_branch = all_branches[1] if len(all_branches) > 1 else ""
+
     # 2. Iterate through each of the four pillars (year, month, day, hour)
     for branch, label in zip(all_branches, _PILLAR_LABELS):
         # 2a. If this branch is excluded (clashed or consumed by a higher-tier combo),
@@ -505,8 +564,14 @@ def compute_de_di(
             # and we have a label for this depth index (0,1,2), take it.
             if stem_elem == day_elem and idx < len(_ROOT_DEPTH_LABELS):
                 found_root = _ROOT_DEPTH_LABELS[idx]  # e.g., "本气根"
-                contribution = weight  # e.g., 0.6
-                root_score += weight  # add to total
+                # 湿土/冻土: a 土 day master rooting in 辰/丑 gets less than the raw 本气
+                # weight — waterlogged, and inert outright in a winter month. See
+                # earth_root_factor. Every other case multiplies by 1.0.
+                factor = earth_root_factor(branch, day_elem, month_branch)
+                contribution = round(weight * factor, 3)
+                root_score += contribution
+                if factor < 1.0:
+                    found_root += "(冻土)" if month_branch in _COLD_MONTHS else "(湿土)"
                 break  # stop at first (strongest) match per branch
 
         # 2e. Store per-pillar result for later inspection
@@ -535,7 +600,32 @@ def compute_de_shi(
     natal_interactions_transformation: dict,
 ) -> dict:
     """
-    得势: Do the year/month/hour heavenly stems support the Day Master?
+    得势 (党众): is the Day Master surrounded by allies — in the STEMS and in the BRANCHES?
+
+    势 classically means 党众 (one's party), which lives in both halves of the chart. This
+    function used to read the three heavenly stems ONLY, which left a hole big enough to
+    invert real charts:
+
+      • 得地 counts only the DM's OWN element in the branches (比劫 roots).
+      • 得势 counted only the stems.
+      ⇒ 印星 hidden in the BRANCHES was invisible to every foundation. 丙 born in 亥月 could
+        not see the 甲 inside 亥 — even though 穷通宝鉴's own 丙亥 entry turns on it
+        ("得见甲戊庚出干，可云科甲") and 亥 is 甲's 长生. The engine scored it 得令 0 (死),
+        得地 0 (no 火 in 亥), 得势 0 (stems only) — nothing, from a month that genuinely feeds it.
+
+    So the branch 藏干 are now read too, using the existing BRANCH_HIDDEN_STEM_ROOTING
+    weights. Those weights (本气 .6 / 中气 .3 / 余气 .1) already encode how exposed a hidden
+    stem is, so hidden support is naturally discounted against a visible stem (1.0) — no
+    invented factor is needed.
+
+    Both 印 AND 比劫 藏干 count. 得地 SATURATES (深根 = 4.0 for one root or three), so 通根
+    (a quality question — do I have a root?) and 党众 (a quantity one — how many allies?)
+    are different measurements, not the same one twice.
+
+    Accounting is SYMMETRIC: branch 印/比劫 add, branch 官杀/财/食伤 subtract, on the same
+    terms as the stems. Counting only the allies would inflate every chart.
+    Branches nullified by 冲 or transmuted by a combo (已合支) are skipped, exactly as 得地
+    skips them — a root that is dead for rooting is dead for support too.
 
     Applies stem-level interaction adjustments from natal_interactions_transformation["天干调整"]:
       - 消除天干: neutralised stems (天干冲, 天克地冲, 合而不化) → skipped
@@ -586,11 +676,47 @@ def compute_de_shi(
         else:
             draining.append(entry)
 
+    # ── 地支党众: the 藏干 of all four branches ────────────────────────────────────
+    # Skip branches the interaction layer has already killed (clashed) or transmuted into
+    # another element (已合支) — the same exclusions compute_de_di honours.
+    dead_branches = set(
+        natal_interactions_transformation.get("冲克消根支", [])
+    ) | set(natal_interactions_transformation.get("已合支", []))
+
+    month_branch = pillars.get("月柱", {}).get("地支", "")
+
+    for pillar in _PILLAR_LABELS:
+        branch = pillars.get(pillar, {}).get("地支", "")
+        if not branch or branch in dead_branches:
+            continue
+        # 湿土/冻土 applies here too: earth too frozen to ROOT the day master is equally too
+        # frozen to STAND WITH it. Applying the discount to 得地 alone would let the same
+        # inert 丑/辰 come back as full-strength 比劫 through the 党众 door.
+        factor = earth_root_factor(branch, day_elem, month_branch)
+        for hidden_stem, raw_weight in BRANCH_HIDDEN_STEM_ROOTING.get(branch, []):
+            stem_elem = get_stem_element(hidden_stem)
+            category = _classify_for_dm(stem_elem, day_elem)
+            # only the DM's own (inert) 土 qi is discounted — 印/官杀/财 in that branch are
+            # unaffected by whether the EARTH can hold the day master up.
+            weight = raw_weight * factor if stem_elem == day_elem else raw_weight
+            if category == "supporting":
+                # 比劫 AND 印 both count. It is tempting to skip 比劫 here as "already in
+                # 得地", but that is wrong: 得地 SATURATES — 深根 is 4.0 whether the DM has one
+                # root or three. 通根 asks a quality question (do I have a root at all?);
+                # 党众 asks a quantity one (how many allies stand with me?). They are not the
+                # same measurement, and skipping 比劫 made a day master sitting in a full
+                # 三会 of its OWN element score 得势 = 失 — no party, while standing in it.
+                supporting.append({"藏干": hidden_stem, "支": branch, "权重": weight})
+            elif category == "opposing":
+                opposing.append({"藏干": hidden_stem, "支": branch, "权重": weight})
+            elif category == "draining":
+                draining.append({"藏干": hidden_stem, "支": branch, "权重": weight})
+
     w_sup = sum(e.get("权重", 1.0) for e in supporting)
     w_opp = sum(e.get("权重", 1.0) for e in opposing)
     w_drn = sum(e.get("权重", 1.0) for e in draining)
 
-    # For 得势, supporting stems contribute positively, while opposing and draining stems detract.
+    # For 得势, supporting allies contribute positively, while opposing and draining ones detract.
     linear = round(max(w_sup - w_opp * 0.5 - w_drn * 0.3, 0.0), 2)
     tier = next((name for thresh, name in _DE_SHI_TIERS if linear >= thresh), "失")
     de_shi = tier in ("强", "中")
@@ -684,11 +810,23 @@ def get_day_master_strength(
     combo_bonus = natal_interactions_transformation.get("组合加分", 0.0)
 
     # ── Step 5: weighted aggregate and verdict ────────────────────────────────
-    # 得令 50% | 得地 25% | 得势 12.5% | Combo 12.5%
+    # 得令 40% | 得地 30% | 得势 17.5% | Combo 12.5%
+    #
+    # Was 50/25/12.5/12.5. At 50%, 得令 was heavy enough that 通根 could NEVER overcome a bad
+    # season: an out-of-season day master was capped at 中和 no matter how deeply rooted, and
+    # across 3000 real charts not one 失令 chart ever reached 旺. That is a flat contradiction
+    # of 滴天髓 — "得时俱为旺论，失时便作衰看，虽是至理，亦有活法" — whose whole point is that a
+    # rooted-but-out-of-season chart CAN be 旺.
+    #
+    # 40/30/17.5/12.5 follows the common modern 子平 split (月令 ~40, 通根 ~30, 党众 ~20). It
+    # keeps 月令 the single heaviest term — 提纲 still rules — while leaving 通根 + 党众 + 局
+    # enough combined mass to carry a 失令 chart to 旺 when the roots genuinely warrant it.
+    # The guard holds: an unrooted 失令 chart still scores ~0 and stays 极弱, so no strength
+    # is manufactured — only real 通根 is allowed to count.
     total = round(max(
-        de_ling["分数"] * 0.50 +
-        de_di_tier      * 0.25 +
-        de_shi["分数"]  * 0.125 +
+        de_ling["分数"] * 0.40 +
+        de_di_tier      * 0.30 +
+        de_shi["分数"]  * 0.175 +
         combo_bonus     * 0.125,
         0.0,
     ), 2)
