@@ -30,18 +30,33 @@ _WU_HE_PAIRS: frozenset = frozenset({
 })
 
 
-def _ten_god_for_transformed(original_stem: str, transformed_element: str, dm_stem: str) -> str:
-    """Ten god for a stem whose element has transformed to transformed_element, relative to dm_stem.
+def get_effective_stem(original_stem: str, element: str) -> str:
+    """The stem `original_stem` BECOMES when its element transforms to `element` (化气格).
 
-    Preserves the original stem's yin/yang polarity when selecting the effective stem.
-    Uses LunarUtil.SHI_SHEN for the final lookup.
+    Polarity is preserved — the stem keeps its 阴/阳 nature and changes only element:
+        癸 (阴水) → 火  ⇒  丁 (阴火)        戊 (阳土) → 火  ⇒  丙 (阳火)
+
+    Returns original_stem unchanged when it already carries that element, so callers may
+    apply it unconditionally: on a 正格 chart it is a no-op.
+
+    Single source of truth. This mapping was inlined in four places (the DM, the 合化
+    partner, the transformed-ten-god helper, and NatalContext) — which is precisely how the
+    调候 lookup came to be left on the RAW stem while every layer around it had moved on.
     """
-    effective_stem = (
-        _ELEMENT_YANG_STEM[transformed_element]
+    if LunarUtil.WU_XING_GAN.get(original_stem) == element:
+        return original_stem
+    return (
+        _ELEMENT_YANG_STEM[element]
         if original_stem in _YANG_STEMS
-        else _ELEMENT_YIN_STEM[transformed_element]
+        else _ELEMENT_YIN_STEM[element]
     )
-    return LunarUtil.SHI_SHEN.get(dm_stem + effective_stem, "无")
+
+
+def _ten_god_for_transformed(original_stem: str, transformed_element: str, dm_stem: str) -> str:
+    """Ten god for a stem whose element has transformed, relative to dm_stem."""
+    return LunarUtil.SHI_SHEN.get(
+        dm_stem + get_effective_stem(original_stem, transformed_element), "无"
+    )
 
 
 def _hidden_ten_gods(shi_shen_zhi: list) -> tuple:
@@ -117,20 +132,18 @@ def apply_heavenlystem_tranformation_tengods(
         transformed_element = interaction["合化条件"]["合化元素"]
 
         # DM transforms → derive the new effective DM stem (same polarity, new element)
-        new_dm_stem = (
-            _ELEMENT_YANG_STEM[transformed_element]
-            if day_master_stem in _YANG_STEMS
-            else _ELEMENT_YIN_STEM[transformed_element]
-        )
+        new_dm_stem = get_effective_stem(day_master_stem, transformed_element)
         original_dm_element = LunarUtil.WU_XING_GAN.get(day_master_stem, "无")
         si_zhu["日柱"]["化气格信息"] = {"类型": "化气格", "原五行": original_dm_element, "现五行": transformed_element}
         si_zhu["日柱"]["天干"]["五行"] = transformed_element
         new_rooting = compute_single_stem_rooting(transformed_element, _zhis, _hides, _pillar_cn)
         si_zhu["日柱"]["天干"]["根基强度"] = new_rooting["根基强度"]
         si_zhu["日柱"]["天干"]["通根于"]   = new_rooting["通根于"]
-        for partner in interaction["组合明细"]:
-            if partner == "日柱":
-                continue
+        # The 合化 PARTNER is absorbed into the 化神 along with the day master — 合化 merges
+        # both stems. It is not "a 伤官 that transformed"; it is no longer a 伤官 at all.
+        absorbed_partners = {p for p in interaction["组合明细"] if p != "日柱"}
+
+        for partner in absorbed_partners:
             original_partner_element = si_zhu[partner]["天干"].get("五行", "无")
             si_zhu[partner]["化气格信息"]       = {"类型": "化气格", "原五行": original_partner_element, "现五行": transformed_element}
             si_zhu[partner]["天干"]["五行"]      = transformed_element
@@ -142,8 +155,27 @@ def apply_heavenlystem_tranformation_tengods(
             original_hidden_stem_tengod  = dict(ten_gods[pillar]["藏干十神"])
 
             if pillar != "日柱":
-                stem = si_zhu[pillar]["天干"]["天干"]
-                new_visible_stem_tengod = LunarUtil.SHI_SHEN.get(new_dm_stem + stem, "无")
+                raw_stem = si_zhu[pillar]["天干"]["天干"]
+                if pillar in absorbed_partners:
+                    # Read the partner AS the 化神, keeping its own polarity — the same
+                    # mapping applied to the day master above (癸阴 → 丁阴火, 戊阳 → 丙阳火).
+                    #
+                    # Previously the ten god was looked up from the RAW char while the 五行
+                    # beside it had already been rewritten to the 化神, so the pillar
+                    # contradicted itself: 戊 五行=火 十神=伤官 — and 伤官 is the EARTH reading
+                    # of 戊. compute_de_shi meanwhile reclassifies 合化 stems by the NEW
+                    # element and was already counting it as 火/supporting, so three layers
+                    # disagreed. Reading it as the 化神 makes all three agree.
+                    #
+                    # This also closes the pipeline hole downstream: an absorbed partner is
+                    # now necessarily the DM's own element, i.e. 比肩/劫财 — so it can never
+                    # match 七杀 or 食神, and apply_qi_sha_transformation /
+                    # apply_shi_shen_transformation can no longer tame or tip a god that the
+                    # 化 has already consumed.
+                    effective_stem = get_effective_stem(raw_stem, transformed_element)
+                else:
+                    effective_stem = raw_stem
+                new_visible_stem_tengod = LunarUtil.SHI_SHEN.get(new_dm_stem + effective_stem, "无")
                 ten_gods[pillar]["天干十神"] = new_visible_stem_tengod
                 si_zhu[pillar]["天干"]["十神"] = new_visible_stem_tengod
 
