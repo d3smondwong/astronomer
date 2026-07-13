@@ -93,14 +93,13 @@ class Interaction:
 # 3. Qualitative classifier (旺 / 相 / 休 / 囚 / 死)
 # ----------------------------------------------------------------------
 
-# Classical seasonal base.
-# Winter row (火囚/土死) diverges intentionally from day_master_strength._SEASONAL_TABLE
-# (火死/土囚). Day-master scoring still uses that table; this one governs five-elements verdict.
+# Classical seasonal base (旺相休囚死): 当令旺 / 令生相 / 生令休 / 克令囚 / 令克死.
+# Equals day_master_strength._SEASONAL_TABLE (modulo 春夏秋冬 vs spring/summer/... keys).
 SEASONAL_BASE: Dict[str, Dict[str, str]] = {
     "春": {"木": "旺", "火": "相", "土": "死", "金": "囚", "水": "休"},
     "夏": {"火": "旺", "土": "相", "木": "休", "金": "死", "水": "囚"},
-    "秋": {"金": "旺", "水": "相", "土": "休", "木": "囚", "火": "死"},
-    "冬": {"水": "旺", "木": "相", "金": "休", "火": "囚", "土": "死"},
+    "秋": {"金": "旺", "水": "相", "土": "休", "火": "囚", "木": "死"},
+    "冬": {"水": "旺", "木": "相", "金": "休", "土": "囚", "火": "死"},
 }
 
 # Occurs when it is the last 18 days of an Earth month (辰, 未, 戌, 丑)
@@ -139,8 +138,13 @@ class QualitativeFiveElementsClassifier:
         si_zhu: Dict[str, Any],
         natal_interactions_data: Dict[str, Any],
         lunar_birthday=None,
+        pillar_order: Tuple[str, ...] = _PILLAR_ORDER,
     ):
         self.si_zhu = si_zhu
+        # Pillars to scan. Defaults to the natal four; cycle five-elements passes
+        # the four natal keys plus the transiting pillar (5-pillar reclassification).
+        # Season detection and 土旺用事 always read 月柱, so they stay natal-anchored.
+        self.pillar_order = tuple(pillar_order)
         self.season = MONTH_SEASON[si_zhu["月柱"]["地支"]["地支"]]
         self.void_map = {
             key: any(
@@ -148,7 +152,7 @@ class QualitativeFiveElementsClassifier:
                 for k, v in (si_zhu[key].get("空亡", {}) or {}).items()
                 if k != "本柱旬空"
             )
-            for key in _PILLAR_ORDER
+            for key in self.pillar_order
         }
         self.interactions = self._convert_interactions(natal_interactions_data)
         self.stem_transform, self.stem_cancelled = self._build_stem_overrides()
@@ -263,7 +267,7 @@ class QualitativeFiveElementsClassifier:
     def _pillars_holding_element(self, element: str) -> Set[str]:
         """Return pillar keys where the element appears via effective stem, branch, or any hidden stem."""
         held: Set[str] = set()
-        for p in _PILLAR_ORDER:
+        for p in self.pillar_order:
             if self._effective_stem_element(p) == element:
                 held.add(p)
                 continue
@@ -319,7 +323,7 @@ class QualitativeFiveElementsClassifier:
         same_element_hidden_stem: List[str] = []
         same_element_hidden_stem_root_depth: List[str]   = []
         same_element_root_labels: List[str]   = []
-        for p in _PILLAR_ORDER:
+        for p in self.pillar_order:
             for hidden_stem, depth in self._hidden_stems_for_pillar(p):
                 hs_el = STEM_ELEMENT.get(hidden_stem)
                 if hs_el is None:
@@ -331,7 +335,7 @@ class QualitativeFiveElementsClassifier:
         strong_root = "本气" in same_element_hidden_stem_root_depth
 
         has_visible_branch = False
-        for p in _PILLAR_ORDER:
+        for p in self.pillar_order:
             branch = self.si_zhu[p]["地支"]["地支"]
             branch_el = BRANCH_ELEMENT.get(branch)
             if branch_el is None:
@@ -341,7 +345,7 @@ class QualitativeFiveElementsClassifier:
                 break
 
         has_effective_presence = (
-            any(self._effective_stem_element(p) == element for p in _PILLAR_ORDER)
+            any(self._effective_stem_element(p) == element for p in self.pillar_order)
             or has_visible_branch
             or bool(same_element_hidden_stem)
         )
@@ -399,7 +403,7 @@ class QualitativeFiveElementsClassifier:
         void_penalty = max_void_tier > max_non_void_tier
 
         has_stem_without_root = (
-            any(self._effective_stem_element(p) == element for p in _PILLAR_ORDER)
+            any(self._effective_stem_element(p) == element for p in self.pillar_order)
             and not same_element_hidden_stem
         )
 
@@ -432,17 +436,25 @@ class QualitativeFiveElementsClassifier:
     # Classification
     # ------------------------------------------------------------------
 
-    def _classify_one(self, element: str) -> Dict[str, Any]:
+    def _classify_one(self, element: str, include_strength: bool = False) -> Dict[str, Any]:
         """Compute the classical state (旺/相/休/囚/死) for a single element.
 
         Applies seasonal base → upgrades → downgrades → seasonal cap in order.
         Non-ruling elements are capped at min(base_idx + 2, 3) = max 相, unless a full
         三合/三会 at ≥0.75 strength is present (overrides the cap to allow 旺).
 
+        When include_strength is True the result also carries 力量 — the raw pre-cap,
+        pre-clamp strength score (seasonal base ± factors). It exists for the cycle
+        变化 delta: the seasonal cap deliberately pins the displayed 状态 (a 失令
+        element genuinely maxes at 相), which would otherwise hide a real 行运 strength
+        shift (a 得地 element still gains 力量 while its 状态 stays 相). Absent elements
+        sink below 死. Never surfaced by /natal (default False).
+
         Uncomment the 依据 block below to include a per-factor audit dict in the output.
         """
         base_state = EARTH_SEASONAL_BASE[element] if self.earth_wang else SEASONAL_BASE[self.season][element]
-        idx = STATE_ORDER.index(base_state)
+        base_idx = STATE_ORDER.index(base_state)
+        idx = base_idx
         f = self._gather_factors(element)
 
         # Upgrades
@@ -455,6 +467,10 @@ class QualitativeFiveElementsClassifier:
         if f["has_stem_without_root"]:   idx -= 1
         if f["is_clashed"]:              idx -= 1
         if f["void_penalty"]:            idx -= 1
+
+        # 力量 — raw strength BEFORE the clamp and seasonal cap. Absent elements are
+        # forced below 死 (idx 0) so an element the cycle introduces registers as 升.
+        strength = idx if f["has_effective_presence"] else STATE_ORDER.index("死") - 2
 
         idx = max(0, min(4, idx))
 
@@ -471,13 +487,12 @@ class QualitativeFiveElementsClassifier:
             and inter.interaction_strength >= 0.75
             for inter in self.interactions
         )
-        base_idx = STATE_ORDER.index(base_state)
         if base_idx < 4 and not has_dominant_combo:
             max_idx = min(base_idx + 2, 3)
             if idx > max_idx:
                 idx = max_idx
 
-        return {
+        result: Dict[str, Any] = {
             "状态": STATE_ORDER[idx],
             # For debugging and interpretability
             # "依据": {
@@ -494,10 +509,17 @@ class QualitativeFiveElementsClassifier:
             #     "缺失": not f["has_effective_presence"],
             # },
         }
+        if include_strength:
+            result["力量"] = strength
+        return result
 
-    def classify_all(self) -> Dict[str, Any]:
-        """Classify all five elements and return the 五行 payload for the natal chart."""
-        return {"五行": {element: self._classify_one(element) for element in ELEMENTS}}
+    def classify_all(self, include_strength: bool = False) -> Dict[str, Any]:
+        """Classify all five elements and return the 五行 payload for the natal chart.
+
+        include_strength adds the pre-cap 力量 score per element (see _classify_one);
+        used by the cycle layer for 变化 deltas, never by /natal.
+        """
+        return {"五行": {element: self._classify_one(element, include_strength) for element in ELEMENTS}}
 
 
 def get_pillar_five_elements(pillars: Dict[str, Any]) -> Dict[str, Any]:
