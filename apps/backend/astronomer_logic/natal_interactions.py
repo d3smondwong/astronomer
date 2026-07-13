@@ -247,6 +247,7 @@ Implemented:
 import dataclasses
 
 from lunar_python.util import LunarUtil
+from apps.backend.astronomer_logic.wu_xing_relations import GENERATES
 from apps.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -283,17 +284,17 @@ clash_map = {
     "亥": "巳",
 }
 
-# 纳音关系 helper — generating cycle used for 冲处相生 classification
-_NA_YIN_SHENG: dict[str, str] = {"木": "火", "火": "土", "土": "金", "金": "水", "水": "木"}
-
-
 def _na_yin_rel(e1: str, e2: str) -> str:
-    """Return 相生, 相克, or 比和 for two 纳音 五行 elements (symmetric)."""
+    """Return 相生, 相克, or 比和 for two 纳音 五行 elements (symmetric).
+
+    纳音 assigns an ELEMENT to a pillar, after which ordinary 五行生克 applies — there is no
+    nayin-specific generating cycle, so this uses the shared GENERATES (used for 冲处相生).
+    """
     if not e1 or not e2:
         return "未知"
     if e1 == e2:
         return "比和"
-    if _NA_YIN_SHENG.get(e1) == e2 or _NA_YIN_SHENG.get(e2) == e1:
+    if GENERATES.get(e1) == e2 or GENERATES.get(e2) == e1:
         return "相生"
     return "相克"
 

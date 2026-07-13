@@ -287,6 +287,7 @@ from datetime import date
 from typing import Any, Callable
 
 from apps.backend.astronomer_logic.twelve_life_stages import _self_seated_stage
+from apps.backend.astronomer_logic.wu_xing_relations import CONTROLS, GENERATES
 
 from apps.backend.data.san_ming_tong_hui_v2 import (
     volume_2_tian_gan_predictions,
@@ -592,21 +593,6 @@ TEN_GOD_ELEMENT: dict[str, dict[str, str]] = {
         "正印": "金",
         "偏印": "金",
     },
-}
-
-_WU_XING_SHENG: dict[str, str] = {
-    "木": "火",
-    "火": "土",
-    "土": "金",
-    "金": "水",
-    "水": "木",
-}
-_WU_XING_KE: dict[str, str] = {
-    "木": "土",
-    "土": "水",
-    "水": "火",
-    "火": "金",
-    "金": "木",
 }
 
 _LU_WEI_MAP: dict[str, str] = {
@@ -1013,8 +999,8 @@ def eval_shen_sha_dizhi_sheng(
         for p_b, e_b in find_hosts(sha_b, shen_sha_sources_b):
             if p_a == p_b:
                 continue
-            if _WU_XING_SHENG.get(e_a) == e_b or _WU_XING_SHENG.get(e_b) == e_a:
-                gen = e_a if _WU_XING_SHENG.get(e_a) == e_b else e_b
+            if GENERATES.get(e_a) == e_b or GENERATES.get(e_b) == e_a:
+                gen = e_a if GENERATES.get(e_a) == e_b else e_b
                 return True, {"神煞A宫位": p_a, "神煞B宫位": p_b, "生方五行": gen}
     return False, {}
 
@@ -1098,7 +1084,7 @@ def eval_rizhu_ke_kongwang(ctx: ChartContext, pos: dict, target: dict) -> tuple[
     dm_element = ctx.day_master.get("五行")
     if not dm_element:
         return False, {}
-    overcomes = _WU_XING_KE.get(dm_element)
+    overcomes = CONTROLS.get(dm_element)
     _void_keys = ("被日柱空", "被年柱空", "被月柱空", "被时柱空")
     for p in _resolve_pillars(pos.get("柱")):
         void_dict = ctx.pillars.get(p, {}).get("空亡", {})
@@ -1241,10 +1227,10 @@ def eval_interaction_absent(
         e2 = ctx.pillars.get(p2, {}).get("天干", {}).get("五行")
         if e1 and e2:
             if check_sheng and (
-                _WU_XING_SHENG.get(e1) == e2 or _WU_XING_SHENG.get(e2) == e1
+                GENERATES.get(e1) == e2 or GENERATES.get(e2) == e1
             ):
                 return False, {}
-            if check_ke and (_WU_XING_KE.get(e1) == e2 or _WU_XING_KE.get(e2) == e1):
+            if check_ke and (CONTROLS.get(e1) == e2 or CONTROLS.get(e2) == e1):
                 return False, {}
 
     return True, {"交互_无": sorted(wanted_types), "涉及柱": pillars_to_check}
@@ -1505,7 +1491,7 @@ def eval_ten_god_ke(ctx: ChartContext, pos: dict, target: dict) -> tuple[bool, d
         ctx, pos,
         agent_group=set(target.get("克方", [])),
         patient_group=set(target.get("被克方", [])),
-        relation_map=_WU_XING_KE,
+        relation_map=CONTROLS,
         agent_key="克方",
         patient_key="被克方",
         fan_wei=target.get("范围", "全局"),
@@ -1518,7 +1504,7 @@ def eval_ten_god_sheng(ctx: ChartContext, pos: dict, target: dict) -> tuple[bool
         ctx, pos,
         agent_group=set(target.get("生方", [])),
         patient_group=set(target.get("被生方", [])),
-        relation_map=_WU_XING_SHENG,
+        relation_map=GENERATES,
         agent_key="生方",
         patient_key="被生方",
         fan_wei=target.get("范围", "全局"),
@@ -1565,13 +1551,13 @@ def eval_sha_zhi_wu_xing_relation(ctx: ChartContext, _pos: dict, target: dict) -
         sha_elem = ctx.pillars.get(p, {}).get("地支", {}).get("五行")
         if not sha_elem:
             continue
-        if relation == "克" and _WU_XING_KE.get(ref_elem) == sha_elem:
+        if relation == "克" and CONTROLS.get(ref_elem) == sha_elem:
             return True, {"宫位": p, "参考柱": ref_pillar, "参考五行": ref_elem, "神煞地支五行": sha_elem}
-        if relation == "被克" and _WU_XING_KE.get(sha_elem) == ref_elem:
+        if relation == "被克" and CONTROLS.get(sha_elem) == ref_elem:
             return True, {"宫位": p, "参考柱": ref_pillar, "参考五行": ref_elem, "神煞地支五行": sha_elem}
-        if relation == "生" and _WU_XING_SHENG.get(ref_elem) == sha_elem:
+        if relation == "生" and GENERATES.get(ref_elem) == sha_elem:
             return True, {"宫位": p, "参考柱": ref_pillar, "参考五行": ref_elem, "神煞地支五行": sha_elem}
-        if relation == "被生" and _WU_XING_SHENG.get(sha_elem) == ref_elem:
+        if relation == "被生" and GENERATES.get(sha_elem) == ref_elem:
             return True, {"宫位": p, "参考柱": ref_pillar, "参考五行": ref_elem, "神煞地支五行": sha_elem}
     return False, {}
 
@@ -1620,9 +1606,9 @@ def eval_wu_xing_relation(
     if not e1 or not e2:
         return False, {}
     if relation == "相生":
-        ok = _WU_XING_SHENG.get(e1) == e2 or _WU_XING_SHENG.get(e2) == e1
+        ok = GENERATES.get(e1) == e2 or GENERATES.get(e2) == e1
     elif relation == "相克":
-        ok = _WU_XING_KE.get(e1) == e2 or _WU_XING_KE.get(e2) == e1
+        ok = CONTROLS.get(e1) == e2 or CONTROLS.get(e2) == e1
     else:
         ok = False
     return (ok, {"五行生克": relation, p1: e1, p2: e2}) if ok else (False, {})
@@ -2233,7 +2219,7 @@ def eval_wu_xing_battle(
 ) -> tuple[bool, dict]:
     ke_fang = target.get("克方")
     bei_ke = target.get("被克方")
-    if not ke_fang or not bei_ke or _WU_XING_KE.get(ke_fang) != bei_ke:
+    if not ke_fang or not bei_ke or CONTROLS.get(ke_fang) != bei_ke:
         return False, {}
     elements_present: set[str] = set()
     for p in _ALL_PILLARS:
@@ -2254,7 +2240,7 @@ def eval_wu_xing_ke_same_pillar(
 ) -> tuple[bool, dict]:
     ke_fang = target.get("克方五行")
     bei_ke = target.get("被克方五行")
-    if not ke_fang or not bei_ke or _WU_XING_KE.get(ke_fang) != bei_ke:
+    if not ke_fang or not bei_ke or CONTROLS.get(ke_fang) != bei_ke:
         return False, {}
     for p in _resolve_pillars(pos.get("柱")):
         pillar = ctx.pillars.get(p, {})
@@ -2460,7 +2446,7 @@ def eval_san_he_guan_ju(
         if (
             item.get("类型") == "三合"
             and item.get("强度") in wanted_strength
-            and _WU_XING_KE.get(item.get("元素")) == dm_element
+            and CONTROLS.get(item.get("元素")) == dm_element
         ):
             return True, {"三合元素": item.get("元素"), "三合组合": item.get("组合明细", {})}
     return False, {}
@@ -2525,7 +2511,7 @@ def eval_wu_xing_ke_cross_pillar(
     patient_elem = _elem(patient_pillar, patient_part)
     if not agent_elem or not patient_elem:
         return False, {}
-    if _WU_XING_KE.get(agent_elem) == patient_elem:
+    if CONTROLS.get(agent_elem) == patient_elem:
         return True, {
             "克方": agent_pillar, "克方部分": agent_part, "克方五行": agent_elem,
             "被克方": patient_pillar, "被克方部分": patient_part, "被克方五行": patient_elem,
@@ -2559,7 +2545,7 @@ def eval_gan_ke_guanxi(
 
     for agent_pillar, agent_elem in _stem_elem(agent_branch):
         for patient_pillar, patient_elem in _stem_elem(patient_branch):
-            if _WU_XING_KE.get(agent_elem) == patient_elem:
+            if CONTROLS.get(agent_elem) == patient_elem:
                 return True, {
                     "施克柱": agent_pillar, "施克支": agent_branch, "施克干五行": agent_elem,
                     "受克柱": patient_pillar, "受克支": patient_branch, "受克干五行": patient_elem,
@@ -2595,7 +2581,7 @@ def eval_tian_gan_he_hua_qi_ke_na_yin(
             _p_b, stem_b, idx_b = stems[j]
             if abs(idx_a - idx_b) == 5:
                 hua_elem = _WU_HE_HUA_QI[min(idx_a, idx_b)]
-                if _WU_XING_KE.get(hua_elem) == na_yin_elem:
+                if CONTROLS.get(hua_elem) == na_yin_elem:
                     return True, {
                         "天干合": f"{stem_a}{stem_b}",
                         "化气五行": hua_elem,
@@ -2830,7 +2816,7 @@ def eval_na_yin_ke_zhu_jian(ctx: ChartContext, pos: dict, _target: dict) -> tupl
         return False, {}
     elem_a = na_yin_a[-1]
     elem_b = na_yin_b[-1]
-    if _WU_XING_KE.get(elem_a) == elem_b:
+    if CONTROLS.get(elem_a) == elem_b:
         return True, {
             "克方柱": pillar_a, "被克方柱": pillar_b,
             "克方纳音": na_yin_a, "被克方纳音": na_yin_b,
@@ -2864,7 +2850,7 @@ def eval_na_yin_ke_guanxi(
 
     for agent_pillar, agent_na_yin, agent_elem in _na_yin_elem(agent_branch):
         for patient_pillar, patient_na_yin, patient_elem in _na_yin_elem(patient_branch):
-            if _WU_XING_KE.get(agent_elem) == patient_elem:
+            if CONTROLS.get(agent_elem) == patient_elem:
                 return True, {
                     "施克柱": agent_pillar, "施克支": agent_branch, "施克纳音": agent_na_yin,
                     "受克柱": patient_pillar, "受克支": patient_branch, "受克纳音": patient_na_yin,
@@ -3229,7 +3215,7 @@ def eval_gan_ke_zhi(ctx: ChartContext, pos: dict, _target: dict) -> tuple[bool, 
         return False, {}
     elem_s = _GAN_ELEMENT.get(stem)
     elem_b = _ZHI_ELEMENT.get(branch)
-    if elem_s and elem_b and _WU_XING_KE.get(elem_s) == elem_b:
+    if elem_s and elem_b and CONTROLS.get(elem_s) == elem_b:
         return True, {"柱": pillar, "天干": stem, "地支": branch, "干五行": elem_s, "支五行": elem_b}
     return False, {}
 
@@ -3269,7 +3255,7 @@ def eval_gan_ke_mu_biao(ctx: ChartContext, pos: dict, _target: dict) -> tuple[bo
         return False, {}
     elem_s = _GAN_ELEMENT.get(source_stem)
     elem_t = _GAN_ELEMENT.get(target_stem)
-    if elem_s and elem_t and _WU_XING_KE.get(elem_s) == elem_t:
+    if elem_s and elem_t and CONTROLS.get(elem_s) == elem_t:
         return True, {
             "克方柱": source_pillar, "被克方柱": target_pillar,
             "克方天干": source_stem, "被克方天干": target_stem,
@@ -3363,7 +3349,7 @@ def eval_zhi_wuxing_ke_mu_biao(ctx: ChartContext, pos: dict, _target: dict) -> t
         return False, {}
     elem_s = _ZHI_ELEMENT.get(source_branch)
     elem_t = _ZHI_ELEMENT.get(target_branch)
-    if elem_s and elem_t and _WU_XING_KE.get(elem_s) == elem_t:
+    if elem_s and elem_t and CONTROLS.get(elem_s) == elem_t:
         return True, {
             "克方柱": source_pillar, "被克方柱": target_pillar,
             "克方地支": source_branch, "被克方地支": target_branch,
@@ -3384,7 +3370,7 @@ def eval_zhi_wuxing_ke_mu_present(ctx: ChartContext, pos: dict, _target: dict) -
     source_elem = _ZHI_ELEMENT.get(source_branch)
     if not source_elem:
         return False, {}
-    controlled_elem = _WU_XING_KE.get(source_elem)
+    controlled_elem = CONTROLS.get(source_elem)
     if not controlled_elem:
         return False, {}
     mu_branch = _WU_XING_MU_BRANCH.get(controlled_elem)
