@@ -18,10 +18,19 @@
 /* Default: Expanded sidebar (12%) */
 .dashboard-sider {
   width: 12% !important;
+  position: fixed;
+  height: 100vh;
+  left: 0;
+  top: 0;
+  z-index: 100;
+  transition: width 0.3s ease;
 }
 
 .dashboard-content {
   margin-left: 12%;
+  min-height: 100vh;
+  overflow: auto;
+  transition: margin-left 0.3s ease;
 }
 
 .sidebar-section-label,
@@ -40,8 +49,9 @@
 }
 
 .sidebar-user-profile {
-  flex-direction: row;
-  gap: 10px;
+  /* Always a centred column — the collapsed breakpoint only hides name/login below. */
+  flex-direction: column;
+  gap: 8px;
 }
 
 .sidebar-user-profile > div:nth-child(2),
@@ -83,7 +93,7 @@
   /* Stack user profile vertically and center */
   .sidebar-user-profile {
     flex-direction: column;
-    gap: 0;
+    gap: 8px;
     justify-content: center;
     align-items: center;
   }

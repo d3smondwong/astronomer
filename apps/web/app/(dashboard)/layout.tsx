@@ -134,12 +134,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Layout style={{ minHeight: '100vh' }}>
-        {/* Left Sidebar */}
-        <Sider className="dashboard-sider" width={isCollapsed ? 85 : "12%"} style={{ background: 'linear-gradient(180deg, #f4f1e8 0%, #fbf9f4 100%)', borderRight: '1px solid rgba(115, 92, 0, 0.08)', boxShadow: '4px 0 20px rgba(115, 92, 0, 0.07)', position: 'fixed', height: '100vh', left: 0, top: 0, zIndex: 100, transition: 'width 0.3s ease' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Layout className="min-h-screen">
+        {/* Left Sidebar — surface styles in components.css, layout math in dashboard.css */}
+        <Sider className="dashboard-sider sidebar-shell" width={isCollapsed ? 85 : "12%"}>
+          <div className="flex flex-col h-full">
             {/* Logo */}
-            <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(115, 92, 0, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="py-3 px-5 border-b border-gold-deep/8 flex items-center justify-center">
               <Link href="/">
                 {isCollapsed ? (
                   <Image
@@ -155,7 +155,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     alt="Huat Life"
                     width={180}
                     height={45}
-                    style={{ width: 'auto', height: '56px' }}
+                    className="w-auto h-14"
                     priority
                   />
                 )}
@@ -163,26 +163,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             {/* Nav Content */}
-            <div className="sidebar-nav-content" style={{ flex: 1, padding: '16px 12px', overflowY: 'auto' }}>
+            <div className="sidebar-nav-content flex-1 px-3 py-4 overflow-y-auto">
               {/* Profiles Section */}
-              <div style={{ marginBottom: '8px' }}>
+              <div className="mb-2">
                 {!isCollapsed && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', padding: '0 4px' }}>
-                    <h3 className="sidebar-section-label" style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(115, 92, 0, 0.5)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: 'Noto Serif, serif' }}>
-                      <span style={{ marginRight: '5px', fontSize: '14px', verticalAlign: 'middle', lineHeight: 1 }}>·</span>{tr.profiles[language]}
+                  <div className="flex items-center justify-between mb-1.5 px-1">
+                    <h3 className="sidebar-section-label">
+                      <span className="mr-[5px] text-sm align-middle leading-none">·</span>{tr.profiles[language]}
                     </h3>
-                    <button
-                      onClick={handleAddProfile}
-                      style={{
-                        width: '22px', height: '22px', padding: 0, borderRadius: '50%',
-                        border: '1px solid rgba(115, 92, 0, 0.2)', background: 'transparent',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', color: '#735c00', transition: 'all 0.15s ease',
-                        flexShrink: 0,
-                      }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(115, 92, 0, 0.08)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(115, 92, 0, 0.4)'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(115, 92, 0, 0.2)'; }}
-                    >
+                    <button className="sidebar-add-btn" onClick={handleAddProfile}>
                       <Plus className="w-3 h-3" />
                     </button>
                   </div>
@@ -190,42 +179,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                 <div>
                   {profiles.length === 0 ? (
-                    <p style={{ fontSize: '13px', color: '#4d4635', padding: '8px 12px', opacity: 0.45, fontStyle: 'italic' }}>
+                    <p className="text-[13px] text-bronze-muted px-3 py-2 opacity-45 italic m-0">
                       {tr.noProfiles[language]}
                     </p>
                   ) : (
                     profiles.map((profile) => (
                       <Fragment key={profile.profileId}>
                       <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          borderRadius: '6px',
-                          marginBottom: '2px',
-                          borderLeft: isActive(profile.profileId) ? '2px solid #735c00' : '2px solid transparent',
-                          backgroundColor: isActive(profile.profileId) ? 'rgba(115, 92, 0, 0.07)' : 'transparent',
-                          transition: 'all 0.15s ease',
-                        }}
-                        className="group"
+                        className="sidebar-item group flex items-center justify-between mb-0.5"
+                        data-active={isActive(profile.profileId)}
                       >
-                        <Link href={`/profile/${profile.profileId}`} style={{ flex: 1 }}>
+                        <Link href={`/profile/${profile.profileId}`} className="flex-1 min-w-0">
                           <button
-                            style={{
-                              width: '100%', display: 'flex', alignItems: 'center', gap: isCollapsed ? '4px' : '8px',
-                              padding: '7px 10px', background: 'none', border: 'none', cursor: 'pointer',
-                              fontSize: '14px', color: isActive(profile.profileId) ? '#735c00' : '#4d4635',
-                              fontWeight: isActive(profile.profileId) ? '500' : '400',
-                              textAlign: 'left', transition: 'color 0.15s ease', justifyContent: isCollapsed ? 'center' : 'flex-start',
-                            }}
+                            className={`w-full flex items-center py-[7px] px-2.5 bg-transparent border-none cursor-pointer text-sm text-left text-inherit [font-weight:inherit] ${isCollapsed ? 'gap-1 justify-center' : 'gap-2 justify-start'}`}
                             title={profile.name}
                           >
-                            <User className="w-3.5 h-3.5" style={{ flexShrink: 0, opacity: isActive(profile.profileId) ? 1 : 0.6 }} />
+                            <User className="w-3.5 h-3.5 sidebar-item-icon" />
                             {!isCollapsed && (
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</span>
+                              <span className="overflow-hidden text-ellipsis whitespace-nowrap">{profile.name}</span>
                             )}
                             {isCollapsed && (
-                              <span style={{ fontSize: '12px', fontWeight: '500' }}>{profile.name.substring(0, 3)}</span>
+                              <span className="text-xs font-medium">{profile.name.substring(0, 3)}</span>
                             )}
                           </button>
                         </Link>
@@ -237,22 +211,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           okText={tr.deleteOk[language]}
                           cancelText={tr.deleteCancel[language]}
                         >
-                          <button
-                            style={{
-                              width: '28px', height: '28px', padding: 0, marginRight: '4px',
-                              border: 'none', background: 'none', cursor: 'pointer',
-                              color: '#c0392b', opacity: 0, borderRadius: '4px',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              transition: 'opacity 0.15s ease',
-                            }}
-                            className="group-hover:opacity-60 hover:!opacity-100"
-                          >
+                          <button className="w-7 h-7 p-0 mr-1 border-none bg-transparent cursor-pointer text-danger rounded flex items-center justify-center transition-opacity opacity-0 group-hover:opacity-60 hover:opacity-100!">
                             <Trash2 className="w-3 h-3" />
                           </button>
                         </Popconfirm>
                       </div>
                       {deleteErrorId === profile.profileId && !isCollapsed && (
-                        <p className="text-xs px-3 pb-1 m-0" style={{ color: '#c0392b' }}>
+                        <p className="text-xs px-3 pb-1 m-0 text-danger">
                           {translations.profile.deleteError[language]}
                         </p>
                       )}
@@ -262,56 +227,36 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
               </div>
 
-              {!isCollapsed && <Divider className="sidebar-divider" style={{ margin: '16px 0', borderColor: 'rgba(115, 92, 0, 0.08)' }} />}
+              {!isCollapsed && <Divider className="sidebar-divider my-4 border-gold-deep/8" />}
 
               {/* Other Sections */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <div className="flex flex-col gap-0.5">
                 {!isCollapsed && (
-                  <div style={{ padding: '0 4px', marginBottom: '6px' }}>
-                    <h3 className="sidebar-section-label" style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(115, 92, 0, 0.5)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: 'Noto Serif, serif' }}>
-                      <span style={{ marginRight: '5px', fontSize: '14px', verticalAlign: 'middle', lineHeight: 1 }}>·</span>{tr.tools[language]}
+                  <div className="px-1 mb-1.5">
+                    <h3 className="sidebar-section-label">
+                      <span className="mr-[5px] text-sm align-middle leading-none">·</span>{tr.tools[language]}
                     </h3>
                   </div>
                 )}
 
-                <Link href="/compatibility" style={{ display: 'block' }}>
+                <Link href="/compatibility" className="block">
                   <div
-                    className="sidebar-nav-item"
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: isCollapsed ? 'center' : 'flex-start', gap: '9px',
-                      padding: isCollapsed ? '8px 0' : '8px 12px', borderRadius: '6px', cursor: 'pointer',
-                      borderLeft: isActive('compatibility') ? '2px solid #735c00' : '2px solid transparent',
-                      backgroundColor: isActive('compatibility') ? 'rgba(115, 92, 0, 0.07)' : 'transparent',
-                      color: isActive('compatibility') ? '#735c00' : '#4d4635',
-                      fontSize: '14px', fontWeight: isActive('compatibility') ? '500' : '400',
-                      transition: 'all 0.15s ease',
-                    }}
-                    onMouseEnter={e => { if (!isActive('compatibility')) (e.currentTarget as HTMLDivElement).style.background = 'rgba(115, 92, 0, 0.04)'; }}
-                    onMouseLeave={e => { if (!isActive('compatibility')) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
+                    className="sidebar-item sidebar-nav-item flex items-center gap-[9px] cursor-pointer text-sm"
+                    data-active={isActive('compatibility')}
                     title="Compatibility"
                   >
-                    <Users className="w-4 h-4" style={{ flexShrink: 0, opacity: isActive('compatibility') ? 1 : 0.55 }} />
+                    <Users className="w-4 h-4 sidebar-item-icon" />
                     {!isCollapsed && <span className="sidebar-nav-label">{tr.compatibility[language]}</span>}
                   </div>
                 </Link>
 
-                <Link href="/ai_oracle_chat" style={{ display: 'block' }}>
+                <Link href="/ai_oracle_chat" className="block">
                   <div
-                    className="sidebar-nav-item"
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: isCollapsed ? 'center' : 'flex-start', gap: '9px',
-                      padding: isCollapsed ? '8px 0' : '8px 12px', borderRadius: '6px', cursor: 'pointer',
-                      borderLeft: isActive('ai_oracle_chat') ? '2px solid #735c00' : '2px solid transparent',
-                      backgroundColor: isActive('ai_oracle_chat') ? 'rgba(115, 92, 0, 0.07)' : 'transparent',
-                      color: isActive('ai_oracle_chat') ? '#735c00' : '#4d4635',
-                      fontSize: '14px', fontWeight: isActive('ai_oracle_chat') ? '500' : '400',
-                      transition: 'all 0.15s ease',
-                    }}
-                    onMouseEnter={e => { if (!isActive('ai_oracle_chat')) (e.currentTarget as HTMLDivElement).style.background = 'rgba(115, 92, 0, 0.04)'; }}
-                    onMouseLeave={e => { if (!isActive('ai_oracle_chat')) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
+                    className="sidebar-item sidebar-nav-item flex items-center gap-[9px] cursor-pointer text-sm"
+                    data-active={isActive('ai_oracle_chat')}
                     title="AI Oracle Chat"
                   >
-                    <MessageSquare className="w-4 h-4" style={{ flexShrink: 0, opacity: isActive('ai_oracle_chat') ? 1 : 0.55 }} />
+                    <MessageSquare className="w-4 h-4 sidebar-item-icon" />
                     {!isCollapsed && <span className="sidebar-nav-label">{tr.aiOracleChat[language]}</span>}
                   </div>
                 </Link>
@@ -319,63 +264,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             {/* User Profile — bottom of sidebar */}
-            <div className="sidebar-user-profile" style={{ padding: '12px', borderTop: '1px solid rgba(115, 92, 0, 0.08)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-              <div style={{
-                width: '40px', height: '40px', borderRadius: '50%',
-                background: 'linear-gradient(135deg, rgba(115,92,0,0.22), rgba(115,92,0,0.07))',
-                border: '1px solid rgba(115, 92, 0, 0.18)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                fontSize: '16px', fontWeight: 700, color: '#735c00', fontFamily: 'Noto Serif, serif',
-              }}>
-                {user && !user.isAnonymous ? user.email?.[0]?.toUpperCase() : <User className="w-5 h-5" style={{ color: '#735c00' }} />}
+            <div className="sidebar-user-profile flex items-center p-3 border-t border-gold-deep/8">
+              <div className="sidebar-avatar">
+                {user && !user.isAnonymous ? user.email?.[0]?.toUpperCase() : <User className="w-5 h-5 text-gold-deep" />}
               </div>
-              <p style={{ fontSize: '12px', fontWeight: '500', color: '#4d4635', margin: 0, fontFamily: 'Noto Serif, serif' }}>
+              <p className="text-xs font-medium text-bronze-muted m-0">
                 {user && !user.isAnonymous ? user.email?.split('@')[0] : tr.guest[language]}
               </p>
               <button
                 className="sidebar-login-btn"
                 onClick={() => (user && !user.isAnonymous) ? signOut() : openAuthModal()}
-                style={{
-                  fontSize: '10px', color: '#735c00', background: 'transparent',
-                  border: '1px solid rgba(115, 92, 0, 0.3)', cursor: 'pointer',
-                  fontFamily: 'Noto Serif, serif', flexShrink: 0,
-                  borderRadius: '4px', padding: '4px 8px',
-                  transition: 'all 0.15s ease',
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(115, 92, 0, 0.08)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(115, 92, 0, 0.5)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(115, 92, 0, 0.3)'; }}
               >
                 {user && !user.isAnonymous ? translations.header.signOut[language] : translations.header.loginSignUp[language]}
               </button>
               {/* Language toggle */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  backgroundColor: '#3d3a5c',
-                  borderRadius: '9999px',
-                  padding: '3px',
-                  flexShrink: 0,
-                }}
-              >
+              <div className="lang-toggle">
                 {(['en', 'ch'] as const).map((lang) => (
                   <button
                     key={lang}
+                    className="lang-toggle-btn"
+                    data-active={language === lang}
                     onClick={() => setLanguage(lang)}
-                    style={{
-                      fontSize: '11px',
-                      fontFamily: 'Noto Serif, serif',
-                      fontWeight: 600,
-                      letterSpacing: '0.05em',
-                      padding: '3px 12px',
-                      borderRadius: '9999px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      backgroundColor: language === lang ? '#3d3a5c' : 'white',
-                      color: language === lang ? 'white' : '#3d3a5c',
-                      boxShadow: language === lang ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
-                    }}
                   >
                     {lang === 'en' ? 'EN' : '中文'}
                   </button>
@@ -385,8 +294,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </Sider>
 
-        {/* Main Content */}
-        <Content className="dashboard-content" style={{ marginLeft: isCollapsed ? '85px' : '12%', background: '#faf8f3', minHeight: '100vh', overflow: 'auto', transition: 'margin-left 0.3s ease' }}>
+        {/* Main Content — margin tracks the JS-driven sidebar width */}
+        <Content
+          className="dashboard-content bg-parchment"
+          style={{ marginLeft: isCollapsed ? '85px' : '12%' }}
+        >
           {children}
         </Content>
       </Layout>

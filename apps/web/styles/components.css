@@ -11,6 +11,12 @@
  *   .bazi-input     — Borderless bottom-border input styled to match the BaZi aesthetic.
  *                     Used on the landing form, dashboard modal, and AI chat input.
  *   .feature-card   — Hover lift animation for landing page feature cards.
+ *   .sidebar-*      — Dashboard sidebar surfaces, rows, and buttons (colours only;
+ *                     the responsive layout math lives in dashboard.css).
+ *   .lang-toggle    — EN / 中文 pill switch.
+ *
+ * Hover/active states belong here as :hover / [data-active='true'] rules —
+ * never as onMouseEnter style mutation in components.
  *
  * AntD AutoComplete overrides are below the @layer block — they need to sit outside
  * the layer to reliably override AntD's own high-specificity component styles.
@@ -50,6 +56,137 @@
   .feature-card:hover {
     transform: translateY(-4px);
   }
+
+  /* ── Dashboard sidebar (app/(dashboard)/layout.tsx) ──
+     (.sidebar-shell lives below, outside the layer, to beat antd's Sider styles) */
+
+  .sidebar-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: color-mix(in srgb, var(--color-gold-deep) 50%, transparent);
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  /* Row for profile links and tool nav items; active state via data-active */
+  .sidebar-item {
+    border-radius: 6px;
+    border-left: 2px solid transparent;
+    color: var(--color-bronze-muted);
+    transition: all 0.15s ease;
+  }
+  .sidebar-item:not([data-active='true']):hover {
+    background: color-mix(in srgb, var(--color-gold-deep) 4%, transparent);
+  }
+  .sidebar-item[data-active='true'] {
+    border-left-color: var(--color-gold-deep);
+    background: color-mix(in srgb, var(--color-gold-deep) 7%, transparent);
+    color: var(--color-gold-deep);
+    font-weight: 500;
+  }
+  .sidebar-item .sidebar-item-icon {
+    opacity: 0.6;
+    flex-shrink: 0;
+  }
+  .sidebar-item[data-active='true'] .sidebar-item-icon {
+    opacity: 1;
+  }
+
+  /* Small round "+" button in the Profiles header */
+  .sidebar-add-btn {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--color-gold-deep) 20%, transparent);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--color-gold-deep);
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+  .sidebar-add-btn:hover {
+    background: color-mix(in srgb, var(--color-gold-deep) 8%, transparent);
+    border-color: color-mix(in srgb, var(--color-gold-deep) 40%, transparent);
+  }
+
+  /* Avatar circle at the bottom of the sidebar */
+  .sidebar-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-gold-deep) 22%, transparent),
+      color-mix(in srgb, var(--color-gold-deep) 7%, transparent)
+    );
+    border: 1px solid color-mix(in srgb, var(--color-gold-deep) 18%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--color-gold-deep);
+  }
+
+  /* Log in / sign out button (visibility per breakpoint is in dashboard.css) */
+  .sidebar-login-btn {
+    font-size: 10px;
+    color: var(--color-gold-deep);
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--color-gold-deep) 30%, transparent);
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: 4px;
+    padding: 4px 8px;
+    transition: all 0.15s ease;
+  }
+  .sidebar-login-btn:hover {
+    background: color-mix(in srgb, var(--color-gold-deep) 8%, transparent);
+    border-color: color-mix(in srgb, var(--color-gold-deep) 50%, transparent);
+  }
+
+  /* EN / 中文 pill toggle */
+  .lang-toggle {
+    display: flex;
+    align-items: center;
+    background-color: var(--color-ink-indigo);
+    border-radius: 9999px;
+    padding: 3px;
+    flex-shrink: 0;
+  }
+  .lang-toggle-btn {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 3px 12px;
+    border-radius: 9999px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: white;
+    color: var(--color-ink-indigo);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  .lang-toggle-btn[data-active='true'] {
+    background-color: var(--color-ink-indigo);
+    color: white;
+    box-shadow: none;
+  }
+}
+
+/* Dashboard sidebar shell — outside the @layer so it overrides antd's own
+   (unlayered) .ant-layout-sider dark background. Width/position math lives
+   in dashboard.css (.dashboard-sider). */
+.ant-layout-sider.sidebar-shell {
+  background: linear-gradient(180deg, var(--color-parchment-dark) 0%, var(--color-parchment) 100%);
+  border-right: 1px solid color-mix(in srgb, var(--color-gold-deep) 8%, transparent);
+  box-shadow: 4px 0 20px color-mix(in srgb, var(--color-gold-deep) 7%, transparent);
 }
 
 /* AntD AutoComplete — override default blue focus ring and hover highlight */
