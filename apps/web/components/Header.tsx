@@ -11,7 +11,7 @@ export default function Header() {
   const { user, loading, openAuthModal, signOut } = useAuth();
 
   return (
-    <header className="fixed top-0 w-full z-50 shadow-sm" style={{ backgroundColor: '#fbf9f4' }}>
+    <header className="fixed top-0 w-full z-50 shadow-sm bg-parchment">
       <nav className="flex justify-between items-center px-8 py-2 max-w-7xl mx-auto w-full">
         <div className="flex items-center">
           <Image
@@ -20,40 +20,18 @@ export default function Header() {
             width={220}
             height={55}
             loading="eager"
-            style={{ width: 'auto', height: '56px' }}
+            className="w-auto h-14"
           />
         </div>
         <div className="flex items-center gap-4">
-          {/* Language toggle */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              backgroundColor: '#3d3a5c',
-              borderRadius: '9999px',
-              padding: '3px',
-              gap: '0',
-              cursor: 'pointer',
-            }}
-          >
+          {/* Language toggle — header variant is slightly larger than the sidebar one */}
+          <div className="lang-toggle cursor-pointer">
             {(['en', 'ch'] as const).map((lang) => (
               <button
                 key={lang}
+                className="lang-toggle-btn text-[13px] px-4 py-1"
+                data-active={language === lang}
                 onClick={() => setLanguage(lang)}
-                style={{
-                  fontSize: '13px',
-                  fontFamily: 'Noto Serif, serif',
-                  fontWeight: 600,
-                  letterSpacing: '0.05em',
-                  padding: '4px 16px',
-                  borderRadius: '9999px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  backgroundColor: language === lang ? '#3d3a5c' : 'white',
-                  color: language === lang ? 'white' : '#3d3a5c',
-                  boxShadow: language === lang ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
-                }}
               >
                 {lang === 'en' ? 'EN' : '中文'}
               </button>
@@ -65,41 +43,15 @@ export default function Header() {
           {!loading && (
             user && !user.isAnonymous ? (
               <div className="flex items-center gap-3">
-                <span style={{ fontSize: '13px', color: '#3d3a5c', fontFamily: 'Noto Serif, serif' }}>
+                <span className="text-[13px] text-ink-indigo">
                   {user.email?.split('@')[0]}
                 </span>
-                <button
-                  onClick={signOut}
-                  style={{
-                    border: '1px solid #3d3a5c',
-                    borderRadius: '8px',
-                    backgroundColor: 'transparent',
-                    color: '#3d3a5c',
-                    fontFamily: 'Noto Serif, serif',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    padding: '6px 14px',
-                    cursor: 'pointer',
-                  }}
-                >
+                <button className="indigo-outline-btn" onClick={signOut}>
                   {tr.signOut[language]}
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => openAuthModal()}
-                style={{
-                  border: '1px solid #3d3a5c',
-                  borderRadius: '8px',
-                  backgroundColor: 'transparent',
-                  color: '#3d3a5c',
-                  fontFamily: 'Noto Serif, serif',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  padding: '6px 14px',
-                  cursor: 'pointer',
-                }}
-              >
+              <button className="indigo-outline-btn" onClick={() => openAuthModal()}>
                 {tr.loginSignUp[language]}
               </button>
             )

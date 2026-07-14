@@ -124,7 +124,7 @@ const PlacesAutocompleteInput: FC<PlacesAutocompleteInputProps> = ({
       options={options}
       onSearch={handleSearch}
       onSelect={handleSelect}
-      style={{ width: '100%' }}
+      className="w-full"
       disabled={disabled}
     >
       <Input

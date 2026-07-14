@@ -191,60 +191,37 @@ export default function AuthModal() {
 
   return (
     <div
-      style={{
-        position: 'fixed', inset: 0,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        zIndex: 9999, display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-      }}
+      className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center"
       onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
-      <div style={{
-        backgroundColor: '#fff', borderRadius: '12px',
-        width: '480px', maxWidth: 'calc(100vw - 48px)',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
-        fontFamily: 'Noto Serif, serif',
-      }}>
+      <div className="bg-white rounded-xl w-[480px] max-w-[calc(100vw-48px)] shadow-[0_8px_40px_rgba(0,0,0,0.18)] font-serif">
         {/* Header bar */}
-        <div style={{
-          display: 'flex', alignItems: 'center',
-          padding: '16px 24px', borderBottom: '1px solid #e8e8e8',
-        }}>
+        <div className="flex items-center px-6 py-4 border-b border-black/10">
           <button
             onClick={handleClose}
             aria-label="Close"
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: '4px', borderRadius: '50%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
+            className="bg-transparent border-none cursor-pointer p-1 rounded-full flex items-center justify-center"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M2 2L14 14M14 2L2 14" stroke="#222" strokeWidth="2" strokeLinecap="round" />
+              <path d="M2 2L14 14M14 2L2 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </button>
-          <span style={{
-            flex: 1, textAlign: 'center', fontWeight: 600,
-            fontSize: '24px', color: '#222', marginRight: '24px',
-          }}>
+          <span className="flex-1 text-center font-semibold text-2xl text-foreground mr-6">
             {copy.title[language]}
           </span>
         </div>
 
         {/* Form body */}
-        <form onSubmit={handleSubmit} style={{ padding: '12px 28px 28px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
-            <Image src="/straight_huat_life_logo_svg.svg" alt="Huat Life" width={288} height={72} style={{ height: '72px', width: 'auto' }} />
+        <form onSubmit={handleSubmit} className="px-7 pt-3 pb-7">
+          <div className="flex justify-center mb-3">
+            <Image src="/straight_huat_life_logo_svg.svg" alt="Huat Life" width={288} height={72} className="h-[72px] w-auto" />
           </div>
 
-          <p style={{
-            textAlign: 'center', fontSize: '14px', color: '#666',
-            marginBottom: '20px', fontFamily: 'Noto Serif, serif', lineHeight: 1.4,
-          }}>
+          <p className="text-center text-sm text-bronze-muted/80 mb-5 leading-snug">
             {copy.subtitle[language]}
           </p>
 
-          <div style={{ marginBottom: '12px' }}>
+          <div className="mb-3">
             <input
               type="email"
               placeholder={tr.emailPlaceholder[language]}
@@ -252,16 +229,11 @@ export default function AuthModal() {
               onChange={e => setEmail(e.target.value)}
               required
               autoComplete="email"
-              style={{
-                width: '100%', padding: '14px 12px',
-                border: '1px solid #b0b0b0', borderRadius: '8px',
-                fontSize: '15px', fontFamily: 'Noto Serif, serif',
-                outline: 'none', boxSizing: 'border-box',
-              }}
+              className="w-full px-3 py-3.5 border border-outline-strong rounded-lg text-[15px] outline-none box-border"
             />
           </div>
 
-          <div style={{ marginBottom: error ? '8px' : '20px' }}>
+          <div className={error ? 'mb-2' : 'mb-5'}>
             <input
               type="password"
               placeholder={tr.passwordPlaceholder[language]}
@@ -270,31 +242,20 @@ export default function AuthModal() {
               required
               minLength={6}
               autoComplete="current-password"
-              style={{
-                width: '100%', padding: '14px 12px',
-                border: '1px solid #b0b0b0', borderRadius: '8px',
-                fontSize: '15px', fontFamily: 'Noto Serif, serif',
-                outline: 'none', boxSizing: 'border-box',
-              }}
+              className="w-full px-3 py-3.5 border border-outline-strong rounded-lg text-[15px] outline-none box-border"
             />
           </div>
 
           {error && (
-            <p style={{ color: '#c0392b', fontSize: '13px', marginBottom: '16px' }}>{error}</p>
+            <p className="text-danger text-[13px] mb-4">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={submitting}
-            style={{
-              width: '100%', padding: '14px',
-              backgroundColor: submitting ? '#7f7a9e' : '#3d3a5c',
-              color: '#fff', border: 'none', borderRadius: '8px',
-              fontSize: '15px', fontWeight: 600,
-              fontFamily: 'Noto Serif, serif',
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              transition: 'background-color 0.2s',
-            }}
+            className={`w-full p-3.5 text-white border-none rounded-lg text-[15px] font-semibold transition-colors duration-200 ${
+              submitting ? 'bg-ink-indigo/70 cursor-not-allowed' : 'bg-ink-indigo cursor-pointer'
+            }`}
           >
             {submitting ? tr.loading[language] : tr.continueBtn[language]}
           </button>

@@ -74,6 +74,18 @@
     cursor: pointer;
   }
 
+  /* Indigo outline button (header login / sign-out) */
+  .indigo-outline-btn {
+    border: 1px solid var(--color-ink-indigo);
+    border-radius: 8px;
+    background-color: transparent;
+    color: var(--color-ink-indigo);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    cursor: pointer;
+  }
+
   /* ── Dashboard sidebar (app/(dashboard)/layout.tsx) ──
      (.sidebar-shell lives below, outside the layer, to beat antd's Sider styles) */
 

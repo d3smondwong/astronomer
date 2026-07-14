@@ -229,7 +229,7 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
           label={<span className={labelClass}>{tr.labelGender[language]}</span>}
           name="gender"
           rules={[{ required: true, message: 'Please select your gender' }]}
-          style={{ marginTop: '-20px' }}
+          className="-mt-5"
         >
           <Radio.Group className="flex gap-6">
             <Radio value="female"><span className="text-sm">{tr.labelFemale[language]}</span></Radio>

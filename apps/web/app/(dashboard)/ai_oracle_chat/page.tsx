@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Card, Input, Button, Avatar as AntAvatar, Spin } from 'antd';
 import { Send, Bot, User as UserIcon } from 'lucide-react';
+import { palette } from '@/lib/theme';
 
 interface Message {
   id: string;
@@ -79,7 +80,7 @@ export default function AIOraclePage() {
         <p className="font-serif italic text-bronze-muted/70">Ask the oracle for guidance on your Bazi chart and life path</p>
       </div>
 
-      <Card className="flex-1 flex flex-col bg-surface-lowest border border-gold-deep/10" style={{ background: '#faf8f3' }}>
+      <Card className="flex-1 flex flex-col border border-gold-deep/10" style={{ background: palette.parchment }}>
         <div
           className="flex-1 overflow-auto space-y-4 p-4 mb-4"
           ref={messagesEndRef}
@@ -94,7 +95,7 @@ export default function AIOraclePage() {
                   <AntAvatar
                     size={32}
                     icon={<Bot className="w-4 h-4" />}
-                    style={{ backgroundColor: '#735c00' }}
+                    style={{ backgroundColor: palette.goldDeep }}
                   />
                 </div>
               )}
@@ -114,7 +115,7 @@ export default function AIOraclePage() {
                   <AntAvatar
                     size={32}
                     icon={<UserIcon className="w-4 h-4" />}
-                    style={{ backgroundColor: '#735c00' }}
+                    style={{ backgroundColor: palette.goldDeep }}
                   />
                 </div>
               )}
@@ -127,7 +128,7 @@ export default function AIOraclePage() {
                 <AntAvatar
                   size={32}
                   icon={<Bot className="w-4 h-4" />}
-                  style={{ backgroundColor: '#735c00' }}
+                  style={{ backgroundColor: palette.goldDeep }}
                 />
               </div>
               <div className="bg-gold-deep/5 border border-gold-deep/10 px-4 py-2 rounded-lg">

@@ -80,7 +80,7 @@ const BaziForm = () => {
       {spotlightCreateForm && (
         <div
           onClick={() => setSpotlightCreateForm(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 55 }}
+          className="fixed inset-0 z-[55]"
           aria-hidden
         />
       )}
@@ -122,7 +122,7 @@ const FeatureCard = ({ icon: Icon, title, description, label, iconSrc }: any) =>
   <div className="feature-card bg-surface-low p-10 rounded-lg shadow-sm border border-gold-deep/5 flex flex-col items-center text-center space-y-6 relative group">
     <div className="w-16 h-16 rounded-full bg-gold-deep/5 flex items-center justify-center border border-gold-deep/20">
       {iconSrc ? (
-        <Image src={iconSrc} alt={title} width={32} height={32} style={{ width: 'auto', height: '32px' }} />
+        <Image src={iconSrc} alt={title} width={32} height={32} className="w-auto h-8" />
       ) : (
         <Icon className="text-gold-deep w-8 h-8" />
       )}

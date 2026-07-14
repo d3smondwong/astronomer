@@ -9,7 +9,7 @@ export default function Footer() {
           alt="Huat Life"
           width={220}
           height={55}
-          style={{ width: 'auto', height: '56px' }}
+          className="w-auto h-14"
         />
         <div className="flex flex-wrap gap-4 md:gap-12 justify-center font-serif text-xs md:text-sm tracking-wide md:tracking-widest uppercase text-gold-deep">
           <a href="#" className="hover:text-gold-light transition-all duration-300">Privacy</a>
