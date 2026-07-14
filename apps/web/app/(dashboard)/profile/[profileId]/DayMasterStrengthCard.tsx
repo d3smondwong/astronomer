@@ -114,6 +114,18 @@ function GaugePointer({ color }: { color: string }) {
   );
 }
 
+function ElementRow({ elem, dimmed }: { elem: string; dimmed?: boolean }) {
+  const Icon = ELEMENT_ICONS[elem];
+  return (
+    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px', opacity: dimmed ? 0.5 : 1 }}>
+      {Icon && <Icon sx={{ fontSize: '24px', color: 'rgba(115,92,0,0.6)' }} />}
+      <div style={{ fontSize: '18px', fontFamily: '"Noto Sans SC", sans-serif', color: 'rgba(115,92,0,0.7)', fontWeight: 600 }}>
+        {elem}
+      </div>
+    </div>
+  );
+}
+
 function getTierForScore(score: number): typeof VERDICT_TIERS[number] {
   for (const tier of VERDICT_TIERS) {
     if (score >= tier.threshold) return tier;
@@ -214,18 +226,6 @@ export default function DayMasterStrengthCard({ chartData, language }: DayMaster
               const 原五行 = 化气格信息?.["原五行"];
               const 现五行 = 化气格信息?.["现五行"];
               const hasTransform = 原五行 != null && 现五行 != null;
-
-              const ElementRow = ({ elem, dimmed }: { elem: string; dimmed?: boolean }) => {
-                const Icon = ELEMENT_ICONS[elem];
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px', opacity: dimmed ? 0.5 : 1 }}>
-                    {Icon && <Icon sx={{ fontSize: '24px', color: 'rgba(115,92,0,0.6)' }} />}
-                    <div style={{ fontSize: '18px', fontFamily: '"Noto Sans SC", sans-serif', color: 'rgba(115,92,0,0.7)', fontWeight: 600 }}>
-                      {elem}
-                    </div>
-                  </div>
-                );
-              };
 
               if (!hasTransform) return <ElementRow elem={五行} />;
 

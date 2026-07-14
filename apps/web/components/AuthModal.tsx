@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   EmailAuthProvider,
@@ -229,7 +230,7 @@ export default function AuthModal() {
         {/* Form body */}
         <form onSubmit={handleSubmit} style={{ padding: '12px 28px 28px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
-            <img src="/straight_huat_life_logo_svg.svg" alt="Huat Life" style={{ height: '72px', width: 'auto' }} />
+            <Image src="/straight_huat_life_logo_svg.svg" alt="Huat Life" width={288} height={72} style={{ height: '72px', width: 'auto' }} />
           </div>
 
           <p style={{

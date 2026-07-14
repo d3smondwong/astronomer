@@ -23,8 +23,10 @@
 
 /* ── Brand tokens (static, always available as Tailwind utilities) ── */
 @theme {
-  --font-serif: "Noto Serif", serif;
-  --font-zh: "Ma Shan Zheng", cursive;
+  /* Font families resolve through next/font variables set on <html> in app/layout.tsx */
+  --font-serif: var(--font-noto-serif), "Noto Serif", serif;
+  --font-zh: var(--font-ma-shan-zheng), "Ma Shan Zheng", cursive;
+  --font-zh-sans: var(--font-noto-sans-sc), "Noto Sans SC", sans-serif;
 
   --color-parchment: #fbf9f4;
   --color-gold-deep: #735c00;

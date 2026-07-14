@@ -73,6 +73,16 @@ export const translations = {
     comparativeView:  { en: 'Comparative View',                   ch: '对比视图' },
     luckyElements:    { en: 'Lucky Elements',                     ch: '用神' },
     luckyElemDesc:    { en: 'Elements that can bring balance to your chart', ch: '可为命盘带来平衡的五行' },
+    // Favorable elements (用神/调候) card
+    favorableLabel:   { en: 'Favorable',                          ch: '喜用' },
+    unfavorableLabel: { en: 'Unfavorable',                        ch: '忌' },
+    climateLabel:     { en: 'Climate Needs',                      ch: '调候' },
+    reasonStrong:     { en: 'Your day master is strong — elements that drain and temper it restore balance.', ch: '日主偏旺，宜克泄耗以归中和。' },
+    reasonWeak:       { en: 'Your day master is weak — elements that support and strengthen it restore balance.', ch: '日主偏弱，宜生扶以归中和。' },
+    reasonBalanced:   { en: 'Your day master is balanced — the season of birth decides which elements serve you best.', ch: '日主中和，喜忌以调候为主。' },
+    structCong:       { en: 'Special structure: this chart follows its dominant force — favorable elements come from the structure, not from supporting the day master.', ch: '此局弃命从势，喜忌由格局而定，不以扶抑论。' },
+    structZhuanWang:  { en: 'Special structure: one element dominates the chart — going with its flow is favorable, opposing it is not.', ch: '此局一行得气，顺其旺势为喜，逆之为忌。' },
+    structHuaQi:      { en: 'Special structure: the day master transforms into another element — favorable elements serve the transformed element.', ch: '日主化气，喜忌以化神为准。' },
     // Insights tab — multi-section report titles
     secPersonality:   { en: 'Core Personality & Character',       ch: '核心性格与品性' },
     secFamily:        { en: 'Family & Upbringing',                ch: '家庭与成长' },

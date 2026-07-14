@@ -70,21 +70,6 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
       reset: () => { form.resetFields(); setLoading(false); pendingValuesRef.current = null; },
     }));
 
-    // When the guest (anonymous) upgrades to a permanent account, auto-submit any chart held
-    // behind the sign-up prompt (it's now tied to the new account).
-    useEffect(() => {
-      const wasAnon = prevIsAnonRef.current;
-      const nowAnon = user?.isAnonymous ?? null;
-      prevIsAnonRef.current = nowAnon;
-      if (wasAnon === true && nowAnon === false) {
-        if (pendingValuesRef.current !== null) {
-          const values = pendingValuesRef.current;
-          pendingValuesRef.current = null;
-          void submitChart(values, false);
-        }
-      }
-    }, [user?.isAnonymous]); // eslint-disable-line react-hooks/exhaustive-deps
-
     const loadDemoProfile = () => {
       form.setFieldsValue({
         fullName: 'Desmond',
@@ -172,6 +157,22 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
         setLoading(false);
       }
     };
+
+    // When the guest (anonymous) upgrades to a permanent account, auto-submit any chart held
+    // behind the sign-up prompt (it's now tied to the new account). Declared after submitChart
+    // so it isn't referenced before initialisation.
+    useEffect(() => {
+      const wasAnon = prevIsAnonRef.current;
+      const nowAnon = user?.isAnonymous ?? null;
+      prevIsAnonRef.current = nowAnon;
+      if (wasAnon === true && nowAnon === false) {
+        if (pendingValuesRef.current !== null) {
+          const values = pendingValuesRef.current;
+          pendingValuesRef.current = null;
+          void submitChart(values, false);
+        }
+      }
+    }, [user?.isAnonymous]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const onFinish = async (values: any) => {
       // Auth signs in anonymously on load; in the brief window before that completes (or if it

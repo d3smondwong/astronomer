@@ -52,11 +52,11 @@ const Hero = () => {
     >
       <div className="flex items-center gap-4 justify-center">
         <div className="w-12 h-[1px] bg-outline-variant"></div>
-        <img src="/temple_icon.svg" alt="Temple" className="w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14" />
+        <Image src="/temple_icon.svg" alt="Temple" width={56} height={56} className="w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14" />
         <div className="w-12 h-[1px] bg-outline-variant"></div>
       </div>
       <blockquote className="text-xl md:text-2xl font-serif italic text-bronze-muted/80 leading-relaxed text-center">
-        "The winds of destiny are never neutral; they carry the whispers of your ancestors and the blueprint of your future."
+        &ldquo;The winds of destiny are never neutral; they carry the whispers of your ancestors and the blueprint of your future.&rdquo;
       </blockquote>
     </motion.div>
   </div>

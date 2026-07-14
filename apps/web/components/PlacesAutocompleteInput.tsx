@@ -41,10 +41,13 @@ const PlacesAutocompleteInput: FC<PlacesAutocompleteInputProps> = ({
     };
   }, []);
 
-  // Sync controlled value from outside (form reset / pre-fill)
-  useEffect(() => {
+  // Sync the controlled value from outside (form reset / pre-fill) by adjusting state
+  // during render rather than in an effect — no extra commit, no stale flash.
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
     setInputValue(value ?? '');
-  }, [value]);
+  }
 
   const handleSearch = (text: string) => {
     setInputValue(text);
