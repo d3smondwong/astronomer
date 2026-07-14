@@ -1,6 +1,5 @@
-import 'antd/dist/reset.css';
 import type { Metadata } from "next";
-import "@/styles/globals.css";
+import "@/styles/globals.css"; // includes antd reset (layered) — see globals.css header
 import { ConfigProvider } from 'antd';
 import { Noto_Serif, Ma_Shan_Zheng, Noto_Sans_SC } from 'next/font/google';
 import { antdTheme } from '@/lib/theme';

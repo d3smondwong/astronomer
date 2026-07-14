@@ -218,6 +218,18 @@
   box-shadow: 4px 0 20px color-mix(in srgb, var(--color-gold-deep) 7%, transparent);
 }
 
+/* Sidebar profile links — antd injects unlayered ':where(.css-…) a { color: var(--ant-color-link) }'
+   for anchors inside antd subtrees; this unlayered higher-specificity rule restores inheritance. */
+.sidebar-item a {
+  color: inherit;
+}
+
+/* .gold-gradient on an antd Button — antd's own (unlayered) background wins over
+   the layered class, so restate it here for buttons specifically. */
+.ant-btn.gold-gradient {
+  background: linear-gradient(135deg, var(--color-gold-deep) 0%, var(--color-gold-light) 100%);
+}
+
 /* Delete button on the midnight profile header — frost tones instead of antd's
    danger red. !important because antd's own danger-text hover selectors are
    higher-specificity CSS-in-JS. */

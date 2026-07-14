@@ -223,6 +223,16 @@ TypeScript (Frontend)
 - No lunar-javascript imports allowed in frontend code.
 - Use strict TypeScript types matching the backend's JSON payload schemas.
 
+### 🎨 Styling rules (theming single source of truth)
+- **Colors and fonts are defined in exactly two places, kept in sync:** `styles/theme.css` (CSS land — Tailwind `@theme` brand tokens + semantic `:root` vars) and `lib/theme.ts` (JS land — `palette`, `goldAlpha()`, `fonts`, `strengthScale`, `antdTheme`). Never write a brand hex literal (`#735c00`, `#4d4635`, `#d4af37`, `rgba(115,92,0,…)`, …) in a component.
+- **Components style with Tailwind utilities on those tokens** (`bg-parchment`, `text-gold-deep/60`, `border-gold-deep/15`, `font-serif`, `font-zh`, `font-zh-sans`). Repeated composites (sidebar rows, CTAs, badges) are named classes in `styles/components.css` under `@layer components`; responsive layout math lives in `styles/dashboard.css`.
+- **Inline `style={{}}` is allowed only for** (a) genuinely dynamic values (score-driven heights, percent positions, data-driven category colors) and (b) antd/MUI component props, fed from `lib/theme.ts` — antd/MUI inject unlayered CSS-in-JS that beats layered utilities, and antd seed tokens must be literal values. Never mutate styles in `onMouseEnter`/`onMouseLeave` — use `:hover` rules or `data-active` attributes.
+- **Cascade layers:** antd's `reset.css` is imported in `globals.css` into `layer(base)` — do not re-import it unlayered in `layout.tsx` (unlayered CSS silently overrides every utility, e.g. `button { color: inherit }`, `a { color: blue }`). Rules that must beat antd's own component CSS sit *below* the `@layer` block in `components.css` (see `.sidebar-shell`, `.profile-delete-btn`).
+- **Fonts load via `next/font` in `app/layout.tsx`** (Noto Serif, Ma Shan Zheng, Noto Sans SC) and resolve through `--font-noto-serif` / `--font-ma-shan-zheng` / `--font-noto-sans-sc`; never add Google Fonts `@import` or inline `fontFamily`.
+- **Five-element presentation constants** (`ELEMENT_ICONS`, `ELEMENT_EN`, `ELEMENT_COLOR`) come from `lib/elements.ts` — never redefine them per component.
+- **User feedback: no toasts.** Success is communicated by the UI change itself (navigation, list update); errors render inline at the point of action (antd `<Alert>`, per-section error state with Retry) and always go through `reportClientError`.
+- Dark mode is deliberately dormant: the `.dark` block in `theme.css` stays, `next-themes` is not installed. Semantic tokens (`--background`, `--primary`, …) already point at brand values so wiring a toggle later only needs a designed `.dark` palette + provider.
+
 ## 📚 Dependencies & Libraries
 
 ### Backend (Python)

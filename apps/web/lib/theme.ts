@@ -69,6 +69,9 @@ export const strengthScale = {
 export const antdTheme: ThemeConfig = {
   token: {
     colorPrimary: palette.goldDeep,
+    // antd paints every <a> inside its subtrees with colorLink — keep it on-brand
+    // (default is #1677ff blue).
+    colorLink: palette.goldDeep,
     fontFamily: fonts.serif,
     borderRadius: 4,
     colorBgContainer: palette.surfaceLowest,

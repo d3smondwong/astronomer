@@ -189,7 +189,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         className="sidebar-item group flex items-center justify-between mb-0.5"
                         data-active={isActive(profile.profileId)}
                       >
-                        <Link href={`/profile/${profile.profileId}`} className="flex-1 min-w-0">
+                        {/* text-inherit: keep the row's color — antd's reset paints bare anchors blue */}
+                        <Link href={`/profile/${profile.profileId}`} className="flex-1 min-w-0 text-inherit">
                           <button
                             className={`w-full flex items-center py-[7px] px-2.5 bg-transparent border-none cursor-pointer text-sm text-left text-inherit [font-weight:inherit] ${isCollapsed ? 'gap-1 justify-center' : 'gap-2 justify-start'}`}
                             title={profile.name}
