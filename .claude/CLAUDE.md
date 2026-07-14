@@ -52,7 +52,11 @@ Detection gate (all must hold): 得令 = 0, 得地 = 无根, 得势 = 0, **and �
 
 **假化 never gets 化气格 用神:** `ten_gods.py` applies the DM element change for `形态 == "化气格"` ONLY. If 用神 treated 假化 as transformed, the 十神 layer would label every god against the ORIGINAL day master while 用神 reasoned about the 化神 — the two layers would disagree about what the day master *is*. 假化 falls through to normal detection and carries an advisory.
 
-**Cycle interaction engine is separate but shares definitions:** `cycles/cycle_interactions.py` runs a 1×4 scan (one transiting pillar vs 4 natal pillars) — `natal_interactions.py` is hard-wired to exactly 4 pillars and must not be extended. All relation maps, `PRIORITY_RULE_TABLE`, and strength tables are imported from `natal_interactions.py`; never redefine what counts as a 冲/合/刑. Every cycle-natal pairing uses the constant `距离: "紧贴"` (no distance decay).
+**Cycle interaction engine is separate but shares definitions:** `cycles/cycle_interactions.py` runs a 1×N scan (one transiting pillar vs its opponents) — `natal_interactions.py` is hard-wired to exactly 4 pillars and must not be extended. All relation maps, `PRIORITY_RULE_TABLE`, and strength tables are imported from `natal_interactions.py`; never redefine what counts as a 冲/合/刑. Every pairing uses the constant `距离: "紧贴"` (no distance decay).
+
+**岁运 — a 大运 is scanned 1×4, a 流年 1×5:** a decade exists independently of any year inside it, so the 大运 meets only the 4 natal pillars. A 流年 meets the natal pillars **plus its enclosing 大运** (`CompanionPillar`, opponent index 4) — classically the year meets its decade FIRST, and only what survives reaches the 命局. 岁运 items are those whose `组合明细` carries a `"大运"` key. Opponent index 4 is NOT a natal pillar: the `日柱特殊`/`涉及月柱` salience flags, the 日主贪合 remark, and the 日柱-anchored void pass all stay gated on indices 0-3 (`_NATAL_COUNT`) — a transiting branch has no slot in the natal 旬 to be absent from. The 1×5 scan is what makes cross-frames visible (大运申 + 流年子 + 日柱辰 → 三合水局); no 1×1 side-scan could see them, which is why there is no second engine.
+
+**合 binds, 冲 agitates — the 岁运 rule that is easiest to get backwards.** `cycles/sui_yun.py` re-resolves the decade's `柱位动态` under the year's 岁运 locks, because the 大运's actions are computed ONCE per decade but a 大运 bound by the 流年 does not deliver its 冲 to the 命局 *that year* (贪合忘冲). **合/三合/伏吟/反吟 downgrade the decade's actions; 六冲 downgrades NOTHING** — 岁冲运 destabilises the decade (`大运态: 受冲`) but does not tie it down, and reading 冲 as suppression would silence exactly the years the classics call the loudest. Each lock behaves exactly as the same lock behaves inside the engine's own passes (`PRIMARY_六合` → branch layer, `STEM_天干合` → stem layer, `STRUCTURAL_三合/三会` → branch+pillar, 交战 → everything). Output is a **compact delta** (`大运制约`) — only items whose 强度 moved, each self-contained so no join back to the decade entry is needed — plus an always-present `大运态` verdict, so an empty delta reads as "the decade acts normally", never "not computed". The re-resolved dynamics (not the raw ones) feed the year's 五行动态, or the two layers would disagree about whether the 大运 acted. Severity surfaces as `运势.警示`, never as a change to `评级`: 评级 is elemental favourability, 警示 is intensity/delivery — orthogonal axes.
 
 ---
 
@@ -126,16 +130,24 @@ class CyclesInput(BirthInput):
       "神煞": [ { "名称", "来源", "解读" } ],
       "运势": { "评级": "喜运|平运|忌运", "依据": "...", "来源": "金不换|用神五行" },
       "五行动态": { "五行构成", "季节状态", "对日主", "引动" },
-      "流年": [ { "年份", "虚岁", "周岁", "干支", "生肖", "运柱", "作用", "神煞", "运势", "五行动态", "太岁", "流月": [] } ] }
+      "流年": [ { "年份", "虚岁", "周岁", "干支", "生肖", "运柱", "作用", "神煞",
+                 "运势": { ..., "警示": ["岁运并临（重）：…"] },
+                 "五行动态",
+                 "岁运": { "关系总览": [...], "特殊组合": [ {"名称","级别","说明"} ],
+                          "大运态": "交战|入局|被合绊|受冲|常态", "大运态说明": "...",
+                          "大运制约": [ {"类型","组合明细","原强度","本年强度","起因","说明"} ],
+                          "警示": [...] },
+                 "太岁", "流月": [] } ] }
   ]
 }
 ```
+`岁运` is present on every 流年 EXCEPT the pre-起运 stub's (未行大运 — no decade to relate to). `运势.警示` appears only when a 级别 "重" configuration fires.
 
 **运势 (per-decade / per-year verdict):** the holistic 喜运/平运/忌运 headline the per-element `五行动态` breakdown cannot give (five elements each move their own way). Sourced from the hand-curated `大运喜`/`大运忌` branch table in `data/climate_data.py` (金不换), keyed `日干+月支` — 运支 ∈ 大运喜 → 喜运, ∈ 大运忌 → 忌运, else 平运. These branch lists are **curated, not derived**: mechanically expanding 喜用 五行 to branches would flag ~7 of 12 branches favorable and say nothing. For the handful of charts with no curated table, the verdict degrades to the branch's 本气 五行 read against the chart's 用神, and reports `来源: "用神五行"` so callers can tell the two apart. Invariant (locked by tests): every 大运喜/大运忌 list holds only pure branch chars, and no branch appears in both.
 
 **The 方位表 is 正格-authored — 非正格 charts bypass it entirely.** It assumes the day master stands and must be balanced, so for a 从格/专旺格/化气格 its directions are not merely unhelpful but *backwards*. `get_cycle_yun_shi` therefore skips it whenever `格局 != 正格` and reads the structure-derived 用神 instead (`来源: "从格用神"`). This is the general form of a real bug: 癸午's source clause (`喜从火财 忌申(无根夭)`) is **从格-conditional, not a 方位 judgment**, and encoding its `忌申` rated 庚金 — the very element 癸午's 经典 calls 必须庚辛为生身之本 — as 忌运 for ordinary charts. Both `大运喜`/`大运忌` there are deliberately empty; do not "restore" them from the raw source string.
 
-**流年 are lazy:** default request returns all 10 大运 fully analysed with empty `流年` lists (~40KB); pass `da_yun_index` to expand one decade (~84KB). Every 流年 carries an empty `流月` seam for the future monthly layer. TypeScript interfaces: `apps/web/types/cyclesChart.ts`.
+**流年 are lazy:** default request returns all 10 大运 fully analysed with empty `流年` lists (~62KB); pass `da_yun_index` to expand one decade (~146KB, of which the 岁运 layer is ~14KB). Every 流年 carries an empty `流月` seam for the future monthly layer. TypeScript interfaces: `apps/web/types/cyclesChart.ts`.
 
 **Caching rule (critical):** cycle timing (起运) depends on the exact birth instant, which `chart_key` deliberately excludes — **never cache cycle data under `chart_key`**. The response is deterministic per (birth fields, lat/lon, TST flag, gender, da_yun_index); cache at the Next.js layer per `profileId + daYunIndex` if needed. `chart_key` in the cycles response is for log correlation only. The `/api/cycles` route handler reads birth data from the profile record (owner-enforced), never from the client.
 
@@ -163,9 +175,10 @@ apps/
 │   │   ├── na_yin.py — Nayin element mappings
 │   │   ├── true_solar_time.py — TST calculations
 │   │   ├── tai_ming_shen.py — Six Relatives stars
-│   │   ├── cycles/ — 大运/流年 cycle modules (1×4 scan vs natal pillars)
+│   │   ├── cycles/ — 大运/流年 cycle modules (大运 = 1×4 scan; 流年 = 1×5, vs natal + 大运)
 │   │   │   ├── cycle_pillars.py — NatalContext + per-pillar 运柱 enrichment
-│   │   │   ├── cycle_interactions.py — Cycle-vs-natal interaction engine
+│   │   │   ├── cycle_interactions.py — Cycle-vs-chart interaction engine (CompanionPillar)
+│   │   │   ├── sui_yun.py — 岁运: classical 流年-vs-大运 reading + 大运制约 (合绊) pass
 │   │   │   ├── cycle_shen_sha.py — Single-pillar shen sha (imports natal tables)
 │   │   │   └── cycle_wu_xing.py — Qualitative elemental dynamics + 引动
 │   │   └── (other calculation modules)

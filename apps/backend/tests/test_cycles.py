@@ -21,12 +21,15 @@ import pytest
 from lunar_python.util import LunarUtil
 
 from apps.backend.astronomer_logic.cycles.cycle_interactions import (
+    CompanionPillar,
     get_cycle_interactions,
 )
 from apps.backend.astronomer_logic.cycles.cycle_pillars import NatalContext
 from apps.backend.astronomer_logic.cycles.cycle_shen_sha import get_cycle_shen_sha
+from apps.backend.astronomer_logic.cycles.sui_yun import analyse_sui_yun
 from apps.backend.astronomer_logic.day_master_strength import get_seasonal_factors
 from apps.backend.astronomer_logic.natal_five_elements import ELEMENTS, STATE_ORDER
+from apps.backend.astronomer_logic.natal_interactions import STRENGTH_ORDER
 from apps.backend.astronomer_logic.yong_shen import get_yong_shen
 from apps.backend.orchestrator.astronomer_data_orchestrator import calculate_natal_chart
 from apps.backend.orchestrator.cycles_orchestrator import calculate_cycles
@@ -117,6 +120,50 @@ def make_yong_shen(
 
 def find(interactions: dict, itype: str) -> list[dict]:
     return [it for it in interactions["柱位动态"] if it["类型"] == itype]
+
+
+def decade_scan(ctx: NatalContext, da_yun: str) -> dict:
+    """The 大运's own 1×4 scan — the decade-level 作用 a 流年 later re-resolves."""
+    return get_cycle_interactions(da_yun[0], da_yun[1], ctx, cycle_label="大运")
+
+
+def sui_yun_scan(
+    ctx: NatalContext, liu_nian: str, da_yun: str
+) -> tuple[dict, dict, tuple]:
+    """Full 岁运 pipeline for a (流年, 大运) pair over a hand-built natal context.
+
+    Returns (the year's 1×5 interactions, the 岁运 block, the decade's dynamics
+    re-resolved under this year's locks)."""
+    decade = decade_scan(ctx, da_yun)
+    companion = CompanionPillar(
+        stem=da_yun[0], branch=da_yun[1], stem_rooting="中根"
+    )
+    year = get_cycle_interactions(
+        liu_nian[0], liu_nian[1], ctx, cycle_label="流年", companion=companion
+    )
+    block, constrained = analyse_sui_yun(
+        liu_nian[0],
+        liu_nian[1],
+        da_yun[0],
+        da_yun[1],
+        year,
+        tuple(decade["柱位动态"]),
+        ctx,
+    )
+    return year, block, constrained
+
+
+def named(block: dict) -> list[str]:
+    return [s["名称"] for s in block["特殊组合"]]
+
+
+def constrained_types(block: dict) -> list[str]:
+    return [c["类型"] for c in block["大运制约"]]
+
+
+def rank_of(strength: str) -> int:
+    """Higher rank = weaker (强势主流 = 0 … 消融吸收 = 4)."""
+    return STRENGTH_ORDER[strength]
 
 
 # ── 起运 & 大运 enumeration ─────────────────────────────────────────────────
@@ -557,6 +604,199 @@ class TestCycleInteractions:
         chong = find(get_cycle_interactions("丙", "辰", ctx2), "六冲")
         assert chong and chong[0]["强度"] == "强势主流"
         assert "冲空填实" in chong[0]["备注"]
+
+
+# ── 岁运: 流年 vs 大运 ───────────────────────────────────────────────────────
+
+
+class TestSuiYunInteractions:
+    """流年-vs-大运 direct interactions, and their consequences for the decade.
+
+    Natal fixture throughout: 甲(年) 丙(月) 戊(日) 壬(时) / 酉 卯 辰 巳.
+    Chosen so the 流年 stems used below (甲, 庚, 丙, 乙) find no combining partner in
+    the natal stems — otherwise the engine's stem lock would absorb the very 天干克
+    these tests are about.
+    """
+
+    NATAL = (("甲", "丙", "戊", "壬"), ("酉", "卯", "辰", "巳"))
+
+    def ctx(self) -> NatalContext:
+        return make_ctx(*self.NATAL)
+
+    # ── the year is scanned against the decade at all ────────────────────
+
+    def test_liu_nian_sees_the_da_yun(self):
+        """A 六冲 between 流年 and 大运 — invisible to the old 1×4 scan."""
+        year, block, _ = sui_yun_scan(self.ctx(), "丙子", "甲午")
+        chong = [it for it in find(year, "六冲") if "大运" in it["组合明细"]]
+        assert len(chong) == 1
+        assert chong[0]["组合明细"] == {"流年": "子", "大运": "午"}
+        assert chong[0]["距离"] == "紧贴"
+        assert block["关系总览"] == ["六冲(流年子大运午)"]
+
+    def test_da_yun_scan_never_sees_a_liu_nian(self):
+        """The decade is analysed 1×4 — it exists independently of any year in it."""
+        decade = decade_scan(self.ctx(), "甲午")
+        assert not any("流年" in it["组合明细"] for it in decade["柱位动态"])
+
+    # ── the named classical configurations ───────────────────────────────
+
+    def test_sui_yun_bing_lin(self):
+        """岁运并临 — 流年干支 == 大运干支."""
+        year, block, _ = sui_yun_scan(self.ctx(), "庚寅", "庚寅")
+        fu = [it for it in find(year, "伏吟") if "大运" in it["组合明细"]]
+        assert fu and fu[0]["组合明细"] == {"流年": "庚寅", "大运": "庚寅"}
+        assert "岁运并临" in named(block)
+        assert block["大运态"] == "交战"
+
+    def test_sui_yun_bing_lin_severity_is_gated_on_xi_ji(self):
+        """「岁运并临，灾殃立至」 describes a 忌神 doubling itself. A 喜用 干支 repeating
+        doubles a FAVOURABLE force — same pattern, different verdict."""
+        ctx = self.ctx()
+        _, block, _ = sui_yun_scan(ctx, "庚寅", "庚寅")
+        bing_lin = next(s for s in block["特殊组合"] if s["名称"] == "岁运并临")
+        stem_verdict = ctx.yong_shen["五行"]["金"]["综合"]
+        branch_verdict = ctx.yong_shen["五行"]["木"]["综合"]
+        expected = "重" if "忌" in {stem_verdict, branch_verdict} else "中"
+        assert bing_lin["级别"] == expected
+
+    def test_sui_yun_fan_yin(self):
+        """岁运反吟 — 天克地冲 between the two transiting pillars. 岁运交战."""
+        year, block, constrained = sui_yun_scan(self.ctx(), "甲子", "庚午")
+        fan = [it for it in find(year, "反吟") if "大运" in it["组合明细"]]
+        assert fan and fan[0]["组合明细"] == {"流年": "甲子", "大运": "庚午"}
+        assert "岁运反吟" in named(block)
+        assert block["大运态"] == "交战"
+        # 交战 spans every layer — nothing the decade does escapes the turbulence.
+        assert all(it["强度"] != "强势主流" for it in constrained)
+
+    def test_yun_fan_sui_jun(self):
+        """大运干克流年干 — 臣犯君, 其祸重."""
+        _, block, _ = sui_yun_scan(self.ctx(), "甲子", "庚寅")
+        assert "运犯岁君" in named(block)
+        ke = next(s for s in block["特殊组合"] if s["名称"] == "运犯岁君")
+        assert ke["级别"] == "重"
+        assert block["警示"]  # 重 configurations surface as an advisory
+
+    def test_sui_jun_fu_yun(self):
+        """流年干克大运干 — 君临臣. 岁能伤运，运不能伤岁: the same 克, the lighter verdict."""
+        _, block, _ = sui_yun_scan(self.ctx(), "庚寅", "甲子")
+        assert "岁君伏运" in named(block)
+        assert next(s for s in block["特殊组合"] if s["名称"] == "岁君伏运")["级别"] == "轻"
+        assert not block["警示"]  # 轻 — not an event trigger
+
+    def test_absorbed_ke_is_not_named_jun_chen(self):
+        """戊癸合 — the stems BOND. A 克 the engine already absorbed under a 合
+        (消融吸收) must not be resurrected as 运犯岁君."""
+        # 流年 戊 combines with 大运 癸; the 戊→癸 克 is absorbed by that 合.
+        year, block, _ = sui_yun_scan(self.ctx(), "戊申", "癸未")
+        ke = [it for it in find(year, "天干克") if "大运" in it["组合明细"]]
+        assert ke and ke[0]["强度"] == "消融吸收"
+        assert "岁君伏运" not in named(block)
+        assert "运犯岁君" not in named(block)
+
+    # ── the 合/冲 asymmetry: 合 binds, 冲 agitates ────────────────────────
+
+    def test_he_ban_suppresses_the_decade(self):
+        """贪合忘冲 — the headline case.
+
+        大运酉 clashes the natal 月支卯 at full strength for the decade. Then 流年辰
+        六合 大运酉: the decade's branch is bound, and for THIS year it no longer
+        delivers that clash — however strong the decade-level analysis rated it."""
+        ctx = self.ctx()
+        decade = decade_scan(ctx, "乙酉")
+        chong = [it for it in decade["柱位动态"] if it["类型"] == "六冲"]
+        assert chong and chong[0]["组合明细"] == {"大运": "酉", "月柱": "卯"}
+        before = chong[0]["强度"]
+
+        _, block, _ = sui_yun_scan(ctx, "丙辰", "乙酉")
+        assert block["大运态"] == "被合绊"
+        assert "六冲" in constrained_types(block)
+
+        entry = next(c for c in block["大运制约"] if c["类型"] == "六冲")
+        assert entry["原强度"] == before
+        assert rank_of(entry["本年强度"]) > rank_of(before)  # strictly weaker
+        assert entry["起因"]["类型"] == "六合"
+        assert entry["起因"]["组合明细"] == {"流年": "辰", "大运": "酉"}
+        # Self-contained: the sentence names the actors, the target and both strengths.
+        assert "大运乙酉" in entry["说明"] and "月柱卯" in entry["说明"]
+
+    def test_chong_agitates_but_does_not_suppress(self):
+        """岁冲运 destabilises the decade — it does NOT bind it. 冲则动.
+
+        Reading 冲 as suppression would silence exactly the years the classics call
+        the loudest."""
+        ctx = self.ctx()
+        _, block, constrained = sui_yun_scan(ctx, "丙子", "甲午")
+        assert block["大运态"] == "受冲"
+        assert block["大运制约"] == []
+        assert "岁运相冲" in named(block)
+        # The decade's own actions are untouched, strength for strength.
+        assert [it["强度"] for it in constrained] == [
+            it["强度"] for it in decade_scan(ctx, "甲午")["柱位动态"]
+        ]
+
+    # ── cross-frames: 大运 + 流年 + natal ─────────────────────────────────
+
+    def test_cross_frame_san_he(self):
+        """申子辰 completed by 大运申 + 流年子 + 日柱辰 — the frame no 1×4 scan can see."""
+        ctx = self.ctx()
+        year, block, _ = sui_yun_scan(ctx, "壬子", "庚申")
+        he = find(year, "三合")
+        assert len(he) == 1
+        assert he[0]["组合明细"] == {"流年": "子", "日柱": "辰", "大运": "申"}
+        assert he[0]["子类型"] == "引动成局"
+        assert he[0]["元素"] == "水"
+        assert block["大运态"] == "入局"
+
+    # ── the LLM-safety property ──────────────────────────────────────────
+
+    def test_chang_tai_is_stated_positively(self):
+        """An empty 大运制约 must read as "the decade acts normally" — never as
+        "we did not compute it". The verdict is ALWAYS present."""
+        _, block, _ = sui_yun_scan(self.ctx(), "丙寅", "甲子")
+        assert block["关系总览"] == []
+        assert block["特殊组合"] == []
+        assert block["大运制约"] == []
+        assert block["大运态"] == "常态"
+        assert "照常作用于命局" in block["大运态说明"]
+
+    # ── orchestrator wiring ──────────────────────────────────────────────
+
+    def test_every_liu_nian_carries_a_sui_yun_block(self, desmond_cycles):
+        cycles, _ = desmond_cycles
+        liu_nian = cycles["大运"][4]["流年"]
+        assert liu_nian
+        for ln in liu_nian:
+            block = ln["岁运"]
+            assert block["大运态"] in {"交战", "入局", "被合绊", "受冲", "常态"}
+            assert block["大运态说明"]
+
+    def test_pre_qi_yun_years_have_no_sui_yun(self):
+        """未行大运 — there is no decade yet, so the year acts on the natal chart alone."""
+        cycles, _ = calculate_cycles(**DESMOND, da_yun_index=0)
+        stub = cycles["大运"][0]
+        assert stub["阶段"] == "未行大运"
+        assert stub["流年"]
+        for ln in stub["流年"]:
+            assert "岁运" not in ln
+            assert not any("大运" in it["组合明细"] for it in ln["作用"]["柱位动态"])
+
+    def test_desmond_2023_cross_frame_is_real(self, desmond_cycles):
+        """A real chart, not a synthetic one: 大运癸未 + 流年癸卯 + 月柱亥 → 亥卯未 木局,
+        which draws the decade's branch into the bureau and mutes its 六冲 with 年柱丑."""
+        cycles, _ = desmond_cycles
+        year_2023 = next(
+            ln for ln in cycles["大运"][4]["流年"] if ln["年份"] == 2023
+        )
+        assert year_2023["干支"] == "癸卯"
+        he = [it for it in year_2023["作用"]["柱位动态"] if it["类型"] == "三合"]
+        assert he and he[0]["组合明细"] == {"流年": "卯", "月柱": "亥", "大运": "未"}
+        block = year_2023["岁运"]
+        assert block["大运态"] == "入局"
+        chong = next(c for c in block["大运制约"] if c["类型"] == "六冲")
+        assert chong["组合明细"] == {"大运": "未", "年柱": "丑"}
+        assert rank_of(chong["本年强度"]) > rank_of(chong["原强度"])
 
 
 # ── 神煞 & determinism ──────────────────────────────────────────────────────

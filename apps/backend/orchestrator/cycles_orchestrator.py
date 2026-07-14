@@ -11,6 +11,13 @@ analysis (运柱 / 作用 / 神煞 / 五行动态) for each.
 populated 流年 list. Every 流年 entry carries an empty "流月" list — the
 reserved seam for the future monthly layer.
 
+岁运: a 大运 is analysed against the natal chart alone (1×4) — a decade exists
+independently of any year inside it. A 流年 is analysed against the natal chart
+PLUS its enclosing 大运 (1×5), and carries an extra "岁运" block: the classical
+reading of that relationship (岁运并临 / 反吟 / 运犯岁君 …) and, crucially, which of
+the decade's actions on the 命局 are suppressed this year (a 大运 bound by the year
+does not deliver its 冲). See cycles/sui_yun.py.
+
 Determinism: no datetime.now(), no "当运" flag — the response depends only on
 the birth instant + gender (+ da_yun_index), so the frontend derives "current
 decade/year" from the year ranges.
@@ -27,6 +34,7 @@ from datetime import datetime
 from apps.backend.astronomer_logic.bazi_key import encode_bazi_key
 from apps.backend.astronomer_logic.bazi_pillars import get_bazi_pillars
 from apps.backend.astronomer_logic.cycles.cycle_interactions import (
+    CompanionPillar,
     get_cycle_interactions,
 )
 from apps.backend.astronomer_logic.cycles.cycle_pillars import (
@@ -35,6 +43,7 @@ from apps.backend.astronomer_logic.cycles.cycle_pillars import (
     build_natal_context,
 )
 from apps.backend.astronomer_logic.cycles.cycle_shen_sha import get_cycle_shen_sha
+from apps.backend.astronomer_logic.cycles.sui_yun import analyse_sui_yun
 from apps.backend.astronomer_logic.cycles.cycle_wu_xing import (
     classify_with_transiting,
     get_cycle_wu_xing,
@@ -80,24 +89,49 @@ class _DecadeContext:
     """The enclosing 大运's facts a 流年 needs to be read 岁运并临.
 
     pillar:   (大运 stem, 大运 branch) — added as a pillar in the 流年 reclassification.
-    dynamics: the 大运's 柱位动态 — merged into the 流年 reclassification.
+    dynamics: the 大运's 柱位动态 — merged into the 流年 reclassification, and the list the
+              年's 岁运 layer re-resolves under its 合绊 locks.
     baseline: the decade's 五行 力量 map (natal + 大运) — the baseline the 流年 变化 is
               measured against, so the delta isolates the year's own contribution.
+    rooting:  the 大运 stem's 根基强度 — so the 岁运 scan reads the decade's rooting from
+              the decade's own pillar rather than recomputing it.
+    xun_kong: the 大运's own void pair.
     """
 
     pillar: tuple[str, str]
     dynamics: tuple
     baseline: dict
+    rooting: str
+    xun_kong: str
+
+    def as_companion(self) -> CompanionPillar:
+        """The decade as a fifth opponent for the year's interaction scan."""
+        return CompanionPillar(
+            stem=self.pillar[0],
+            branch=self.pillar[1],
+            label="大运",
+            stem_rooting=self.rooting,
+            xun_kong=self.xun_kong,
+        )
 
 
 def _build_decade_context(
-    ctx: NatalContext, da_yun_stem: str, da_yun_branch: str, da_yun_interactions: dict
+    ctx: NatalContext,
+    da_yun_stem: str,
+    da_yun_branch: str,
+    da_yun_interactions: dict,
+    da_yun_pillar: dict,
+    da_yun_xun_kong: str,
 ) -> _DecadeContext:
     """Compute the decade context once per expanded 大运 (shared by all its 流年)."""
     dynamics = tuple(da_yun_interactions.get("柱位动态", []))
     baseline = classify_with_transiting(ctx, ((da_yun_stem, da_yun_branch, "大运"),), dynamics)
     return _DecadeContext(
-        pillar=(da_yun_stem, da_yun_branch), dynamics=dynamics, baseline=baseline
+        pillar=(da_yun_stem, da_yun_branch),
+        dynamics=dynamics,
+        baseline=baseline,
+        rooting=da_yun_pillar["天干"]["根基强度"],
+        xun_kong=da_yun_xun_kong,
     )
 
 
@@ -200,6 +234,11 @@ def _analyse_cycle_pillar(
     `decade` is set only for 流年: it carries the enclosing 大运 (pillar + 柱位动态 +
     五行 力量 baseline) so the year's 五行 is read 岁运并临 (natal + 大运 + 流年) and its
     变化 is measured against the decade rather than birth.
+
+    It also makes the year's interaction scan a 1×5 — the decade joins the four natal
+    pillars as an opponent — and unlocks the 岁运 layer. A 大运 has no enclosing decade,
+    so it is scanned 1×4 and carries no 岁运 block: a decade exists independently of any
+    particular year inside it.
     """
     pillar = build_cycle_pillar(cycle_stem, cycle_branch, cycle_xun_kong, ctx, cycle_label)
     interactions = get_cycle_interactions(
@@ -209,8 +248,32 @@ def _analyse_cycle_pillar(
         cycle_label=cycle_label,
         cycle_xun_kong=cycle_xun_kong,
         cycle_stem_rooting=pillar["天干"]["根基强度"],
+        companion=decade.as_companion() if decade else None,
     )
-    return {
+
+    yun_shi = get_cycle_yun_shi(cycle_branch, ctx.yong_shen, cycle_stem)
+
+    sui_yun = None
+    # decade_dynamics defaults to the decade's raw (unconstrained) list; the 岁运 layer
+    # replaces it with the version re-resolved under this year's 合绊 locks, so the 五行
+    # layer and the 岁运 layer never disagree about whether the 大运 actually acted.
+    decade_dynamics = decade.dynamics if decade else ()
+    if decade:
+        sui_yun, decade_dynamics = analyse_sui_yun(
+            cycle_stem,
+            cycle_branch,
+            decade.pillar[0],
+            decade.pillar[1],
+            interactions,
+            decade.dynamics,
+            ctx,
+        )
+        # 警示 is intensity/delivery (岁运并临, 反吟, 运犯岁君); 评级 stays a 五行-favourability
+        # verdict. Orthogonal axes — collapsing them into one score destroys both.
+        if sui_yun["警示"]:
+            yun_shi = {**yun_shi, "警示": sui_yun["警示"]}
+
+    entry = {
         "运柱": pillar,
         "作用": interactions,
         "神煞": get_cycle_shen_sha_interpretations(
@@ -220,7 +283,7 @@ def _analyse_cycle_pillar(
         # The stem is passed for 非正格 charts: a 忌 stem attacks a fragile structure directly
         # (透干破格) and drags the verdict down a step. 正格 charts remain branch-only — the
         # 金不换 表 is a 方位 table, and directions are branches.
-        "运势": get_cycle_yun_shi(cycle_branch, ctx.yong_shen, cycle_stem),
+        "运势": yun_shi,
         "五行动态": get_cycle_wu_xing(
             cycle_stem,
             cycle_branch,
@@ -229,10 +292,13 @@ def _analyse_cycle_pillar(
             pillar,
             cycle_label,
             decade_pillar=decade.pillar if decade else None,
-            decade_dynamics=decade.dynamics if decade else (),
+            decade_dynamics=decade_dynamics,
             baseline=decade.baseline if decade else None,
         ),
     }
+    if sui_yun is not None:
+        entry["岁运"] = sui_yun
+    return entry
 
 
 def _tai_sui_check(liu_nian_branch: str, ctx: NatalContext) -> dict:
@@ -268,7 +334,8 @@ def _liu_nian_entry(
     """One fully-analysed 流年 entry (read 岁运并临 inside its `decade`).
 
     decade is None only for the pre-起运 stub (未行大运) — there is no 大运 yet, so the
-    year acts on the natal chart alone (natal + 流年) with 变化 measured against birth.
+    year acts on the natal chart alone (natal + 流年) with 变化 measured against birth,
+    and carries no 岁运 block: there is nothing for it to relate to.
     """
     gan_zhi = liu_nian.getGanZhi()
     stem, branch = gan_zhi[0], gan_zhi[1]
@@ -356,7 +423,9 @@ def calculate_cycles(
         }
 
         if da_yun_index is not None and i == da_yun_index:
-            decade = _build_decade_context(ctx, stem, branch, entry["作用"])
+            decade = _build_decade_context(
+                ctx, stem, branch, entry["作用"], entry["运柱"], da_yun.getXunKong()
+            )
             entry["流年"] = [
                 _liu_nian_entry(ln, birth_year, ctx, decade) for ln in da_yun.getLiuNian()
             ]

@@ -279,6 +279,67 @@ export interface YunShi {
    *                decade rates 喜 on elements (金生水) yet is 忌运 in truth.
    */
   来源: "金不换" | "用神五行" | "从格用神" | "化气破格";
+  /**
+   * 流年 only, and only when a severe 岁运 configuration fires (岁运并临 / 岁运反吟 /
+   * 运犯岁君). Deliberately NOT folded into 评级: 评级 measures elemental favourability
+   * (what the period gives you), 警示 measures intensity and delivery (how violently it
+   * arrives). Orthogonal axes — collapsing them into one score destroys both.
+   */
+  警示?: string[];
+}
+
+/** A named classical 岁运 pattern. */
+export interface SuiYunSpecial {
+  /** 岁运并临 | 岁运反吟 | 岁运双合 | 岁运相冲 | 运犯岁君 | 岁君伏运 | 天比地比 */
+  名称: string;
+  /** 重 = a genuine event trigger (surfaces in 运势.警示); 中; 轻. */
+  级别: "重" | "中" | "轻";
+  说明: string;
+}
+
+/**
+ * One of the decade's actions on the natal chart, suppressed for THIS year because the
+ * 流年 binds the 大运 (合绊 / 贪合忘冲 / 入局).
+ *
+ * Self-contained by design: 类型 + 组合明细 + both strengths + the causing 岁运 item are all
+ * carried here, so a reader never has to join back to the decade entry's 柱位动态. Only items
+ * whose 强度 actually moved appear — read 大运态 for the verdict when this list is empty.
+ */
+export interface DaYunConstraint {
+  类型: string;
+  组合明细: Record<string, string>;
+  原强度: string;
+  本年强度: string;
+  /** The 岁运 relation that did the binding. */
+  起因: { 类型: string; 组合明细: Record<string, string> };
+  说明: string;
+}
+
+/**
+ * 岁运 — the 流年's direct relationship with its enclosing 大运, and what that does to the
+ * decade. Present on every 流年 EXCEPT those before 起运 (未行大运 — there is no decade yet).
+ *
+ * The 合/冲 asymmetry is the rule to hold onto when reading this: 合 binds (the decade is
+ * 绊住 and its actions are downgraded — see 大运制约), whereas 冲 merely agitates (受冲: the
+ * decade still acts on the 命局, and 大运制约 is empty).
+ */
+export interface SuiYun {
+  /** The 流年-vs-大运 items, restated from 作用.柱位动态 (those with a 大运 key in 组合明细). */
+  关系总览: string[];
+  特殊组合: SuiYunSpecial[];
+  /**
+   * 交战  — 岁运并临/反吟: the two transiting pillars are wholly at odds; every decade action is muted.
+   * 入局  — the 大运 branch is drawn into a 三合/三会 with the year and forgets its business elsewhere.
+   * 被合绊 — 合 binds the decade; it cannot deliver its 冲/克 to the 命局 this year.
+   * 受冲  — the year clashes the decade. Agitates, does NOT bind: 大运制约 is empty by design.
+   * 常态  — no 岁运 constraint; the decade acts on the 命局 as the decade-level analysis says.
+   */
+  大运态: "交战" | "入局" | "被合绊" | "受冲" | "常态";
+  /** Always present — an empty 大运制约 means "the decade acts normally", never "not computed". */
+  大运态说明: string;
+  大运制约: DaYunConstraint[];
+  /** The 级别 === "重" configurations, flattened. Mirrored onto 运势.警示. */
+  警示: string[];
 }
 
 export interface CycleWuXing {
@@ -315,12 +376,20 @@ export interface LiuNianEntry {
   干支: string;
   生肖: string;
   运柱: CyclePillar;
+  /**
+   * The year scanned against the four natal pillars AND its enclosing 大运 (a 1×5 scan).
+   * 岁运 items are the ones whose 组合明细 carries a "大运" key — including frames the two
+   * transiting pillars complete together with a natal branch (大运申 + 流年子 + 日柱辰 →
+   * 三合水局). See 岁运 below for the classical reading of them.
+   */
   作用: CycleInteractions;
   神煞: CycleShenSha;
   /** Headline 喜运/平运/忌运 for the year — read alongside the 五行动态 detail. */
   运势: YunShi;
   五行动态: CycleWuXing;
   太岁: TaiSui;
+  /** Absent only on the pre-起运 years (未行大运 — no decade to relate to yet). */
+  岁运?: SuiYun;
   /** Reserved seam — always present, empty until the monthly layer ships. */
   流月: unknown[];
 }
