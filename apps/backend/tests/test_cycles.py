@@ -15,6 +15,7 @@ Run:  conda activate astronomer
 """
 
 import json
+from dataclasses import replace
 from datetime import datetime, timedelta
 
 import pytest
@@ -464,6 +465,100 @@ class TestYongShen:
         assert ys["五行"]["土"]["扶抑"] == "平"
         assert ys["五行"]["水"]["综合"] == "平"   # not a 调候用神, 扶抑 neutral
         assert ys["五行"]["火"]["综合"] == "喜"   # 调候用神 still 喜
+
+
+# ── 仇神 / 闲神 — the split of the 平 bucket ─────────────────────────────────
+
+
+class TestChouShen:
+    """仇神 = 生忌神者 — the element that FEEDS a 忌, while being neither 喜 nor 忌 itself.
+
+    Reference case is the 中和 戊亥 chart (same 调候 row as Desmond, but balanced):
+        调候 喜 甲丙 (木火) · 忌 辛 (金) · 扶抑 平 across the board
+        → 喜用 = 木火 · 忌 = 金 · 平 = 土水
+        → 土生金 and 金 is 忌  ⇒ 土 = 仇神
+        → 水生木 and 木 is 喜用 ⇒ 水 = 闲神
+    """
+
+    ZHONG_HE = ("戊", "土", "亥", "中和")
+
+    def test_chou_shen_feeds_a_ji_element(self):
+        from apps.backend.astronomer_logic.wu_xing_relations import GENERATES
+
+        ys = make_yong_shen(*self.ZHONG_HE)
+        assert ys["仇"] == ["土"]   # 比劫, idle in itself, but 土生金 and 金 is 忌
+        assert ys["闲"] == ["水"]   # 财星, idle and feeding nothing feared
+
+        for el in ys["仇"]:
+            assert GENERATES[el] in ys["忌"]                       # the defining rule
+            assert el not in ys["喜用"] and el not in ys["忌"]      # 喜/忌 win the label
+            assert ys["五行"][el]["角色"] == "仇神"
+            assert "仇神" in ys["五行"][el]["备注"]
+
+    def test_roles_partition_the_five_elements(self):
+        """喜用 / 忌 / 仇 / 闲 are a partition, and 角色 never contradicts 综合."""
+        charts = [
+            make_yong_shen(*self.ZHONG_HE),
+            make_yong_shen("戊", "土", "亥", "弱"),
+            make_yong_shen("甲", "木", "寅", "旺"),
+            calculate_natal_chart(**TestGeJu.CONG_CAI)[0]["用神"],   # 非正格 path
+        ]
+        expected = {"喜": "喜用神", "忌": "忌神"}
+        for ys in charts:
+            buckets = [ys["喜用"], ys["忌"], ys["仇"], ys["闲"]]
+            flat = [el for b in buckets for el in b]
+            assert sorted(flat) == sorted(ELEMENTS)   # covers all five, no duplicates
+            for el in ELEMENTS:
+                combined, role = ys["五行"][el]["综合"], ys["五行"][el]["角色"]
+                if combined in expected:
+                    assert role == expected[combined]
+                else:                                  # 平 splits, and ONLY 平 splits
+                    assert role in ("仇神", "闲神")
+
+    def test_no_chou_shen_when_fu_yi_leaves_nothing_idle(self):
+        """弱/旺 正格 → 扶抑 tags all five elements 喜 or 忌, so NOTHING is idle and both
+        lists are empty. That is the right answer, not missing data — 仇神 presupposes an
+        element with no verdict of its own."""
+        for ys in (make_yong_shen("戊", "土", "亥", "弱"),
+                   make_yong_shen("甲", "木", "寅", "旺")):
+            assert ys["仇"] == [] and ys["闲"] == []
+            assert all(ys["五行"][el]["综合"] != "平" for el in ELEMENTS)
+
+    def test_chou_shen_does_not_change_yun_shi_rating(self):
+        """角色 is a ROLE label; 综合 is the FAVOURABILITY verdict. Only 综合 may move 评级.
+
+        戌 is a 土 branch — 土 is this chart's 仇神 — and sits in neither 大运喜 (巳午未) nor
+        大运忌 (酉卯辰), so the decade stays 平运. A 仇神 is a reading, not a downgrade.
+        """
+        from apps.backend.astronomer_logic.cycles.cycle_wu_xing import get_cycle_yun_shi
+
+        ys = make_yong_shen(*self.ZHONG_HE)
+        assert ys["五行"]["土"]["角色"] == "仇神"
+        assert ys["五行"]["土"]["综合"] == "平"      # the axis 评级 actually reads
+        assert get_cycle_yun_shi("戌", ys)["评级"] == "平运"
+
+    def test_cycle_reading_names_the_chou_shen(self, desmond_ctx):
+        """The bug this whole layer fixes: a 仇神 used to be prose-labelled 闲神 and read as
+        「平和应对」 — harmless — while it was in fact feeding the chart's 忌神.
+
+        Desmond is 戊 in 亥 — the SAME 调候 row as the reference case — but 弱, so his own
+        chart leaves nothing idle. Swapping in the 中和 用神 for that row turns 土 into a 仇神
+        while every other input (四柱, 五行 baseline, interactions) stays genuinely his.
+        """
+        ctx = replace(desmond_ctx, yong_shen=make_yong_shen(*self.ZHONG_HE))
+        assert ctx.yong_shen["五行"]["土"]["角色"] == "仇神"
+
+        pillar = build_cycle_pillar("戊", "戌", "", ctx, "大运")
+        ix = get_cycle_interactions(
+            "戊", "戌", ctx, cycle_label="大运",
+            cycle_stem_rooting=pillar["天干"]["根基强度"],
+        )
+        tu = get_cycle_wu_xing("戊", "戌", ctx, ix, pillar, "大运")["五行"]["土"]
+
+        assert tu["角色"] == "仇神"          # carried as DATA, not only inside the prose
+        assert tu["喜忌"] == "平"            # …while the favourability axis stays unmoved
+        assert "仇神" in tu["解读"]
+        assert "闲神随运流转" not in tu["解读"]
 
 
 # ── 1×4 interaction engine (hand-built fixtures) ────────────────────────────
@@ -1502,9 +1597,11 @@ class TestYongShenKeysAreUnambiguous:
         ys = chart["用神"]
         gj = ys["格局详情"]
 
-        # the outer answer is ELEMENTS…
+        # the outer answer is ELEMENTS… (all four 五神 buckets, same discipline)
         assert set(ys["喜用"]) <= set(ELEMENTS)
         assert set(ys["忌"]) <= set(ELEMENTS)
+        assert set(ys["仇"]) <= set(ELEMENTS)
+        assert set(ys["闲"]) <= set(ELEMENTS)
         # …the structure detail is TEN-GOD CATEGORIES, under distinct keys.
         categories = {"比劫", "印星", "食伤", "财星", "官杀"}
         assert set(gj["喜用十神"]) <= categories and gj["喜用十神"]

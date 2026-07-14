@@ -50,6 +50,10 @@ Use the `lunar-python` library if a mapping or function is available.
 
 Detection gate (all must hold): 得令 = 0, 得地 = 无根, 得势 = 0, **and 印星 力量 ≈ 0**. That last condition is load-bearing — 得地 sees only the DM's own (clash-aware) 比劫 root and 得势 only 印比 in the *stems*, so 印星 buried in the **branches** is invisible to all three. Without it the detector fires on ~9% of charts instead of ~5%, inverting ordinary charts. Do NOT add 比劫 力量 to that gate: it double-counts roots 得地 has already ruled dead by 冲/空亡. 真从 = no 印 at all; 假从 = a trace survives (keeps the 从格 *direction*, flagged fragile — the residue is exactly what a 印比 运 revives to 破格). Calibration is pinned by `TestGeJu::test_cong_ge_rate_is_classically_rare`; 正格 must stay ≈95%.
 
+**仇神/闲神 are a SPLIT of the 平 bucket — 角色 and 综合 are different axes.** `yong_shen.py` assigns every element both a favourability verdict `综合` (喜/忌/平) and a 五神 role `角色` (喜用神/忌神/仇神/闲神). **仇神 = 生忌神者** — an element that is neither wanted nor feared in itself but *feeds* one the chart fears (火生土 when 土 is 忌). Because 喜用/忌 are **sets** (调候 ∪ 扶抑, or structure-derived), an element that generates a 忌 element may already be the 用神 (土生金 on a weak 戊 that fears 金) — so **喜/忌 always win the label** and 仇神 is assigned in a second pass over the `平` leftovers only. The `克喜用神者` formulation is deliberately NOT encoded: under 扶抑, whatever attacks the 用神 is already tagged 忌.
+
+Consequences that look like bugs but are not: on a **弱/旺 正格 chart `仇` and `闲` are BOTH empty** — 扶抑 tags all five elements 喜 or 忌 and nothing is left idle. 仇神 only fires on **中和 charts** (~24%, where 扶抑 is silent and only 调候 speaks) and on **非正格** charts. And **仇神 never moves `运势.评级`**: 评级 reads `综合`, and a 仇神 is still `平` → 平运. `角色` is a *reading*, `综合` is the *verdict* — orthogonal axes, same discipline as 警示 vs 评级 in the 岁运 layer. `cycle_wu_xing.py` must READ `角色` from the 用神 block, never re-derive a role from `综合` — doing so is what made a 仇神 report 「闲神随运流转，平和应对」 (harmless) while it was strengthening the chart's 忌神.
+
 **假化 never gets 化气格 用神:** `ten_gods.py` applies the DM element change for `形态 == "化气格"` ONLY. If 用神 treated 假化 as transformed, the 十神 layer would label every god against the ORIGINAL day master while 用神 reasoned about the 化神 — the two layers would disagree about what the day master *is*. 假化 falls through to normal detection and carries an advisory.
 
 **Cycle interaction engine is separate but shares definitions:** `cycles/cycle_interactions.py` runs a 1×N scan (one transiting pillar vs its opponents) — `natal_interactions.py` is hard-wired to exactly 4 pillars and must not be extended. All relation maps, `PRIORITY_RULE_TABLE`, and strength tables are imported from `natal_interactions.py`; never redefine what counts as a 冲/合/刑. Every pairing uses the constant `距离: "紧贴"` (no distance decay).
@@ -129,7 +133,9 @@ class CyclesInput(BirthInput):
 ```json
 {
   "起运": { "顺逆": "顺推|逆推", "起运阳历": "...", "起运计岁": "...", "性别": "..." },
-  "用神": { "强弱", "格局", "格局详情", "调候用神", "调候喜五行", "喜用", "忌", "大运喜", "大运忌", "五行", "经典" },
+  "用神": { "强弱", "格局", "格局详情", "调候适用", "调候用神", "调候忌神", "调候喜五行", "调候忌五行",
+           "喜用", "忌", "仇", "闲", "大运喜", "大运忌", "五行", "经典" },
+  // 五行[元素] = { 十神, 扶抑, 调候, 综合 (喜|忌|平), 角色 (喜用神|忌神|仇神|闲神), 备注 }
   "大运": [
     { "序号": 0, "阶段": "未行大运", "干支": "", "开始年份", "结束年份", "开始年龄", "结束年龄", "流年": [] },
     { "序号": 1, "干支": "丙戌", "周期": "7-16岁", ...,
@@ -137,7 +143,8 @@ class CyclesInput(BirthInput):
       "作用": { "关系总览": [...], "柱位动态": [...] },
       "神煞": [ { "名称", "来源", "解读" } ],
       "运势": { "评级": "喜运|平运|忌运", "依据": "...", "来源": "金不换|用神五行" },
-      "五行动态": { "五行构成", "季节状态", "对日主", "引动" },
+      "五行动态": { "五行", "对日主", "引动" },
+      // 五行[元素] = { 状态, 本命, 运基 (流年 only), 变化, 十神, 喜忌, 角色, 解读 }
       "流年": [ { "年份", "虚岁", "周岁", "干支", "生肖", "运柱", "作用", "神煞",
                  "运势": { ..., "警示": ["岁运并临（重）：…"] },
                  "五行动态",

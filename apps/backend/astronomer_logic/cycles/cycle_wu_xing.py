@@ -315,35 +315,44 @@ _MOVE_PHRASE = {
     "大升": "力量大增", "升": "力量渐增", "持平": "力量持平",
     "降": "力量渐弱", "大降": "力量大减",
 }
-_YONGSHEN_ROLE = {"喜": "喜用神", "忌": "忌神", "平": "闲神"}
-
-
 def _element_reading(
-    element: str, ten_god: str, state: str, change: str, yong_shen: str,
+    element: str, ten_god: str, state: str, change: str, role: str,
     note: str, cycle_label: str,
 ) -> str:
-    """One-line LLM-facing reading fusing 用神(喜忌) × movement × domain.
+    """One-line LLM-facing reading fusing 用神(角色) × movement × domain.
 
-    The 用神 verdict (喜/忌/平) is chart-fixed; the movement (变化) is this period's.
+    The 角色 (喜用神/忌神/仇神/闲神) is chart-fixed and comes from get_yong_shen — this module
+    must NOT re-derive it from 综合, or the role vocabulary would exist in two places and
+    could diverge. The movement (变化) is this period's.
+
     A 喜神 strengthening is auspicious; a 忌神 strengthening is a caution — that
     cross-reference is the interpretive judgment the model should not have to guess.
+
+    The 仇神 arm is why the role must be a real field rather than a 综合 lookup: a 仇神 is
+    still 综合 == "平", so deriving the role from 综合 would call it 闲神 and report a rising
+    one as 「平和应对」 — harmless — when it is in fact feeding the 忌神 the chart fears.
     """
-    role = _YONGSHEN_ROLE.get(yong_shen, "闲神")
     move = _MOVE_PHRASE.get(change, "力量持平")
     rising = change in ("大升", "升")
     falling = change in ("大降", "降")
 
-    if yong_shen == "喜":
+    if role == "喜用神":
         verdict = (
             "喜神得势，运势得力，为吉" if rising
             else "喜神受挫，助力转弱，宜固本培元" if falling
             else "喜神平稳，得其滋养"
         )
-    elif yong_shen == "忌":
+    elif role == "忌神":
         verdict = (
             "忌神增势，压力渐显，宜谨慎防范" if rising
             else "忌神退避，反为吉兆" if falling
             else "忌神平稳，尚无大碍"
+        )
+    elif role == "仇神":
+        verdict = (
+            "仇神得势，暗助忌神，其党益盛，宜防" if rising
+            else "仇神退避，忌神失其所生，反为吉兆" if falling
+            else "仇神平稳，助忌之力未显"
         )
     else:
         verdict = "闲神随运流转，平和应对"
@@ -502,15 +511,19 @@ def get_cycle_wu_xing(
     for el in ELEMENTS:
         change = _delta(combined[el]["力量"], base_map[el]["力量"])
         tg = element_ten_god_class(el, dm_element)
-        yong_shen = ys[el]["综合"]           # 喜/忌/平 — chart-fixed 用神 verdict
+        yong_shen = ys[el]["综合"]           # 喜/忌/平 — chart-fixed favourability verdict
+        role = ys[el]["角色"]                # 喜用神/忌神/仇神/闲神 — chart-fixed ROLE
         entry = {
             "状态": combined[el]["状态"],
             "本命": ctx.natal_five_elements[el]["状态"],
             "变化": change,
             "十神": tg,
             "喜忌": yong_shen,
+            # 角色 splits the 平 bucket into 仇神 (feeds a 忌) and 闲神 (idle). Carried as
+            # DATA, not only in the 解读 prose, so consumers need not parse the sentence.
+            "角色": role,
             "解读": _element_reading(
-                el, tg, combined[el]["状态"], change, yong_shen, ys[el]["备注"], cycle_label
+                el, tg, combined[el]["状态"], change, role, ys[el]["备注"], cycle_label
             ),
         }
         if baseline is not None:  # 流年 only — the enclosing 大运's level for this element

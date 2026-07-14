@@ -20,6 +20,28 @@ not a hard engine rule.
 balanced, so without it such a chart would have NO 忌 at all — and ~24% of charts are
 中和. That is not "nothing to avoid"; it is a missing input.
 
+五神 — 仇神 and 闲神 complete the set
+------------------------------------
+喜/忌 name only three of the classical five gods (用神, 喜神, 忌神). The remaining two are
+NOT a further verdict: they are a SPLIT of the 平 leftovers.
+
+  • 仇神 = 生忌神者 — an element that is neither wanted nor feared in itself, but FEEDS one
+    the chart fears (金生水 when 水 is 忌 → 金 is 仇).
+  • 闲神 = the genuine idlers.
+
+喜/忌 always win the label. That precedence is load-bearing, not tidiness: 喜用/忌 are SETS
+(调候 ∪ 扶抑, or structure-derived), so an element that generates a 忌 element can already be
+喜用 — a weak 戊 fearing 金 still has 土生金, yet 土 is its 用神. Classically 仇神 is by
+definition neither 用 nor 忌, so the split runs as a second pass over the 平 bucket only.
+
+The 克喜用神者 formulation is deliberately NOT encoded: under 扶抑, whatever attacks the 用神
+is already tagged 忌, so that rule would mostly restate a verdict we hold anyway.
+
+Consequence: on a 弱/旺 正格 chart 仇 and 闲 are BOTH empty — 扶抑 tags all five elements 喜 or
+忌 and nothing is left idle. 仇神 can only fire where the 平 bucket exists: 中和 charts (~24%,
+where only 调候 speaks) and 非正格 charts whose 十神 category is in neither PATTERN_MAPPING
+list. An empty 仇 on a weak chart is the right answer, not a gap.
+
 Output (Chinese-keyed) — see get_yong_shen.
 """
 
@@ -28,6 +50,7 @@ from lunar_python.util import LunarUtil
 from apps.backend.astronomer_logic.ge_ju import detect_ge_ju
 from apps.backend.astronomer_logic.wu_xing_relations import (
     ELEMENTS,
+    GENERATES,
     element_ten_god_class,
 )
 from apps.backend.data.climate_data import CLIMATE_DATA
@@ -101,11 +124,17 @@ def get_yong_shen(
           "调候忌五行": [elements],
           "喜用": [elements],
           "忌": [elements],
+          "仇": [elements],                # 生忌神者 — idle but feeds a 忌 (see module docstring)
+          "闲": [elements],                # the genuine idlers
           "大运喜": [branches],             # 金不换 方位表 — 正格-authored (see 运势)
           "大运忌": [branches],
-          "五行": { "火": {"十神","扶抑","调候","综合","备注"}, ... },
+          "五行": { "火": {"十神","扶抑","调候","综合","角色","备注"}, ... },
           "经典": {...} | None,
         }
+
+    角色 (喜用神/忌神/仇神/闲神) is the ROLE label; 综合 (喜/忌/平) is the FAVOURABILITY verdict.
+    They are separate axes and must not be conflated — 仇神 and 闲神 are both 综合 == "平", so
+    a 仇神 running in a 大运 is still 平运. Only 综合 may move 运势.评级.
 
     Note: 强弱 was previously (mis)named 格局. They are different things — 强弱 is a
     5-point scale, 格局 is the structural class. 极弱 does NOT imply 从格.
@@ -200,6 +229,29 @@ def get_yong_shen(
         elif combined == "忌":
             unfavorable.append(el)
 
+    # 仇神 / 闲神 — the split of the 平 leftovers (see module docstring for the full rule).
+    # Runs as a SECOND pass because 喜/忌 must win the label: 仇神 is by definition neither
+    # 用 nor 忌, and with 喜用/忌 being sets, an element that generates a 忌 element can very
+    # well be the 用神 itself (土生金 on a weak 戊 that fears 金).
+    ji_set = set(unfavorable)
+    chou: list[str] = []
+    idle: list[str] = []
+    for el in ELEMENTS:
+        entry_el = per_element[el]
+        if entry_el["综合"] != "平":
+            entry_el["角色"] = "喜用神" if entry_el["综合"] == "喜" else "忌神"
+            continue
+        fed = GENERATES[el]
+        if fed in ji_set:
+            entry_el["角色"] = "仇神"
+            chou.append(el)
+            # Append — the 非正格 path already wrote a 格局 note here and it must survive.
+            clause = f"闲神而生{fed}（忌），为仇神"
+            entry_el["备注"] = f"{entry_el['备注']}；{clause}" if entry_el["备注"] else clause
+        else:
+            entry_el["角色"] = "闲神"
+            idle.append(el)
+
     return {
         "强弱": dm_strength,
         "格局": ge_ju["格局"],
@@ -222,6 +274,8 @@ def get_yong_shen(
         "调候忌五行": climate_ji_elements,
         "喜用": favorable,
         "忌": unfavorable,
+        "仇": chou,
+        "闲": idle,
         "大运喜": list(entry.get("大运喜", [])),
         "大运忌": list(entry.get("大运忌", [])),
         "五行": per_element,

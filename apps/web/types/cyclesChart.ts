@@ -156,9 +156,17 @@ export interface CycleFiveElementState {
   十神: string;
   /** Chart-fixed 用神 verdict (调候 + 扶抑): 喜 | 忌 | 平. */
   喜忌: string;
+  /**
+   * Chart-fixed 五神 role — mirrors 用神.五行[el].角色. Distinguishes a 仇神 (idle but feeding
+   * a 忌) from a true 闲神, which 喜忌 alone cannot: both read 平.
+   */
+  角色: YongShenRole;
   /** One-line reading fusing 用神 × movement × domain (LLM-facing guidance). */
   解读: string;
 }
+
+/** The 五神 role an element plays. See YongShen.仇 for the 仇神 rule. */
+export type YongShenRole = "喜用神" | "忌神" | "仇神" | "闲神";
 
 /** Per-element 用神 breakdown (see YongShen). */
 export interface YongShenElement {
@@ -169,6 +177,11 @@ export interface YongShenElement {
   调候: boolean;
   /** Combined verdict: 喜 | 忌 | 平. */
   综合: string;
+  /**
+   * The 五神 ROLE — a separate axis from 综合, not a restatement of it. 仇神 and 闲神 are
+   * BOTH 综合 === "平", so a 仇神 never moves 运势.评级; only 综合 does.
+   */
+  角色: YongShenRole;
   备注: string;
 }
 
@@ -254,6 +267,18 @@ export interface YongShen {
   喜用: string[];
   /** Unfavorable elements (扶抑忌). */
   忌: string[];
+  /**
+   * 仇神 — 生忌神者: an element that is neither 喜用 nor 忌 itself, but GENERATES one the
+   * chart fears (金生水 when 水 is 忌 → 金 is 仇). 喜/忌 always win the label, so this is a
+   * split of the 平 leftovers, never a fourth verdict.
+   *
+   * Empty on 弱/旺 正格 charts BY CONSTRUCTION — 扶抑 tags all five elements 喜 or 忌 and
+   * nothing is left idle. It fires on 中和 charts (where only 调候 speaks) and 非正格 charts.
+   * An empty list is the right answer, not missing data.
+   */
+  仇: string[];
+  /** 闲神 — the genuine idlers: 平, and feeding nothing the chart fears. */
+  闲: string[];
   /**
    * Curated favorable 大运/流年 branches (金不换 方位表) — the source of each pillar's
    * 运势 verdict. Empty when the chart is uncurated, in which case 运势 falls back to 五行.
