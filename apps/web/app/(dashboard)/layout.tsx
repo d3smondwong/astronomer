@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
+import { Fragment, useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Divider, Layout, Popconfirm, Modal } from 'antd';
 import { Plus, Users, MessageSquare, User, Trash2 } from 'lucide-react';
 import BaziProfileForm, { type BaziProfileFormRef } from '@/components/BaziProfileForm';
-import { toast } from 'sonner';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
 import { useAuth } from '@/lib/authContext';
@@ -38,6 +37,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [profiles, setProfiles] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // profileId whose delete failed — shows an inline notice under that row.
+  // Success needs no announcement: the row disappearing is the feedback.
+  const [deleteErrorId, setDeleteErrorId] = useState<string | null>(null);
   const isCollapsed = useIsCollapsed();
   const { language, setLanguage } = useLanguage();
   const tr = translations.sidebar;
@@ -99,15 +101,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   const handleDeleteProfile = async (profileId: string) => {
+    setDeleteErrorId(null);
     try {
       const idToken = user ? await user.getIdToken() : null;
-      await fetch(`/api/profiles/${profileId}`, {
+      const res = await fetch(`/api/profiles/${profileId}`, {
         method: 'DELETE',
         headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const remaining = profiles.filter((p: any) => p.profileId !== profileId);
       setProfiles(remaining);
-      toast.success(tr.successDeleted[language]);
 
       if (pathname.includes(profileId)) {
         if (remaining.length > 0) {
@@ -120,7 +123,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
     } catch (error) {
       console.error('Error deleting profile:', error);
-      toast.error('Failed to delete profile');
+      // Row stays in the list; show the failure right where the action happened.
+      setDeleteErrorId(profileId);
     }
   };
 
@@ -191,8 +195,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </p>
                   ) : (
                     profiles.map((profile) => (
+                      <Fragment key={profile.profileId}>
                       <div
-                        key={profile.profileId}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -247,6 +251,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           </button>
                         </Popconfirm>
                       </div>
+                      {deleteErrorId === profile.profileId && !isCollapsed && (
+                        <p className="text-xs px-3 pb-1 m-0" style={{ color: '#c0392b' }}>
+                          {translations.profile.deleteError[language]}
+                        </p>
+                      )}
+                      </Fragment>
                     ))
                   )}
                 </div>

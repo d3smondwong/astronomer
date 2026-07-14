@@ -143,11 +143,11 @@ export const translations = {
     deleteTitle:      { en: 'Delete Profile',   ch: '删除命盘' },
     deleteCancel:     { en: 'Cancel',           ch: '取消' },
     deleteOk:         { en: 'Delete',           ch: '删除' },
-    // Toasts
-    deleteSuccess:    { en: 'Profile deleted successfully', ch: '命盘删除成功' },
+    // Inline feedback (errors only — success is communicated by the UI change itself)
     deleteError:      { en: 'Failed to delete the profile. Please try again.', ch: '删除命盘失败，请重试。' },
-    errorInsights:    { en: "We couldn't generate your reading at this time. Please try regenerating the chart.",
-                        ch: '暂时无法生成您的解读，请重新生成命盘。' },
+    errorInsights:    { en: "We couldn't generate part of your reading. Please retry.",
+                        ch: '部分解读暂时无法生成，请重试。' },
+    retryInsights:    { en: 'Retry',            ch: '重试' },
     profileNotFound:  { en: 'Profile not found', ch: '找不到命盘' },
     loadingProfile:   { en: 'Loading profile...', ch: '加载中...' },
     tdLabel:          { en: 'Coming Soon',      ch: '敬请期待' },
@@ -189,9 +189,7 @@ export const translations = {
     labelMale:        { en: 'Male',                   ch: '男' },
     labelFemale:      { en: 'Female',                 ch: '女' },
     btnGenerate:      { en: 'Generate My Bazi Chart', ch: '生成八字命盘' },
-    successGenerated: { en: 'Bazi chart generated successfully!', ch: '八字命盘生成成功！' },
     errorGenerated:   { en: "We couldn't generate your chart at this time. Please try regenerating the chart.", ch: '暂时无法生成您的命盘，请重新生成命盘。' },
-    successDeleted:   { en: 'Profile deleted',        ch: '命盘已删除' },
   },
   landing: {
     heroLine1:        { en: 'Timeless Insights,',    ch: '洞悉天机，' },
@@ -233,7 +231,6 @@ export const translations = {
     labelFemale:        { en: 'Female',                 ch: '女' },
     btnGenerate:        { en: 'Generate My Bazi Chart', ch: '生成八字命盘' },
     solarTime:          { en: 'Solar Time',             ch: '真太阳时' },
-    successGenerated:   { en: 'Bazi chart generated successfully!', ch: '八字命盘生成成功！' },
     errorGenerated:     { en: 'Failed to generate Bazi chart. Please try again.', ch: '生成八字命盘失败，请重试。' },
     notReady:           { en: 'Just a moment — getting things ready. Please try again.', ch: '正在准备中，请稍候重试。' },
     btnDemo:            { en: "Try Demo (Desmond's Profile)", ch: '试用示例（Desmond 命盘）' },

@@ -2,10 +2,9 @@
 
 import React, { forwardRef, useImperativeHandle, useRef, useEffect } from 'react';
 import dayjs from 'dayjs';
-import { Form, Input, DatePicker, TimePicker, Radio, Switch, Button, Tooltip } from 'antd';
+import { Alert, Form, Input, DatePicker, TimePicker, Radio, Switch, Button, Tooltip } from 'antd';
 import { Calendar, Clock, Info } from 'lucide-react';
 import PlacesAutocompleteInput from '@/components/PlacesAutocompleteInput';
-import { toast } from 'sonner';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
 import { useAuth } from '@/lib/authContext';
@@ -58,6 +57,9 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
   ({ onSuccess, showDemoButton = false, submitClassName }, ref) => {
     const [form] = Form.useForm();
     const [loading, setLoading] = React.useState(false);
+    // Submission-level failure shown inline above the submit button (field-level
+    // validation is handled by antd Form rules). Cleared on the next attempt.
+    const [formError, setFormError] = React.useState<string | null>(null);
     const { language } = useLanguage();
     const tr = translations.form;
     const { user, loading: authLoading, openAuthModal, refreshSession } = useAuth();
@@ -67,7 +69,7 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
     const prevIsAnonRef = useRef<boolean | null>(null);
 
     useImperativeHandle(ref, () => ({
-      reset: () => { form.resetFields(); setLoading(false); pendingValuesRef.current = null; },
+      reset: () => { form.resetFields(); setLoading(false); setFormError(null); pendingValuesRef.current = null; },
     }));
 
     const loadDemoProfile = () => {
@@ -89,6 +91,7 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
 
     const submitChart = async (values: any, skipInsights: boolean) => {
       setLoading(true);
+      setFormError(null);
       // Minted here at the true origin so the same id spans browser → Next → FastAPI,
       // and ties a failure report to the server-side natal compute logs.
       const requestId = crypto.randomUUID();
@@ -143,16 +146,16 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
         // right after an anonymous→permanent upgrade). If it can't be established even after
         // retries, don't walk into that redirect loop — the chart was saved; tell the user.
         if (!(await refreshSession())) {
-          toast.error(translations.auth.sessionError[language]);
+          setFormError(translations.auth.sessionError[language]);
           return;
         }
-        toast.success(tr.successGenerated[language]);
+        // Success needs no announcement — onSuccess navigates to the new chart.
         onSuccess(profileId);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error(`Error generating Bazi chart [req:${requestId}]:`, error);
         reportClientError({ context: 'chart_generation', requestId, uid: user?.uid, status, message });
-        toast.error(tr.errorGenerated[language]);
+        setFormError(tr.errorGenerated[language]);
       } finally {
         setLoading(false);
       }
@@ -178,7 +181,7 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
       // Auth signs in anonymously on load; in the brief window before that completes (or if it
       // failed), `user` is null and /api/chart would 401. Guard rather than show a generic error.
       if (!user) {
-        toast.error(tr.notReady[language]);
+        setFormError(tr.notReady[language]);
         return;
       }
       // Guests (anonymous) get the chart only — skipInsights — and the server enforces the
@@ -250,6 +253,10 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
         {/* Coordinates are populated by PlacesAutocompleteInput — never shown to the user */}
         <Form.Item name="latitude" hidden><Input /></Form.Item>
         <Form.Item name="longitude" hidden><Input /></Form.Item>
+
+        {formError && (
+          <Alert type="error" showIcon message={formError} className="font-serif" />
+        )}
 
         <Button
           type="primary"

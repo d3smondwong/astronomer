@@ -10,11 +10,10 @@ import Waves from '@mui/icons-material/Waves';
 import { type LifeStageInfo, type NaYinInfo, type VoidInfo, type VoidStatus, type VoidCondition } from '@/types/baziLibraryTypes';
 import { type ProfileRecord } from '@/lib/profilesDb';
 import { type InsightsResponse, type StructuredSection } from '@/lib/fastApiClient';
-import { Card, Tabs, Button, Popconfirm, Tooltip, Collapse } from 'antd';
+import { Alert, Card, Tabs, Button, Popconfirm, Tooltip, Collapse } from 'antd';
 import dayjs from 'dayjs';
 import localizedFormat from 'dayjs/plugin/localizedFormat';
 import { Calendar, Clock, MapPin, User, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
 import { useAuth } from '@/lib/authContext';
@@ -1025,9 +1024,14 @@ interface ProfilePageClientProps {
 
 export default function ProfilePageClient({ profileRecord, chartData, insights, chartKey }: ProfilePageClientProps) {
   const [isDeleting, setIsDeleting] = useState(false);
+  // Delete failure shown inline next to the delete control (success just navigates away).
+  const [deleteError, setDeleteError] = useState(false);
   const [insightsData, setInsightsData] = useState<InsightsResponse | null>(insights ?? null);
   // Section keys whose LLM call is currently in flight (progressive loading).
   const [loadingSections, setLoadingSections] = useState<string[]>([]);
+  // Section keys whose fetch failed — surfaced as an inline alert with Retry in the
+  // Insights tab (sections that did succeed keep rendering normally).
+  const [failedSections, setFailedSections] = useState<string[]>([]);
   const { language } = useLanguage();
   const tr = translations.profile;
   const trAuth = translations.auth;
@@ -1041,6 +1045,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
   // Fetch one section and merge its prose into state; always clears its loading flag.
   // `requestId` correlates all 6 section calls of one generation across browser → Next → FastAPI.
   const fetchSection = async (idToken: string, key: string, force: boolean, requestId: string) => {
+    setFailedSections((prev) => prev.filter((k) => k !== key));
     try {
       const res = await fetch('/api/insights', {
         method: 'POST',
@@ -1096,8 +1101,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
           context: 'insights_section', requestId, chartKey, profileId: profileRecord.profileId,
           uid: user?.uid, section: key, status: res.status, message: detail || `HTTP ${res.status}`,
         });
-        // Stable id collapses parallel section failures into a single toast.
-        toast.error(tr.errorInsights[language], { id: 'insights-error' });
+        setFailedSections((prev) => (prev.includes(key) ? prev : [...prev, key]));
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1106,7 +1110,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
         context: 'insights_section', requestId, chartKey, profileId: profileRecord.profileId,
         uid: user?.uid, section: key, message,
       });
-      toast.error(tr.errorInsights[language], { id: 'insights-error' });
+      setFailedSections((prev) => (prev.includes(key) ? prev : [...prev, key]));
     } finally {
       setLoadingSections((prev) => prev.filter((k) => k !== key));
     }
@@ -1128,12 +1132,33 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
       reportClientError({
         context: 'auth_token', requestId, profileId: profileRecord.profileId, uid: user?.uid, message,
       });
-      toast.error(tr.errorInsights[language], { id: 'insights-error' });
+      setFailedSections(keys);
       setLoadingSections([]);
       return;
     }
     await fetchSection(idToken, keys[0], force, requestId); // personality first
     await Promise.all(keys.slice(1).map((k) => fetchSection(idToken, k, force, requestId)));
+  };
+
+  // Re-fetch only the failed sections (fresh token + requestId).
+  const retryFailedSections = async (): Promise<void> => {
+    if (!user || user.isAnonymous || failedSections.length === 0) return;
+    const keys = [...failedSections];
+    const requestId = crypto.randomUUID();
+    setLoadingSections(keys);
+    let idToken: string;
+    try {
+      idToken = await user.getIdToken();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`Failed to get auth token [req:${requestId}]:`, err);
+      reportClientError({
+        context: 'auth_token', requestId, profileId: profileRecord.profileId, uid: user?.uid, message,
+      });
+      setLoadingSections([]);
+      return;
+    }
+    await Promise.all(keys.map((k) => fetchSection(idToken, k, false, requestId)));
   };
 
   // Auto-generate insights once we have a permanent (non-anonymous) owner and none are cached.
@@ -1160,6 +1185,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
 
   const handleDeleteProfile = async () => {
     setIsDeleting(true);
+    setDeleteError(false);
     try {
       const idToken = user ? await user.getIdToken() : null;
       const res = await fetch(`/api/profiles/${profileRecord.profileId}`, {
@@ -1167,13 +1193,13 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
         headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast.success(tr.deleteSuccess[language]);
+      // Success needs no announcement — navigating away from the deleted profile is the feedback.
       router.push('/');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error('Error deleting profile:', error);
       reportClientError({ context: 'profile_delete', profileId: profileRecord.profileId, uid: user?.uid, message });
-      toast.error(tr.deleteError[language]);
+      setDeleteError(true);
       setIsDeleting(false);
     }
   };
@@ -1353,6 +1379,11 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
                 />
               </Popconfirm>
             </Tooltip>
+            {deleteError && (
+              <p className="text-xs m-0 mt-1 text-right" style={{ color: '#f1aeb5' }}>
+                {tr.deleteError[language]}
+              </p>
+            )}
           </div>
         </Card>
 
@@ -1462,6 +1493,20 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
               label: tr.tabInsights[language],
               children: (
                 <div className="space-y-4">
+                  {/* Sections that failed to generate — inline alert with retry; sections
+                      that did succeed keep rendering below. */}
+                  {failedSections.length > 0 && !generating && (
+                    <Alert
+                      type="error"
+                      showIcon
+                      message={tr.errorInsights[language]}
+                      action={
+                        <Button size="small" danger onClick={() => void retryFailedSections()}>
+                          {tr.retryInsights[language]}
+                        </Button>
+                      }
+                    />
+                  )}
                   {process.env.NODE_ENV !== 'production' && user && !user.isAnonymous && (
                     /* Dev-only: force-regenerate (bypass cache) to iterate on prompt/data edits */
                     <div className="flex justify-end">

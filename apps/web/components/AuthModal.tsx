@@ -13,7 +13,6 @@ import { useAuth } from '@/lib/authContext';
 import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
 import { reportClientError } from '@/lib/errorReporter';
-import { toast } from 'sonner';
 
 /**
  * Move the guest's profiles to the just-signed-in account. Migration failures are usually
@@ -115,7 +114,12 @@ export default function AuthModal() {
                 uid: auth.currentUser?.uid,
                 message: 'Profile migration failed after retries',
               });
-              toast.error(tr.migrateFailed[language]);
+              // Sign-in itself succeeded — keep the modal open so the message is
+              // actually seen (same pattern as the session error below). The next
+              // Continue proceeds as a plain sign-in; the account is already active.
+              setError(tr.migrateFailed[language]);
+              setSubmitting(false);
+              return;
             }
           } else {
             throw linkErr;

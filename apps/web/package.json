@@ -28,7 +28,6 @@
     "playwright": "^1.61.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "sonner": "^1.7.4",
     "tz-lookup": "^6.1.25",
     "victory": "^37.3.0"
   },
