@@ -35,7 +35,7 @@ export interface CycleHiddenStemTier {
   十神: string;
 }
 
-/** Three-check void block (see backend cycle_pillars docstring). */
+/** Void block (see backend cycle_pillars docstring). */
 export interface CycleVoid {
   /** The cycle pillar's own 旬空 pair (e.g. "午未"). */
   本柱旬空: string;
@@ -43,6 +43,13 @@ export interface CycleVoid {
   落入命局空亡: string;
   /** Natal branches inside the cycle's own 旬空 — data only, or "无". */
   命局逢运空: string[] | string;
+  /**
+   * 流年 ONLY (absent on a 大运): the two transiting pillars each carry their own 旬, so
+   * each can fall into the other's void — 「运逢流年空亡」. Data only, never a downgrade
+   * driver: only the natal 日柱-anchored void has force. Always present on a 流年, "无"
+   * when there is no overlap.
+   */
+  岁运互空?: string[] | string;
 }
 
 export interface CycleSeasonalState {
@@ -66,7 +73,13 @@ export interface CyclePillar {
   纳音: string;
   空亡: CycleVoid;
   季节状态: CycleSeasonalState;
-  /** 制化 annotation (e.g. 食神制杀 available) — present only when applicable. */
+  /**
+   * 制化 annotation for an incoming 七杀 (食神制杀 / 印化杀) or 食神 (枭夺) — present only
+   * when applicable. On a 流年 this also sees the enclosing 大运's stem: a 大运 食神 tames
+   * a 流年 七杀 exactly as a natal one would, and the text names its source ("命局…" vs
+   * "大运…"). A tamed 七杀 is an authority asset; an unrestrained one is danger — so the
+   * distinction is load-bearing, not cosmetic.
+   */
   制化?: string;
 }
 

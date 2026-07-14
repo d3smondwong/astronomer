@@ -34,10 +34,10 @@ from datetime import datetime
 from apps.backend.astronomer_logic.bazi_key import encode_bazi_key
 from apps.backend.astronomer_logic.bazi_pillars import get_bazi_pillars
 from apps.backend.astronomer_logic.cycles.cycle_interactions import (
-    CompanionPillar,
     get_cycle_interactions,
 )
 from apps.backend.astronomer_logic.cycles.cycle_pillars import (
+    CompanionPillar,
     NatalContext,
     build_cycle_pillar,
     build_natal_context,
@@ -245,7 +245,13 @@ def _analyse_cycle_pillar(
     so it is scanned 1×4 and carries no 岁运 block: a decade exists independently of any
     particular year inside it.
     """
-    pillar = build_cycle_pillar(cycle_stem, cycle_branch, cycle_xun_kong, ctx, cycle_label)
+    # One companion, shared by every layer that can see the decade: the interaction scan
+    # (1×5), the 制化 annotation + 岁运互空 in the 运柱, and the set-completion 神煞.
+    companion = decade.as_companion() if decade else None
+
+    pillar = build_cycle_pillar(
+        cycle_stem, cycle_branch, cycle_xun_kong, ctx, cycle_label, companion
+    )
     interactions = get_cycle_interactions(
         cycle_stem,
         cycle_branch,
@@ -253,7 +259,7 @@ def _analyse_cycle_pillar(
         cycle_label=cycle_label,
         cycle_xun_kong=cycle_xun_kong,
         cycle_stem_rooting=pillar["天干"]["根基强度"],
-        companion=decade.as_companion() if decade else None,
+        companion=companion,
     )
 
     yun_shi = get_cycle_yun_shi(cycle_branch, ctx.yong_shen, cycle_stem)
@@ -290,7 +296,7 @@ def _analyse_cycle_pillar(
         "运柱": pillar,
         "作用": interactions,
         "神煞": get_cycle_shen_sha_interpretations(
-            get_cycle_shen_sha(cycle_stem, cycle_branch, ctx), cycle_label
+            get_cycle_shen_sha(cycle_stem, cycle_branch, ctx, companion), cycle_label
         ),
         # Headline 喜运/平运/忌运 for the period — read it against the 五行动态 detail below.
         # The stem is passed for 非正格 charts: a 忌 stem attacks a fragile structure directly

@@ -22,10 +22,36 @@ in cycle context instead.
 Natal SELF_EXCLUSION rules are intentionally skipped: they prevent a star
 from landing on the pillar that derives it, which is meaningless for a
 transiting pillar (it is never its own anchor).
+
+ANCHORS vs SETS — the one boundary that matters here.
+
+A 流年 is evaluated with its enclosing 大运 (`companion`), but the companion changes
+exactly ONE class of star:
+
+  ANCHOR stars (Phase 1, and the 年系/月系/日系 blocks) — 驿马, 桃花, 华盖, 天乙贵人,
+  羊刃, 元辰 … derive from a BIRTH fact (年支/月支/日支/日干/年干/年纳音). The 大运 is
+  itself a guest and is NEVER an anchor. Admitting it would invent 神煞 that no classical
+  text recognises. These read the natal chart alone.
+
+  SET stars (Phase 2, plus 天罗/地网 and 德秀贵人's 秀 pair) — 天罗, 地网, 自缢煞, 破煞,
+  挂剑煞, 天火煞 … ask whether a group of branches/stems is PRESENT TOGETHER. 岁运命 are
+  all physically present at once, so these draw on the natal chart + the 大运 + the guest.
+  This is the same 岁运-completion the interaction engine's 1×5 scan does for 三合/三会.
+
+  天火煞 is the star that proves the point: its water VOID condition is a set test too, so
+  a 流年 completing 寅午戌 inside a 癸亥 decade used to report 天火煞 while water sat right
+  beside it. That was a false POSITIVE, not merely a missed completion.
+
+  三奇 is excluded from the companion despite being a "combination" star: it requires the
+  three stems in CONSECUTIVE pillars, and a 大运/流年 pair has no sequence position. Same
+  documented parity gap as 共拱/拱会 in cycle_interactions.
 """
 
 from apps.backend.astronomer_logic.bazi_pillars import _YANG_STEMS
-from apps.backend.astronomer_logic.cycles.cycle_pillars import NatalContext
+from apps.backend.astronomer_logic.cycles.cycle_pillars import (
+    CompanionPillar,
+    NatalContext,
+)
 from apps.backend.astronomer_logic.natal_interactions import clash_map
 from apps.backend.astronomer_logic.natal_shen_sha import (
     GUA_JIAN_METAL_FULL,
@@ -71,9 +97,15 @@ _ZHI_ORDER = "子丑寅卯辰巳午未申酉戌亥"
 _PILLAR_LABELS = ("年柱", "月柱", "日柱", "时柱")
 
 
-def _natal_pillars_with_branch(ctx: NatalContext, branch_set: set) -> list:
-    """Natal pillar labels whose branch is in branch_set (for 组合明细)."""
-    return [_PILLAR_LABELS[i] for i, z in enumerate(ctx.zhis) if z in branch_set]
+def _natal_pillars_with_branch(
+    ctx: NatalContext, branch_set: set, companion: CompanionPillar | None = None
+) -> list:
+    """Pillar labels whose branch is in branch_set (for 组合明细) — including the 大运
+    when it contributed to the set."""
+    labels = [_PILLAR_LABELS[i] for i, z in enumerate(ctx.zhis) if z in branch_set]
+    if companion and companion.branch in branch_set:
+        labels.append(companion.label)
+    return labels
 
 # month_earthly_branches_shens entries keyed by SEASON (not month branch)
 _SEASONAL_STAR_NAMES = ("天赦", "天转", "地转", "季节性退神")
@@ -103,13 +135,22 @@ def _virtue_union(virtue_value: str, cycle_stem: str, cycle_branch: str) -> bool
     return bool(partner_branch) and cycle_branch == partner_branch
 
 
-def get_cycle_shen_sha(cycle_stem: str, cycle_branch: str, ctx: NatalContext) -> list:
+def get_cycle_shen_sha(
+    cycle_stem: str,
+    cycle_branch: str,
+    ctx: NatalContext,
+    companion: CompanionPillar | None = None,
+) -> list:
     """
     Evaluate the 神煞 activated by one cycle pillar.
 
     Args:
         cycle_stem/cycle_branch: the transiting pillar.
         ctx: NatalContext (raw natal stems/branches, gender, na_yin).
+        companion: the enclosing 大运, when this pillar is a 流年.
+
+    The companion changes exactly ONE class of star, and the boundary is the whole
+    design — see the module docstring's "anchors vs sets" note.
 
     Returns:
         [...] — flat list of entries {"名称": str, "来源": str}
@@ -119,6 +160,19 @@ def get_cycle_shen_sha(cycle_stem: str, cycle_branch: str, ctx: NatalContext) ->
     year_stem, day_stem = ctx.gans[0], ctx.day_stem
     cycle_pillar = cycle_stem + cycle_branch
     season = seasons_map.get(month_branch, "")
+
+    # The pool a SET-COMPLETION star draws from: the natal chart PLUS the enclosing 大运.
+    # 岁运命 are all physically present at once, so a 天罗 completed by 大运戌 + 流年亥 is
+    # as real as one completed by 流年亥 + a natal 戌 — and, critically, a WATER 大运 must
+    # be able to void 天火煞 the way a natal water branch does.
+    #
+    # ANCHOR-based stars (年支/月支/日支/日干/年干/纳音 → 驿马, 桃花, 天乙贵人, 羊刃 …) must
+    # NOT use this pool: 神煞 anchors are BIRTH facts, and the 大运 is itself a guest, never
+    # an anchor. Making it one would invent stars no classical text recognises.
+    comp_branches = {companion.branch} if companion else set()
+    comp_stems = {companion.stem} if companion else set()
+    pool_branches = set(ctx.zhis) | comp_branches
+    pool_stems = set(ctx.gans) | comp_stems
 
     entries: list = []
     seen: set[tuple] = set()
@@ -209,16 +263,19 @@ def get_cycle_shen_sha(cycle_stem: str, cycle_branch: str, ctx: NatalContext) ->
     #   With the guest as a 5th stem: 德 = a 德-stem among natal (year/day/hour) ∪ guest;
     #   秀 = a 秀 pair complete across natal stems ∪ guest. Fire only if both hold and the
     #   guest participates (supplies the 德 stem or completes the 秀 pair).
+    #   The 秀 half is a PAIR of stems present together (unordered set membership, not a
+    #   sequence), so the 大运's stem can supply one half exactly as a natal stem can.
     de_stems, xiu_pairs = dexiu_map.get(month_branch, ("", []))
     if de_stems or xiu_pairs:
-        # natal 德-stems checked in year/day/hour (non-month), per natal
-        natal_de_stems = {ctx.gans[i] for i in (0, 2, 3)}
-        stems_with_guest = set(ctx.gans) | {cycle_stem}
-        has_de = bool((natal_de_stems | {cycle_stem}) & set(de_stems))
+        # natal 德-stems checked in year/day/hour (non-month), per natal; + the 大运's
+        base_de_stems = {ctx.gans[i] for i in (0, 2, 3)} | comp_stems
+        stems_with_guest = pool_stems | {cycle_stem}
+        has_de = bool((base_de_stems | {cycle_stem}) & set(de_stems))
         has_xiu = any(a in stems_with_guest and b in stems_with_guest for a, b in xiu_pairs)
         guest_is_de = cycle_stem in de_stems
         guest_completes_xiu = any(
-            (cycle_stem == a and b in ctx.gans) or (cycle_stem == b and a in ctx.gans)
+            (cycle_stem == a and b in pool_stems)
+            or (cycle_stem == b and a in pool_stems)
             for a, b in xiu_pairs
         )
         if has_de and has_xiu and (guest_is_de or guest_completes_xiu):
@@ -277,17 +334,16 @@ def get_cycle_shen_sha(cycle_stem: str, cycle_branch: str, ctx: NatalContext) ->
 
     # 天罗 / 地网 — branch-pair completion (natal _calc_tian_luo_di_wang): independent,
     #   can coexist; the nayin restriction is an interpretation concern, not derivation.
-    natal_branches = set(ctx.zhis)
     for _name, _pair in (("天罗", {"戌", "亥"}), ("地网", {"辰", "巳"})):
-        if cycle_branch in _pair and (_pair - {cycle_branch}) <= natal_branches:
-            _subtype = "增力" if _pair <= natal_branches else "引动成局"
+        if cycle_branch in _pair and (_pair - {cycle_branch}) <= pool_branches:
+            _subtype = "增力" if _pair <= pool_branches else "引动成局"
             add(_name, "四柱", detail=_subtype,
-                zuhe=["运柱"] + _natal_pillars_with_branch(ctx, _pair))
+                zuhe=["运柱"] + _natal_pillars_with_branch(ctx, _pair, companion))
 
     # ════════════════════════════════════════════════════════════════════════
     # Phase 1 — single-anchor stars (guest lands on a natal-derived target)
+    #   These are BIRTH-anchored by definition and never consult the companion.
     # ════════════════════════════════════════════════════════════════════════
-    natal_stems = set(ctx.gans)
     hour_branch = ctx.zhis[3]
 
     # 吟呻 / 破碎 / 白衣 (暗金的煞) — year branch → (target branch, name)
@@ -346,6 +402,12 @@ def get_cycle_shen_sha(cycle_stem: str, cycle_branch: str, ctx: NatalContext) ->
     # Phase 2 — set-based stars (guest completes / reinforces a set)
     # ════════════════════════════════════════════════════════════════════════
     # 三奇 — guest-involving consecutive triples (NOT pure set-presence).
+    #
+    # The companion is deliberately NOT admitted here. 三奇 requires the three stems to sit
+    # in CONSECUTIVE pillars — it is an adjacency/sequence star, and the sequence position
+    # of a 大运 relative to a 流年 is undefined (they are both transiting, neither occupies
+    # a slot in the natal 干支 run). Admitting them would mean inventing an ordering.
+    # Same reasoning, and the same documented parity gap, as 共拱/拱会 in cycle_interactions.
     _Y, _M, _D, _H = ctx.gans[0], ctx.gans[1], ctx.gans[2], ctx.gans[3]
     _G = cycle_stem
     _guest_triples = [
@@ -371,27 +433,33 @@ def get_cycle_shen_sha(cycle_stem: str, cycle_branch: str, ctx: NatalContext) ->
     # 自缢煞 / 破煞 — whole-chart branch-pair completion (guest supplies one half).
     for _pairs, _sha in ((_ZI_YI_SHA_PAIRS, "自缢煞"), (_PO_SHA_PAIRS, "破煞")):
         for _pair in _pairs:
-            if cycle_branch in _pair and (_pair - {cycle_branch}) <= natal_branches:
+            if cycle_branch in _pair and (_pair - {cycle_branch}) <= pool_branches:
                 add(_sha, "四柱",
-                    detail="增力" if _pair <= natal_branches else "引动成局",
-                    zuhe=["运柱"] + _natal_pillars_with_branch(ctx, _pair))
+                    detail="增力" if _pair <= pool_branches else "引动成局",
+                    zuhe=["运柱"] + _natal_pillars_with_branch(ctx, _pair, companion))
                 break
 
-    # 挂剑煞 (从革) — combined 5-pillar metal formation; guest must be metal to contribute.
+    # 挂剑煞 (从革) — combined metal formation; guest must be metal to contribute.
+    #   Counted over the natal branches + the 大运 + the guest (6 branches for a 流年).
     if cycle_branch in GUA_JIAN_METAL_FULL:
-        _combined = list(ctx.zhis) + [cycle_branch]
+        _base = list(ctx.zhis) + list(comp_branches)
+        _combined = _base + [cycle_branch]
         _all_metal = all(z in GUA_JIAN_METAL_FULL for z in _combined)
         _heavy = sum(1 for z in _combined if z in GUA_JIAN_METAL_TRIO) >= 3
         if _all_metal or _heavy:
-            _natal_all = all(z in GUA_JIAN_METAL_FULL for z in ctx.zhis)
-            _natal_heavy = sum(1 for z in ctx.zhis if z in GUA_JIAN_METAL_TRIO) >= 3
+            _base_all = all(z in GUA_JIAN_METAL_FULL for z in _base)
+            _base_heavy = sum(1 for z in _base if z in GUA_JIAN_METAL_TRIO) >= 3
             add("挂剑煞", "四柱",
-                detail="增力" if (_natal_all or _natal_heavy) else "引动成局",
-                zuhe=["运柱"] + _natal_pillars_with_branch(ctx, GUA_JIAN_METAL_FULL))
+                detail="增力" if (_base_all or _base_heavy) else "引动成局",
+                zuhe=["运柱"]
+                + _natal_pillars_with_branch(ctx, GUA_JIAN_METAL_FULL, companion))
 
-    # 天火煞 — combined fire frame; a guest bringing water VOIDS it.
-    _cb = natal_branches | {cycle_branch}
-    _cs = natal_stems | {cycle_stem}
+    # 天火煞 — combined fire frame; ANY water in the pool VOIDS it.
+    #   The voiding half is why the companion matters most here: a 流年 completing 寅午戌
+    #   inside a 癸亥 decade used to report 天火煞 anyway, because the evaluator could not
+    #   see the water sitting right next to it. That was a false POSITIVE, not a near-miss.
+    _cb = pool_branches | {cycle_branch}
+    _cs = pool_stems | {cycle_stem}
     if (
         TIAN_HUO_FIRE_TRINE <= _cb
         and (_cs & TIAN_HUO_FIRE_STEMS)
@@ -399,15 +467,18 @@ def get_cycle_shen_sha(cycle_stem: str, cycle_branch: str, ctx: NatalContext) ->
         and not (_cb & TIAN_HUO_WATER_BRANCHES)
         and (cycle_branch in TIAN_HUO_FIRE_TRINE or cycle_stem in TIAN_HUO_FIRE_STEMS)
     ):
-        _natal_fire = (
-            TIAN_HUO_FIRE_TRINE <= natal_branches
-            and (natal_stems & TIAN_HUO_FIRE_STEMS)
-            and not (natal_stems & TIAN_HUO_WATER_STEMS)
-            and not (natal_branches & TIAN_HUO_WATER_BRANCHES)
+        # 增力 vs 引动成局 = was the frame already standing WITHOUT this guest? The pool
+        # (natal + 大运, guest excluded) is exactly that baseline.
+        _base_fire = (
+            TIAN_HUO_FIRE_TRINE <= pool_branches
+            and (pool_stems & TIAN_HUO_FIRE_STEMS)
+            and not (pool_stems & TIAN_HUO_WATER_STEMS)
+            and not (pool_branches & TIAN_HUO_WATER_BRANCHES)
         )
         add("天火煞", "四柱",
-            detail="增力" if _natal_fire else "引动成局",
-            zuhe=["运柱"] + _natal_pillars_with_branch(ctx, TIAN_HUO_FIRE_TRINE))
+            detail="增力" if _base_fire else "引动成局",
+            zuhe=["运柱"]
+            + _natal_pillars_with_branch(ctx, TIAN_HUO_FIRE_TRINE, companion))
 
     # 天屠煞 — directional day↔hour pair; guest inserts as Day or Hour only.
     if cycle_branch == _TIAN_TU_SHA_DAY_HOUR.get(day_branch):

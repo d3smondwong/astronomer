@@ -869,6 +869,140 @@ class TestSuiYunInteractions:
         assert rank_of(chong["本年强度"]) > rank_of(chong["原强度"])
 
 
+# ── 岁运: the OTHER layers that must see the 大运 ────────────────────────────
+
+
+class TestSuiYunAcrossLayers:
+    """The 1×5 interaction scan was not the only 大运-blind layer.
+
+    Two of these were WRONG answers, not missing ones — 制化 asserted an unrestrained
+    七杀 while a 食神 sat in the 大运, and 天火煞 fired while water sat in the 大运.
+    """
+
+    # 日主 甲木 → 七杀 = 庚, 食神 = 丙, 偏印 = 壬. No 食神/印 revealed natally.
+    BARE = (("甲", "甲", "甲", "甲"), ("子", "寅", "辰", "戌"))
+
+    def test_da_yun_shi_shen_tames_a_liu_nian_qi_sha(self):
+        """食神制杀 — a 大运 食神 tames a 流年 七杀 exactly as a natal one would.
+
+        This is the wrong-answer fix: with a 食神 sitting in the 大运, the old code still
+        reported the killing as UNRESTRAINED, which inverts the reading."""
+        ctx = make_ctx(*self.BARE)  # nothing revealed natally
+
+        # Same year, same chart, decade with no tamer in it → still unrestrained.
+        untamed = build_cycle_pillar(
+            "庚", "申", "", ctx, "流年", CompanionPillar(stem="甲", branch="子")
+        )
+        assert untamed["天干"]["十神"] == "七杀"
+        assert untamed["制化"] == "命局与大运均无明显制化，岁运七杀直临"
+
+        # Swap ONLY the decade's stem to 丙 (食神) → the killing is tamed.
+        tamed = build_cycle_pillar(
+            "庚", "申", "", ctx, "流年", CompanionPillar(stem="丙", branch="午")
+        )
+        assert "食神制杀" in tamed["制化"]
+        assert tamed["制化"].startswith("大运")
+
+    def test_da_yun_seal_transforms_a_liu_nian_qi_sha(self):
+        """印化杀 — the other classical taming route."""
+        ctx = make_ctx(*self.BARE)
+        p = build_cycle_pillar(
+            "庚", "申", "", ctx, "流年",
+            CompanionPillar(stem="壬", branch="子"),  # 壬 = 偏印
+        )
+        assert "印化杀" in p["制化"]
+
+    def test_natal_tamer_outranks_a_da_yun_one(self):
+        """命局 is the standing condition; the 大运 only a ten-year one."""
+        ctx = make_ctx(*self.BARE, revealed_gods=frozenset({"食神"}))
+        p = build_cycle_pillar(
+            "庚", "申", "", ctx, "流年", CompanionPillar(stem="丙", branch="午")
+        )
+        assert p["制化"].startswith("命局")
+
+    def test_da_yun_has_no_companion_so_its_zhi_hua_is_unchanged(self):
+        """A 大运 reads the natal chart alone — its wording must not drift."""
+        ctx = make_ctx(*self.BARE)
+        p = build_cycle_pillar("庚", "申", "", ctx, "大运")
+        assert p["制化"] == "命局无明显制化，岁运七杀直临"
+        assert "岁运互空" not in p["空亡"]
+
+    def test_tian_huo_sha_is_voided_by_a_water_da_yun(self):
+        """The false positive. 流年 丙午 completes 寅午戌 — but a 癸亥 大运 is water,
+        and water voids 天火煞. The old evaluator could not see the decade at all."""
+        ctx = make_ctx(("丙", "丙", "甲", "己"), ("寅", "戌", "辰", "巳"))
+
+        dry = [e["名称"] for e in get_cycle_shen_sha("丙", "午", ctx)]
+        assert "天火煞" in dry  # frame completes, no water anywhere
+
+        wet = [
+            e["名称"]
+            for e in get_cycle_shen_sha(
+                "丙", "午", ctx, CompanionPillar(stem="癸", branch="亥")
+            )
+        ]
+        assert "天火煞" not in wet  # 癸 water stem AND 亥 water branch both void it
+
+    def test_set_star_completed_across_sui_yun(self):
+        """天罗 {戌,亥} completed by 大运亥 + 流年戌 — neither branch is natal."""
+        ctx = make_ctx(("甲", "丙", "戊", "庚"), ("子", "卯", "午", "申"))
+        assert "天罗" not in [e["名称"] for e in get_cycle_shen_sha("甲", "戌", ctx)]
+
+        entries = get_cycle_shen_sha(
+            "甲", "戌", ctx, CompanionPillar(stem="乙", branch="亥")
+        )
+        tian_luo = next(e for e in entries if e["名称"] == "天罗")
+        assert tian_luo["细节"] == "引动成局"
+        assert "大运" in tian_luo["组合明细"]
+
+    def test_anchor_stars_never_consult_the_da_yun(self):
+        """神煞 anchors are BIRTH facts. The 大运 is a guest and must never become one —
+        otherwise we invent stars no classical text recognises."""
+        ctx = make_ctx(("甲", "丙", "戊", "庚"), ("子", "卯", "午", "申"))
+        anchored = {"年支", "月支", "日支", "日干", "年干", "纳音", "年纳音", "节气"}
+
+        def anchor_stars(companion):
+            return {
+                (e["名称"], e["来源"])
+                for e in get_cycle_shen_sha("甲", "戌", ctx, companion)
+                if e["来源"] in anchored
+            }
+
+        # Swapping the decade must not add or remove a single anchor-derived star.
+        assert anchor_stars(None) == anchor_stars(
+            CompanionPillar(stem="乙", branch="亥")
+        )
+        assert anchor_stars(CompanionPillar(stem="壬", branch="子")) == anchor_stars(
+            CompanionPillar(stem="丁", branch="巳")
+        )
+
+    def test_sui_yun_hu_kong_is_data_only(self):
+        """岁运互空 — each transiting pillar carries its own 旬, so each can fall into the
+        other's void. Reported, never a downgrade driver (the standing cycle-void rule)."""
+        ctx = make_ctx(("甲", "丙", "戊", "庚"), ("子", "卯", "午", "申"))
+        # 流年 甲子 → 旬空 戌亥. A 大运 on 戌 falls into it.
+        p = build_cycle_pillar(
+            "甲", "子", "戌亥", ctx, "流年",
+            CompanionPillar(stem="庚", branch="戌", xun_kong="辰巳"),
+        )
+        mutual = p["空亡"]["岁运互空"]
+        assert any("大运支戌落入流年旬空" in m for m in mutual)
+
+        # No overlap → the key is present and says 无 (never absent, never guessed at).
+        clean = build_cycle_pillar(
+            "甲", "子", "戌亥", ctx, "流年",
+            CompanionPillar(stem="丙", branch="午", xun_kong="辰巳"),
+        )
+        assert clean["空亡"]["岁运互空"] == "无"
+
+    def test_orchestrator_threads_one_companion_to_every_layer(self, desmond_cycles):
+        cycles, _ = desmond_cycles
+        for ln in cycles["大运"][4]["流年"]:
+            assert "岁运互空" in ln["运柱"]["空亡"]
+        for da_yun in cycles["大运"][1:]:
+            assert "岁运互空" not in da_yun["运柱"]["空亡"]
+
+
 # ── 神煞 & determinism ──────────────────────────────────────────────────────
 
 

@@ -52,15 +52,20 @@ the classical 引动/应期 mechanism: 「岁运之干与命局藏干合，谓�
 即应何事」).
 """
 
-from dataclasses import dataclass
-
 from lunar_python.util import LunarUtil
 
 from apps.backend.astronomer_logic.bazi_pillars import (
     compute_pillar_rooting,
     compute_single_stem_rooting,
 )
-from apps.backend.astronomer_logic.cycles.cycle_pillars import NatalContext
+
+# CompanionPillar is defined in cycle_pillars (every cycle layer needs it, and this
+# module already depends on that one). Re-exported here because this is where the 1×5
+# scan consumes it.
+from apps.backend.astronomer_logic.cycles.cycle_pillars import (  # noqa: F401
+    CompanionPillar,
+    NatalContext,
+)
 from apps.backend.astronomer_logic.day_master_strength import get_stem_element
 from apps.backend.astronomer_logic.natal_interactions import (
     DEFAULT_STRENGTH,
@@ -98,29 +103,6 @@ _HIDE_TIERS = ("本气", "中气", "余气")
 # companion (the 大运, when a 流年 is being scanned). The natal-only passes —
 # the 日柱-anchored void sweep above all — gate on this.
 _NATAL_COUNT = 4
-
-
-@dataclass(frozen=True)
-class CompanionPillar:
-    """The enclosing 大运, scanned as a fifth opponent when the cycle pillar is a 流年.
-
-    A 大运 is analysed against the natal chart alone (a decade exists independently
-    of any year inside it), so it never carries a companion. A 流年 always does —
-    classically the year meets its decade FIRST (岁运冲合), and only what survives
-    that meeting reaches the 命局.
-
-    stem_rooting: the decade's own 根基强度, already computed by build_cycle_pillar
-                  over 4 natal branches + its own (自坐通根). Passed in rather than
-                  recomputed so the 大运's rooting reads identically wherever it
-                  appears.
-    xun_kong:     the 大运's own void pair — data only; see the void pass.
-    """
-
-    stem: str
-    branch: str
-    label: str = "大运"
-    stem_rooting: str = "无根"
-    xun_kong: str = ""
 
 # Tier = resolution/sort priority. Whole-pillar 反吟/伏吟 are cycle-unique and
 # occupy the top tiers (legacy CYCLE_TIER_ORDER did the same); everything else

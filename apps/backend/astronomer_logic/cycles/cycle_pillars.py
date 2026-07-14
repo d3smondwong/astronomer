@@ -10,20 +10,27 @@ ages, years) lives in the cycles orchestrator — this module only knows one
 Ten-god policy (see .claude/CLAUDE.md): cycle-pillar ten gods are RAW
 LunarUtil.SHI_SHEN lookups — the natal 七杀→偏官 / 食神→伤官 relabeling is
 adjacency-based, and adjacency is undefined for a transiting pillar. Instead
-a 制化 annotation notes when the natal chart (chart-wide, revealed stems)
-contains taming gods for an incoming 七杀 / a lurking 偏印 for an incoming
-食神.
+a 制化 annotation notes when a taming god is REVEALED IN A STEM for an incoming
+七杀 (食神制杀 / 印化杀), or a lurking 偏印 for an incoming 食神 (枭夺).
 
-空亡 decomposes into three distinct checks (a pillar's own branch can never
-sit inside its own 旬空):
-  本柱旬空     — the cycle pillar's own void pair (reference data + the seam
-                 for the future 流年-vs-大运 layer).
+制化 sees the enclosing 大运 too (`companion`), not just the natal chart: for the
+ten years a decade runs, its stem is as present and revealed as any natal one, and
+a 大运 食神 tames a 流年 七杀 exactly as a natal 食神 would. Reading natal stems
+alone made this assert 「命局无明显制化，岁运七杀直临」 — an UNRESTRAINED killing —
+while a 食神 sat in the 大运, which inverts the reading (a tamed 七杀 is an authority
+asset; an unrestrained one is danger).
+
+空亡 checks (a pillar's own branch can never sit inside its own 旬空):
+  本柱旬空     — the cycle pillar's own void pair (reference data).
   落入命局空亡 — cycle branch ∈ natal 日柱 void pair (classical 岁运临空亡).
                  The dominant reading is 填实 — the void fills and the dormant
                  palace activates — so this is an annotation, not a weakness.
-  命局逢运空   — natal branches ∈ the cycle's own void pair. School-dependent
-                 (some reject 运论空亡 entirely); reported as data only and
-                 never drives strength downgrades.
+  命局逢运空   — natal branches ∈ the cycle's own void pair.
+  岁运互空     — 流年 only: the two transiting pillars each carry their OWN 旬, so
+                 each can fall into the other's void (「运逢流年空亡」).
+The last two are school-dependent (some reject 运论空亡 entirely): reported as data
+only, never driving strength downgrades. Only the natal 日柱-anchored void has force,
+and it applies in cycle_interactions' void pass.
 """
 
 from dataclasses import dataclass
@@ -52,6 +59,29 @@ _HIDE_TIERS = ("本气", "中气", "余气")
 # Ten gods that tame an incoming 七杀 when revealed in the natal chart
 _QI_SHA_FOOD_TAMERS = frozenset({"食神"})
 _QI_SHA_SEAL_TAMERS = frozenset({"正印", "偏印"})
+
+
+@dataclass(frozen=True)
+class CompanionPillar:
+    """The enclosing 大运, when the pillar being analysed is a 流年.
+
+    Lives here (not in cycle_interactions) because every cycle layer needs it, and
+    cycle_interactions already imports NatalContext from this module — defining it
+    there would make the dependency circular.
+
+    A 大运 is analysed against the natal chart alone: a decade exists independently of
+    any year inside it, so it never carries a companion. A 流年 always does — classically
+    the year meets its decade FIRST, and only what survives that meeting reaches the 命局.
+
+    stem_rooting: the decade's own 根基强度, already computed by build_cycle_pillar.
+    xun_kong:     the 大运's own void pair — used for 岁运互空 (data only).
+    """
+
+    stem: str
+    branch: str
+    label: str = "大运"
+    stem_rooting: str = "无根"
+    xun_kong: str = ""
 
 
 @dataclass(frozen=True)
@@ -182,23 +212,63 @@ def _cycle_hidden_stems(cycle_branch: str) -> list[str]:
     return list(LunarUtil.ZHI_HIDE_GAN.get(cycle_branch, []))
 
 
-def _zhi_hua_annotation(stem_god: str, ctx: NatalContext) -> str | None:
-    """制化 annotation for the cycle stem's raw ten god (chart-wide, no adjacency)."""
+def _visible_gods(
+    ctx: NatalContext, companion: CompanionPillar | None
+) -> dict[str, str]:
+    """Ten gods revealed in a STEM, mapped to where they are revealed.
+
+    The natal chart, plus the enclosing 大运's stem when there is one. A 大运 食神 tames
+    a 流年 七杀 just as a natal one does — 制化 asks whether a taming god is *present and
+    revealed*, and for the ten years a decade runs its stem is exactly that. Reading only
+    the natal stems made the annotation assert 「命局无明显制化，岁运七杀直临」 — an
+    UNRESTRAINED killing — while a 食神 sat in the 大运. That inverts the reading: a tamed
+    七杀 is an authority asset, an unrestrained one is danger.
+
+    命局 wins when a god is revealed in both: the natal chart is the standing condition,
+    the 大运 only a ten-year one.
+    """
+    visible = {god: "命局" for god in ctx.revealed_gods}
+    if companion:
+        god = LunarUtil.SHI_SHEN.get(
+            ctx.effective_day_stem + companion.stem, "无"
+        )
+        if god not in ("日主", "无"):
+            visible.setdefault(god, companion.label)
+    return visible
+
+
+def _zhi_hua_annotation(
+    stem_god: str, ctx: NatalContext, companion: CompanionPillar | None = None
+) -> str | None:
+    """制化 annotation for the cycle stem's raw ten god (chart-wide, no adjacency).
+
+    Sees the enclosing 大运's stem as a taming source when one is supplied — see
+    _visible_gods. A 大运 (no companion) reads the natal chart alone, as before.
+    """
+    visible = _visible_gods(ctx, companion)
+
     if stem_god == "七杀":
-        if ctx.revealed_gods & _QI_SHA_FOOD_TAMERS:
-            return "命局食神透出，岁运七杀有制（食神制杀）"
-        if ctx.revealed_gods & _QI_SHA_SEAL_TAMERS:
-            return "命局印星透出，岁运七杀可化（印化杀）"
-        return "命局无明显制化，岁运七杀直临"
-    if stem_god == "食神" and "偏印" in ctx.revealed_gods:
-        return "命局偏印透出，岁运食神防枭神夺食（枭夺提示）"
+        food = _QI_SHA_FOOD_TAMERS & visible.keys()
+        if food:
+            return f"{visible[next(iter(food))]}食神透出，岁运七杀有制（食神制杀）"
+        seal = _QI_SHA_SEAL_TAMERS & visible.keys()
+        if seal:
+            return f"{visible[next(iter(seal))]}印星透出，岁运七杀可化（印化杀）"
+        where = "命局与大运均无" if companion else "命局无"
+        return f"{where}明显制化，岁运七杀直临"
+    if stem_god == "食神" and "偏印" in visible:
+        return f"{visible['偏印']}偏印透出，岁运食神防枭神夺食（枭夺提示）"
     return None
 
 
 def _void_block(
-    cycle_branch: str, cycle_xun_kong: str, ctx: NatalContext, cycle_label: str
+    cycle_branch: str,
+    cycle_xun_kong: str,
+    ctx: NatalContext,
+    cycle_label: str,
+    companion: CompanionPillar | None = None,
 ) -> dict:
-    """The three-check 空亡 block (see module docstring). Data + 填实 annotation only —
+    """The 空亡 block (see module docstring). Data + 填实 annotation only —
     strength modulation lives in cycle_interactions' void pass."""
     day_void = ctx.natal_void.get("日柱", "")
 
@@ -216,11 +286,33 @@ def _void_block(
         if cycle_xun_kong and zhi in cycle_xun_kong
     ]
 
-    return {
+    block = {
         "本柱旬空": cycle_xun_kong or "无",
         "落入命局空亡": into_natal_void,
         "命局逢运空": natal_into_cycle_void if natal_into_cycle_void else "无",
     }
+
+    # 岁运互空 — the two transiting pillars each carry their OWN 旬, so each can fall into
+    # the other's void (「运逢流年空亡」). Reported only, never a downgrade driver: that is
+    # the standing rule for a cycle pillar's own 旬空 throughout this engine (some schools
+    # reject 运论空亡 outright), and 命局逢运空 above is already reported on the same terms.
+    # The key is present ONLY for a 流年 — a 大运 has no companion, and its block stays
+    # byte-identical to what it always was.
+    if companion:
+        mutual: list[str] = []
+        if cycle_xun_kong and companion.branch in cycle_xun_kong:
+            mutual.append(
+                f"{companion.label}支{companion.branch}落入{cycle_label}旬空"
+                f"（{cycle_xun_kong}）"
+            )
+        if companion.xun_kong and cycle_branch in companion.xun_kong:
+            mutual.append(
+                f"{cycle_label}支{cycle_branch}落入{companion.label}旬空"
+                f"（{companion.xun_kong}）"
+            )
+        block["岁运互空"] = mutual if mutual else "无"
+
+    return block
 
 
 def build_cycle_pillar(
@@ -229,6 +321,7 @@ def build_cycle_pillar(
     cycle_xun_kong: str,
     ctx: NatalContext,
     cycle_label: str = "大运",
+    companion: CompanionPillar | None = None,
 ) -> dict:
     """
     Build the 运柱 analysis block for one cycle pillar.
@@ -241,6 +334,9 @@ def build_cycle_pillar(
         ctx:            NatalContext from build_natal_context()
         cycle_label:    "大运" | "流年" (future "流月") — used in rooting labels
                         and 空亡 descriptions.
+        companion:      the enclosing 大运, when this pillar is a 流年. Feeds the
+                        制化 annotation (a 大运 食神 tames a 流年 七杀) and 岁运互空.
+                        A 大运 never has one.
 
     Returns:
         dict mirroring the natal 四柱实体 per-pillar shape (天干/地支/藏干/
@@ -249,6 +345,9 @@ def build_cycle_pillar(
     stem_god = LunarUtil.SHI_SHEN.get(ctx.effective_day_stem + cycle_stem, "无")
 
     # 5-branch rooting: 4 natal branches + the cycle branch itself (自坐通根).
+    # The companion's branch is deliberately EXCLUDED: 通根 is a statement about the chart
+    # a stem stands on, and letting a 流年 root into a transient neighbour would make the
+    # same year's stem strength swing from decade to decade. 原局 + 自坐 only.
     # Labels are built from cycle_label and MUST stay index-aligned with the lists.
     cycle_hide = _cycle_hidden_stems(cycle_branch)
     rooting = compute_single_stem_rooting(
@@ -293,7 +392,7 @@ def build_cycle_pillar(
             "自坐": _self_seated_stage(cycle_stem, cycle_branch),
         },
         "纳音": LunarUtil.NAYIN.get(cycle_stem + cycle_branch, "无"),
-        "空亡": _void_block(cycle_branch, cycle_xun_kong, ctx, cycle_label),
+        "空亡": _void_block(cycle_branch, cycle_xun_kong, ctx, cycle_label, companion),
         # Seasonal state vs the NATAL month branch (the chart's climate anchor).
         "季节状态": {
             "天干": _STATE_DESCRIPTIONS.get(ctx.seasonal.states.get(stem_element, "囚")),
@@ -301,7 +400,7 @@ def build_cycle_pillar(
         },
     }
 
-    zhi_hua = _zhi_hua_annotation(stem_god, ctx)
+    zhi_hua = _zhi_hua_annotation(stem_god, ctx, companion)
     if zhi_hua:
         pillar["制化"] = zhi_hua
 
