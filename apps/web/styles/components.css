@@ -57,6 +57,23 @@
     transform: translateY(-4px);
   }
 
+  /* Day-master ribbon on the day pillar card (profile page) */
+  .day-master-badge {
+    background: linear-gradient(135deg, var(--color-gold-deep), #a08000);
+  }
+
+  /* Indigo call-to-action button (unlock insights, generate insights, auth) */
+  .indigo-cta {
+    padding: 10px 24px;
+    background-color: var(--color-ink-indigo);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
   /* ── Dashboard sidebar (app/(dashboard)/layout.tsx) ──
      (.sidebar-shell lives below, outside the layer, to beat antd's Sider styles) */
 
@@ -187,6 +204,18 @@
   background: linear-gradient(180deg, var(--color-parchment-dark) 0%, var(--color-parchment) 100%);
   border-right: 1px solid color-mix(in srgb, var(--color-gold-deep) 8%, transparent);
   box-shadow: 4px 0 20px color-mix(in srgb, var(--color-gold-deep) 7%, transparent);
+}
+
+/* Delete button on the midnight profile header — frost tones instead of antd's
+   danger red. !important because antd's own danger-text hover selectors are
+   higher-specificity CSS-in-JS. */
+.ant-btn.profile-delete-btn {
+  color: var(--color-frost-muted) !important;
+  border-color: transparent !important;
+}
+.ant-btn.profile-delete-btn:not(:disabled):hover {
+  color: var(--color-frost) !important;
+  background-color: color-mix(in srgb, var(--color-frost) 10%, transparent) !important;
 }
 
 /* AntD AutoComplete — override default blue focus ring and hover highlight */
