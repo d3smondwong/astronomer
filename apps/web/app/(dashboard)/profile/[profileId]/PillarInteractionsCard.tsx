@@ -2,13 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Card } from 'antd';
-import {
-  Forest,
-  LocalFireDepartment,
-  Terrain,
-  Waves,
-  StopCircleOutlined,
-} from '@mui/icons-material';
+import { ELEMENT_ICONS } from '@/lib/elements';
 import { translations } from '@/lib/translations';
 
 interface PillarInteractionsCardProps {
@@ -26,15 +20,6 @@ const SHI_SHEN_LABELS: Record<string, string> = {
   '伤官': 'Hurting Officer', '偏财': 'Indirect Wealth', '正财': 'Direct Wealth',
   '七杀': 'Seven Killings', '偏官': 'Indirect Officer', '正官': 'Direct Officer', '偏印': 'Indirect Resource',
   '正印': 'Direct Resource', '我': 'Self',
-};
-
-// Element to Material Design Icon mapping
-const ELEMENT_ICONS: Record<string, React.ComponentType<any>> = {
-  '木': Forest,
-  '火': LocalFireDepartment,
-  '土': Terrain,
-  '金': StopCircleOutlined,
-  '水': Waves,
 };
 
 type Category = 'he' | 'chong' | 'ke' | 'xing' | 'hai' | 'po' | 'yin' | 'xu' | 'other';

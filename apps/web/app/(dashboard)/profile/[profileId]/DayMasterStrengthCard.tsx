@@ -8,13 +8,8 @@ import {
   GaugeReferenceArc,
   useGaugeState,
 } from '@mui/x-charts/Gauge';
-import {
-  Nature,
-  LocalFireDepartment,
-  Terrain,
-  StopCircleOutlined,
-  Waves,
-} from '@mui/icons-material';
+import { ELEMENT_ICONS } from '@/lib/elements';
+import { strengthScale } from '@/lib/theme';
 
 interface DayMasterStrengthCardProps {
   chartData: any;
@@ -24,20 +19,12 @@ interface DayMasterStrengthCardProps {
 const MOBILE_BREAKPOINT = 720;
 const TABLET_BREAKPOINT = 1024;
 
-const ELEMENT_ICONS: Record<string, React.ComponentType<any>> = {
-  '木': Nature,
-  '火': LocalFireDepartment,
-  '土': Terrain,
-  '金': StopCircleOutlined,
-  '水': Waves,
-};
-
 const VERDICT_TIERS = [
-  { threshold: 3.2, key: '极旺', color: '#146432', label: { en: 'Very Strong', ch: '极旺' } },
-  { threshold: 2.4, key: '旺',   color: '#2e8b57', label: { en: 'Strong', ch: '旺' } },
-  { threshold: 1.6, key: '中和', color: '#9b8200', label: { en: 'Balanced', ch: '中和' } },
-  { threshold: 0.8, key: '弱',   color: '#c46000', label: { en: 'Weak', ch: '弱' } },
-  { threshold: 0.0, key: '极弱', color: '#b42424', label: { en: 'Very Weak', ch: '极弱' } },
+  { threshold: 3.2, key: '极旺', color: strengthScale.veryStrong, label: { en: 'Very Strong', ch: '极旺' } },
+  { threshold: 2.4, key: '旺',   color: strengthScale.strong,     label: { en: 'Strong', ch: '旺' } },
+  { threshold: 1.6, key: '中和', color: strengthScale.balanced,   label: { en: 'Balanced', ch: '中和' } },
+  { threshold: 0.8, key: '弱',   color: strengthScale.weak,       label: { en: 'Weak', ch: '弱' } },
+  { threshold: 0.0, key: '极弱', color: strengthScale.veryWeak,   label: { en: 'Very Weak', ch: '极弱' } },
 ];
 
 const GAUGE_BAND_ORDER = [...VERDICT_TIERS].reverse();
@@ -136,11 +123,11 @@ function getTierForScore(score: number): typeof VERDICT_TIERS[number] {
 
 function getBarFillColor(score: number, max: number): string {
   const ratio = Math.min(score / max, 1);
-  if (ratio < 0.2) return '#b42424';      // very weak
-  if (ratio < 0.4) return '#c46000';      // weak
-  if (ratio < 0.6) return '#9b8200';      // balanced
-  if (ratio < 0.8) return '#2e8b57';      // strong
-  return '#146432';                       // very strong
+  if (ratio < 0.2) return strengthScale.veryWeak;
+  if (ratio < 0.4) return strengthScale.weak;
+  if (ratio < 0.6) return strengthScale.balanced;
+  if (ratio < 0.8) return strengthScale.strong;
+  return strengthScale.veryStrong;
 }
 
 export default function DayMasterStrengthCard({ chartData, language }: DayMasterStrengthCardProps) {

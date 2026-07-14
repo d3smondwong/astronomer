@@ -28,7 +28,9 @@
   --font-zh: var(--font-ma-shan-zheng), "Ma Shan Zheng", cursive;
   --font-zh-sans: var(--font-noto-sans-sc), "Noto Sans SC", sans-serif;
 
+  /* ⚠ KEEP IN SYNC WITH lib/theme.ts — same palette for JS consumers (antd, charts). */
   --color-parchment: #fbf9f4;
+  --color-parchment-dark: #f4f1e8;
   --color-gold-deep: #735c00;
   --color-gold-light: #d4af37;
   --color-bronze-muted: #4d4635;
@@ -36,21 +38,37 @@
   --color-surface-low: #f5f3ee;
   --color-surface-lowest: #ffffff;
   --color-outline-variant: rgba(127, 118, 99, 0.15);
+  --color-outline-strong: #8b7f73;
+
+  /* Deep indigo — language toggle, auth CTAs */
+  --color-ink-indigo: #3d3a5c;
+  /* Midnight-navy profile header gradient + light-on-dark text tones */
+  --color-ink-navy: #1b263b;
+  --color-ink-navy-light: #243447;
+  --color-frost: #e8f4f8;
+  --color-frost-muted: #d4dfe6;
+  --color-frost-label: #a8bcc9;
+  /* Destructive/error accent */
+  --color-danger: #c0392b;
+  /* Informational blue accent (climate 调候 chips, 化气格 badges) */
+  --color-info-blue: #1e5a9a;
 
   --radius-full: 0.75rem;
 }
 
-/* ── Functional tokens (light mode defaults) ── */
+/* ── Functional tokens (light mode defaults) ──
+   Semantic tokens point at the brand palette so bg-background / text-primary
+   etc. are meaningful (and a future dark mode only needs the .dark block). */
 :root {
   --font-size: 16px;
 
-  --background: #ffffff;
-  --foreground: oklch(0.145 0 0);
+  --background: var(--color-parchment);
+  --foreground: var(--color-bronze-muted);
   --card: #ffffff;
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: var(--color-bronze-muted);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #030213;
+  --popover-foreground: var(--color-bronze-muted);
+  --primary: var(--color-gold-deep);
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.95 0.0058 264.53);
   --secondary-foreground: #030213;
@@ -58,9 +76,9 @@
   --muted-foreground: #717182;
   --accent: #e9ebef;
   --accent-foreground: #030213;
-  --destructive: #d4183d;
+  --destructive: var(--color-danger);
   --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
+  --border: var(--color-outline-variant);
   --input: transparent;
   --input-background: #f3f3f5;
   --switch-background: #cbced4;

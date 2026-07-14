@@ -2,11 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Forest from '@mui/icons-material/Forest';
-import LocalFireDepartment from '@mui/icons-material/LocalFireDepartment';
-import Terrain from '@mui/icons-material/Terrain';
-import StopCircleOutlined from '@mui/icons-material/StopCircleOutlined';
-import Waves from '@mui/icons-material/Waves';
+import { ELEMENT_ICONS, ELEMENT_EN, ELEMENT_COLOR } from '@/lib/elements';
 import { type LifeStageInfo, type NaYinInfo, type VoidInfo, type VoidStatus, type VoidCondition } from '@/types/baziLibraryTypes';
 import { type ProfileRecord } from '@/lib/profilesDb';
 import { type InsightsResponse, type StructuredSection } from '@/lib/fastApiClient';
@@ -38,14 +34,6 @@ const BRANCH_ELEMENT: Record<string, string> = {
   申: '金', 酉: '金', 戌: '土', 亥: '水',
 };
 
-const ELEMENT_ICON: Record<string, React.ComponentType<Record<string, unknown>>> = {
-  '木': Forest, '火': LocalFireDepartment, '土': Terrain, '金': StopCircleOutlined, '水': Waves,
-};
-
-const ELEMENT_COLOR: Record<string, string> = {
-  '木': '#2d6a2d', '火': '#b42424', '土': '#8a6200', '金': '#666666', '水': '#1e5a9a',
-};
-
 // English labels for Heavenly Stems and Earthly Branches (used in English mode only)
 const GAN_LABELS: Record<string, string> = {
   甲: 'Yang Wood', 乙: 'Yin Wood', 丙: 'Yang Fire', 丁: 'Yin Fire',
@@ -58,10 +46,6 @@ const GAN_LABELS_CH: Record<string, string> = {
   甲: '阳木', 乙: '阴木', 丙: '阳火', 丁: '阴火',
   戊: '阳土', 己: '阴土', 庚: '阳金', 辛: '阴金',
   壬: '阳水', 癸: '阴水',
-};
-
-const ELEMENT_EN: Record<string, string> = {
-  '木': 'Wood', '火': 'Fire', '土': 'Earth', '金': 'Metal', '水': 'Water',
 };
 
 const ZHI_LABELS: Record<string, string> = {
@@ -266,7 +250,7 @@ const PillarCard = ({
 
             if (!stemTransform) {
               const el = STEM_ELEMENT[heavenlyChar];
-              const Icon = el ? ELEMENT_ICON[el] : null;
+              const Icon = el ? ELEMENT_ICONS[el] : null;
               const color = el ? ELEMENT_COLOR[el] : '#4d4635';
               return (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
@@ -279,10 +263,10 @@ const PillarCard = ({
             }
 
             const OldElement = stemTransform.原五行;
-            const OldIcon = OldElement ? ELEMENT_ICON[OldElement] : null;
+            const OldIcon = OldElement ? ELEMENT_ICONS[OldElement] : null;
             const oldColor = OldElement ? ELEMENT_COLOR[OldElement] : '#4d4635';
             const NewElement = stemTransform.合化五行;
-            const NewIcon = NewElement ? ELEMENT_ICON[NewElement] : null;
+            const NewIcon = NewElement ? ELEMENT_ICONS[NewElement] : null;
             const newColor = NewElement ? ELEMENT_COLOR[NewElement] : '#4d4635';
             const combinedLabel = language === 'en'
               ? `${origLabel.split(' ')[0]} ${ELEMENT_EN[NewElement] ?? NewElement}`
@@ -438,7 +422,7 @@ const PillarCard = ({
         </div>
         {(() => {
           const branchElement = BRANCH_ELEMENT[earthlyChar];
-          const ElemIcon = branchElement ? ELEMENT_ICON[branchElement] : null;
+          const ElemIcon = branchElement ? ELEMENT_ICONS[branchElement] : null;
           const elemColor = branchElement ? ELEMENT_COLOR[branchElement] : '#4d4635';
           return (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
@@ -533,7 +517,7 @@ const PillarCard = ({
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                   {(() => {
                     const stemElement = STEM_ELEMENT[stem];
-                    const ElemIcon = stemElement ? ELEMENT_ICON[stemElement] : null;
+                    const ElemIcon = stemElement ? ELEMENT_ICONS[stemElement] : null;
                     const elemColor = stemElement ? ELEMENT_COLOR[stemElement] : 'rgba(77, 70, 53, 0.6)';
                     return (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>

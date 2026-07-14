@@ -2,11 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Card } from 'antd';
-import Forest from '@mui/icons-material/Forest';
-import LocalFireDepartment from '@mui/icons-material/LocalFireDepartment';
-import Terrain from '@mui/icons-material/Terrain';
-import StopCircleOutlined from '@mui/icons-material/StopCircleOutlined';
-import Waves from '@mui/icons-material/Waves';
+import { ELEMENT_ICONS, ELEMENT_EN, ELEMENT_COLOR } from '@/lib/elements';
+import { palette, strengthScale } from '@/lib/theme';
 import { BaziChartData } from '@/types/baziChart';
 import { YongShen } from '@/types/cyclesChart';
 import { translations } from '@/lib/translations';
@@ -18,29 +15,9 @@ interface FavorableElementsCardProps {
   language: 'en' | 'ch';
 }
 
-const ELEMENT_ICONS: Record<string, React.ComponentType<Record<string, unknown>>> = {
-  '木': Forest,
-  '火': LocalFireDepartment,
-  '土': Terrain,
-  '金': StopCircleOutlined,
-  '水': Waves,
-};
-
-const ELEMENT_EN: Record<string, string> = {
-  '木': 'Wood',
-  '火': 'Fire',
-  '土': 'Earth',
-  '金': 'Metal',
-  '水': 'Water',
-};
-
-const ELEMENT_COLOR: Record<string, string> = {
-  '木': '#2d6a2d', '火': '#b42424', '土': '#8a6200', '金': '#666666', '水': '#1e5a9a',
-};
-
-const FAVORABLE_COLOR = '#2e8b57';
-const UNFAVORABLE_COLOR = '#b42424';
-const CLIMATE_COLOR = '#1e5a9a';
+const FAVORABLE_COLOR = strengthScale.strong;
+const UNFAVORABLE_COLOR = strengthScale.veryWeak;
+const CLIMATE_COLOR = palette.infoBlue;
 
 // 强弱 → plain-language reason (正格 only; special structures use the banner instead).
 const REASON_KEY: Record<string, 'reasonStrong' | 'reasonWeak' | 'reasonBalanced'> = {

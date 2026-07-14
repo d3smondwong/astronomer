@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "@/styles/globals.css";
 import { ConfigProvider } from 'antd';
 import { Noto_Serif, Ma_Shan_Zheng, Noto_Sans_SC } from 'next/font/google';
+import { antdTheme } from '@/lib/theme';
 import { LanguageProvider } from '@/lib/languageContext';
 import { ClientRoot } from '@/components/ClientRoot';
 
@@ -34,32 +35,6 @@ const notoSansSC = Noto_Sans_SC({
   display: 'swap',
   preload: false, // CJK font — served subset-split on demand
 });
-
-const antdTheme = {
-  token: {
-    colorPrimary: '#735c00',
-    fontFamily: 'var(--font-noto-serif), serif',
-    borderRadius: 4,
-    colorBgContainer: '#ffffff',
-    colorText: '#4d4635',
-    colorBorder: 'rgba(127, 118, 99, 0.15)',
-  },
-  components: {
-    Button: {
-      colorPrimary: '#735c00',
-      colorPrimaryHover: '#d4af37',
-      borderRadius: 4,
-    },
-    Input: {
-      activeBorderColor: '#735c00',
-      hoverBorderColor: '#d4af37',
-    },
-    Radio: {
-      colorPrimary: '#735c00',
-      colorBorder: '#8b7f73',
-    },
-  },
-};
 
 export const metadata: Metadata = {
   title: "Celestial Dawn",

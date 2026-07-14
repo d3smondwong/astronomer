@@ -2,11 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Card } from 'antd';
-import Forest from '@mui/icons-material/Forest';
-import LocalFireDepartment from '@mui/icons-material/LocalFireDepartment';
-import Terrain from '@mui/icons-material/Terrain';
-import StopCircleOutlined from '@mui/icons-material/StopCircleOutlined';
-import Waves from '@mui/icons-material/Waves';
+import { ELEMENT_ICONS, ELEMENT_EN } from '@/lib/elements';
+import { strengthScale } from '@/lib/theme';
 import { BaziChartData, ElementState, FiveElements } from '@/types/baziChart';
 
 const MOBILE_BREAKPOINT = 720;
@@ -18,30 +15,15 @@ interface FiveElementsCardProps {
 
 const ELEMENTS = ['木', '火', '土', '金', '水'] as const;
 
-const ELEMENT_ICONS = {
-  '木': Forest,
-  '火': LocalFireDepartment,
-  '土': Terrain,
-  '金': StopCircleOutlined,
-  '水': Waves,
-};
-
-const ELEMENT_EN: Record<string, string> = {
-  '木': 'Wood',
-  '火': 'Fire',
-  '土': 'Earth',
-  '金': 'Metal',
-  '水': 'Water',
-};
-
 const STATE_ORDER: ElementState[] = ['死', '囚', '休', '相', '旺'];
 
+// Seasonal-state colors reuse the shared 5-tier strength scale.
 const STATE_COLORS: Record<ElementState, string> = {
-  '旺': '#146432',
-  '相': '#2e8b57',
-  '休': '#9b8200',
-  '囚': '#c46000',
-  '死': '#b42424',
+  '旺': strengthScale.veryStrong,
+  '相': strengthScale.strong,
+  '休': strengthScale.balanced,
+  '囚': strengthScale.weak,
+  '死': strengthScale.veryWeak,
 };
 
 const STATE_EN: Record<ElementState, string> = {
