@@ -5,7 +5,8 @@ import { Card, Select, Tag } from 'antd';
 import type { BaziProfile } from '@/types/baziLibraryTypes';
 // import { getProfiles } from '@/lib/baziStorage';
 import { Heart, Zap } from 'lucide-react';
-import { VictoryChart, VictoryBar, VictoryTheme, VictoryAxis, VictoryGroup } from 'victory';
+import { BarChart } from '@mui/x-charts/BarChart';
+import { goldAlpha, palette } from '@/lib/theme';
 
 export default function CompatibilityPage() {
   const [profiles] = useState<BaziProfile[]>([]);
@@ -75,7 +76,7 @@ export default function CompatibilityPage() {
         <p className="font-serif italic text-bronze-muted/70">Compare the compatibility between two Bazi charts</p>
       </div>
 
-      <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+      <Card style={{ borderColor: goldAlpha(0.1) }}>
         <div className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -102,7 +103,7 @@ export default function CompatibilityPage() {
       </Card>
 
       {compatibility && selectedProfile1 && selectedProfile2 && (
-        <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+        <Card style={{ borderColor: goldAlpha(0.1) }}>
           <div className="space-y-6">
             <div className="text-center space-y-4">
               <div>
@@ -151,34 +152,22 @@ export default function CompatibilityPage() {
             {selectedProfile1.baziChart && selectedProfile2.baziChart && (
               <div className="border-t border-gold-deep/10 pt-6">
                 <h3 className="text-lg font-semibold mb-4 font-serif text-gold-deep">Element Comparison</h3>
-                <svg viewBox="0 0 600 400" className="w-full">
-                  <VictoryChart
-                    standalone={false}
-                    width={600}
-                    height={400}
-                    domainPadding={40}
-                    theme={VictoryTheme.material}
-                  >
-                    <VictoryAxis />
-                    <VictoryAxis dependentAxis />
-                    <VictoryGroup offset={15}>
-                      <VictoryBar
-                        data={Object.entries(selectedProfile1.baziChart.elements).map(([k, v]) => ({
-                          x: k,
-                          y: v,
-                        }))}
-                        style={{ data: { fill: '#1f77b4' } }}
-                      />
-                      <VictoryBar
-                        data={Object.entries(selectedProfile2.baziChart.elements).map(([k, v]) => ({
-                          x: k,
-                          y: v,
-                        }))}
-                        style={{ data: { fill: '#ff7f0e' } }}
-                      />
-                    </VictoryGroup>
-                  </VictoryChart>
-                </svg>
+                <BarChart
+                  height={400}
+                  xAxis={[{ data: Object.keys(selectedProfile1.baziChart.elements), scaleType: 'band' }]}
+                  series={[
+                    {
+                      data: Object.values(selectedProfile1.baziChart.elements),
+                      label: selectedProfile1.name,
+                      color: palette.goldDeep,
+                    },
+                    {
+                      data: Object.values(selectedProfile2.baziChart.elements),
+                      label: selectedProfile2.name,
+                      color: palette.inkIndigo,
+                    },
+                  ]}
+                />
               </div>
             )}
           </div>
@@ -186,7 +175,7 @@ export default function CompatibilityPage() {
       )}
 
       {!compatibility && (profile1 || profile2) && (
-        <Card style={{ borderColor: 'rgba(115, 92, 0, 0.1)' }}>
+        <Card style={{ borderColor: goldAlpha(0.1) }}>
           <p className="text-center text-bronze-muted/70">
             Please select both profiles to view compatibility analysis
           </p>
