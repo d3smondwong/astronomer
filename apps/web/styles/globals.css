@@ -17,9 +17,13 @@
 /* antd element reset — layered so components/utilities win over it */
 @import 'antd/dist/reset.css' layer(base);
 
-/* Tailwind v4 (must appear exactly once) */
+/* Tailwind v4 (must appear exactly once).
+   @source lists ONLY the real source dirs — a broad '../**' glob would make
+   Tailwind rescan node_modules (1.2 GB) and .next on every compile. */
 @import 'tailwindcss';
-@source '../**/*.{js,ts,jsx,tsx}';
+@source '../app';
+@source '../components';
+@source '../lib';
 
 /* Project layers */
 @import "./theme.css";
