@@ -24,15 +24,25 @@ from apps.backend.astronomer_logic.cycles.cycle_interactions import (
     CompanionPillar,
     get_cycle_interactions,
 )
-from apps.backend.astronomer_logic.cycles.cycle_pillars import NatalContext
+from apps.backend.astronomer_logic.cycles.cycle_pillars import (
+    NatalContext,
+    build_cycle_pillar,
+)
 from apps.backend.astronomer_logic.cycles.cycle_shen_sha import get_cycle_shen_sha
+from apps.backend.astronomer_logic.cycles.cycle_wu_xing import (
+    classify_with_transiting,
+    get_cycle_wu_xing,
+)
 from apps.backend.astronomer_logic.cycles.sui_yun import analyse_sui_yun
 from apps.backend.astronomer_logic.day_master_strength import get_seasonal_factors
 from apps.backend.astronomer_logic.natal_five_elements import ELEMENTS, STATE_ORDER
 from apps.backend.astronomer_logic.natal_interactions import STRENGTH_ORDER
 from apps.backend.astronomer_logic.yong_shen import get_yong_shen
-from apps.backend.orchestrator.astronomer_data_orchestrator import calculate_natal_chart
-from apps.backend.orchestrator.cycles_orchestrator import calculate_cycles
+from apps.backend.orchestrator.astronomer_data_orchestrator import (
+    calculate_natal_chart,
+    get_lunar_birthday,
+)
+from apps.backend.orchestrator.cycles_orchestrator import _build_context, calculate_cycles
 
 DESMOND = dict(
     birth_datetime=datetime(1985, 11, 25, 17, 7, 0),
@@ -50,6 +60,18 @@ DESMOND_DA_YUN_GAN_ZHI = ["丙戌", "乙酉", "甲申", "癸未", "壬午", "辛
 def desmond_cycles():
     cycles, chart_key = calculate_cycles(**DESMOND, da_yun_index=4)
     return cycles, chart_key
+
+
+@pytest.fixture(scope="module")
+def desmond_ctx() -> NatalContext:
+    """The same NatalContext the orchestrator builds — for re-deriving a layer by hand."""
+    lunar = get_lunar_birthday(
+        DESMOND["birth_datetime"],
+        DESMOND["latitude"],
+        DESMOND["longitude"],
+        DESMOND["use_solar_time_correction"],
+    )
+    return _build_context(lunar.getEightChar(), DESMOND["gender"], lunar)
 
 
 def make_ctx(
@@ -781,6 +803,54 @@ class TestSuiYunInteractions:
         for ln in stub["流年"]:
             assert "岁运" not in ln
             assert not any("大运" in it["组合明细"] for it in ln["作用"]["柱位动态"])
+
+    def test_wu_xing_reads_the_constrained_decade_not_the_raw_one(
+        self, desmond_cycles, desmond_ctx
+    ):
+        """The 五行 layer and the 岁运 layer must not disagree about whether the 大运 acted.
+
+        2023 癸卯 draws the decade's 未 into 亥卯未, which downgrades its 六冲 with 年柱丑.
+        A 冲 that does not fire must not move the elements either — so the year's 五行动态
+        is computed from the CONSTRAINED decade dynamics, never the raw decade-level list.
+
+        This pins an invariant that would otherwise fail SILENTLY: analyse_sui_yun returns
+        the re-resolved dynamics as its second value, and a caller that drops it would get
+        a 五行 reading quietly contradicting its own 大运制约 — with nothing raising.
+        """
+        cycles, _ = desmond_cycles
+        ctx = desmond_ctx
+        decade = cycles["大运"][4]
+        dy_s, dy_b = decade["干支"][0], decade["干支"][1]
+        raw = tuple(decade["作用"]["柱位动态"])
+        baseline = classify_with_transiting(ctx, ((dy_s, dy_b, "大运"),), raw)
+
+        year = next(ln for ln in decade["流年"] if ln["年份"] == 2023)
+        s, b = year["干支"][0], year["干支"][1]
+        pillar = build_cycle_pillar(s, b, "", ctx, "流年")
+        ix = get_cycle_interactions(
+            s, b, ctx, cycle_label="流年",
+            cycle_stem_rooting=pillar["天干"]["根基强度"],
+            companion=CompanionPillar(
+                stem=dy_s, branch=dy_b,
+                stem_rooting=decade["运柱"]["天干"]["根基强度"],
+            ),
+        )
+        _, constrained = analyse_sui_yun(s, b, dy_s, dy_b, ix, raw, ctx)
+
+        def wu_xing(dynamics):
+            return get_cycle_wu_xing(
+                s, b, ctx, ix, pillar, "流年",
+                decade_pillar=(dy_s, dy_b),
+                decade_dynamics=dynamics,
+                baseline=baseline,
+            )["五行"]
+
+        from_raw = wu_xing(raw)
+        from_constrained = wu_xing(constrained)
+        # Guard the guard: if these ever coincide the test proves nothing.
+        assert from_raw != from_constrained
+        assert year["五行动态"]["五行"] == from_constrained
+        assert year["五行动态"]["五行"] != from_raw
 
     def test_desmond_2023_cross_frame_is_real(self, desmond_cycles):
         """A real chart, not a synthetic one: 大运癸未 + 流年癸卯 + 月柱亥 → 亥卯未 木局,

@@ -28,7 +28,7 @@ The chart_key returned here is for log correlation only.
 """
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from apps.backend.astronomer_logic.bazi_key import encode_bazi_key
@@ -89,10 +89,15 @@ class _DecadeContext:
     """The enclosing 大运's facts a 流年 needs to be read 岁运并临.
 
     pillar:   (大运 stem, 大运 branch) — added as a pillar in the 流年 reclassification.
-    dynamics: the 大运's 柱位动态 — merged into the 流年 reclassification, and the list the
-              年's 岁运 layer re-resolves under its 合绊 locks.
-    baseline: the decade's 五行 力量 map (natal + 大运) — the baseline the 流年 变化 is
-              measured against, so the delta isolates the year's own contribution.
+    dynamics: the 大运's 柱位动态. Built RAW (decade vs natal) once per decade — but inside
+              _analyse_cycle_pillar the context is rebound (dataclasses.replace) to the
+              year's view, where this field holds the dynamics re-resolved under that year's
+              岁运 locks. Downstream layers therefore always read the decade as the year
+              actually experiences it; the raw list has no name in that scope.
+    baseline: the decade's 五行 力量 map (natal + 大运) — the fixed reference each of the
+              decade's 10 years measures its 变化 against, so the delta isolates the year's
+              own contribution. Never re-derived per year: the yardstick must not move with
+              the thing being measured.
     rooting:  the 大运 stem's 根基强度 — so the 岁运 scan reads the decade's rooting from
               the decade's own pillar rather than recomputing it.
     xun_kong: the 大运's own void pair.
@@ -254,12 +259,8 @@ def _analyse_cycle_pillar(
     yun_shi = get_cycle_yun_shi(cycle_branch, ctx.yong_shen, cycle_stem)
 
     sui_yun = None
-    # decade_dynamics defaults to the decade's raw (unconstrained) list; the 岁运 layer
-    # replaces it with the version re-resolved under this year's 合绊 locks, so the 五行
-    # layer and the 岁运 layer never disagree about whether the 大运 actually acted.
-    decade_dynamics = decade.dynamics if decade else ()
     if decade:
-        sui_yun, decade_dynamics = analyse_sui_yun(
+        sui_yun, constrained = analyse_sui_yun(
             cycle_stem,
             cycle_branch,
             decade.pillar[0],
@@ -268,6 +269,18 @@ def _analyse_cycle_pillar(
             decade.dynamics,
             ctx,
         )
+        # REBIND `decade` to this year's view of it. Past this line the decade's raw
+        # 柱位动态 are unreachable by design: a 大运 the year has bound (合绊) did not act,
+        # and every downstream layer must agree on that. Handing the raw list to
+        # get_cycle_wu_xing would make the 五行 layer report a 冲 that the 岁运 layer, in the
+        # same response, says never landed — and nothing would raise. There is now exactly
+        # one `decade` name in scope and it always holds the correct list.
+        #
+        # `baseline` is deliberately NOT re-derived: it is the decade's own 五行 力量 map,
+        # the fixed reference each of its 10 years measures its 变化 against. Constraining it
+        # per-year would make the yardstick move with the thing being measured.
+        decade = replace(decade, dynamics=constrained)
+
         # 警示 is intensity/delivery (岁运并临, 反吟, 运犯岁君); 评级 stays a 五行-favourability
         # verdict. Orthogonal axes — collapsing them into one score destroys both.
         if sui_yun["警示"]:
@@ -292,7 +305,7 @@ def _analyse_cycle_pillar(
             pillar,
             cycle_label,
             decade_pillar=decade.pillar if decade else None,
-            decade_dynamics=decade_dynamics,
+            decade_dynamics=decade.dynamics if decade else (),
             baseline=decade.baseline if decade else None,
         ),
     }
