@@ -45,7 +45,10 @@ from apps.backend.astronomer_logic.natal_five_elements import (
     ELEMENTS,
     QualitativeFiveElementsClassifier,
 )
-from apps.backend.astronomer_logic.wu_xing_relations import element_ten_god_class
+from apps.backend.astronomer_logic.wu_xing_relations import (
+    CONTROLS as _CONTROLS,
+    element_ten_god_class,
+)
 
 _STRONG_VERDICTS = frozenset({"极旺", "旺"})
 _WEAK_VERDICTS = frozenset({"极弱", "弱"})
@@ -62,8 +65,61 @@ _RATING_BY_YONG_SHEN = {"喜": "喜运", "忌": "忌运"}
 
 _STEM_ELEMENT = LunarUtil.WU_XING_GAN
 
-# A 忌 stem drags the verdict down exactly one step, never further and never up.
+# 运看地支为重，天干为辅 — the stem moves the branch's verdict by exactly ONE step, never more.
+_UPGRADE = {"忌运": "平运", "平运": "喜运", "喜运": "喜运"}
 _DOWNGRADE = {"喜运": "平运", "平运": "忌运", "忌运": "忌运"}
+
+
+def _apply_stem(
+    rating: str, reason: str, cycle_stem: str, cycle_branch: str, yong_shen: dict
+) -> tuple[str, str]:
+    """Adjust a BRANCH-derived 运势 by the cycle STEM — via 盖头 / 截脚.
+
+    A 大运 is a 干支 pair and BOTH act (运以支为重，天干为辅; many read it 上五年看天干，
+    下五年看地支). The 金不换 方位表 is branch-indexed because 方位 (寅卯辰 = 东方木) IS a branch
+    concept — it has nothing to SAY about stems. Treating that silence as "stems are
+    irrelevant" left half the 运柱 unread.
+
+    But a flat "忌 stem → downgrade" is far too crude, because a stem's POWER depends on the
+    branch it sits on:
+
+        盖头 — the stem 克s its own branch. The stem is potent AND smothers the branch.
+        截脚 — the branch 克s the stem. The stem is cut off at the root: it CANNOT act.
+
+    The following example is the proof. His three 南方火 decades all carry a 忌 stem, and a flat rule
+    downgraded all three — wrecking the curated 方位 judgment:
+
+        癸未  未土 克 癸水  → 截脚. The 忌 水 is defanged; 未's warmth survives.   → stays 喜运
+        辛巳  巳火 克 辛金  → 截脚. Same.                                          → stays 喜运
+        壬午  壬水 克 午火  → 盖头. The 忌 水 SMOTHERS the 喜 火.                   → genuinely damaged
+
+    Only 壬午 is truly compromised. 盖头/截脚 is what tells them apart.
+
+    So: a stem that is 截脚'd cannot move the verdict at all — friendly or hostile, it is
+    powerless. Otherwise it moves the branch's verdict one step, and no further: the branch
+    always dominates.
+
+    NOT applied to a structural 破格 (化气 复根) — a shattered structure is not repaired by a
+    friendly stem, so that verdict stays absolute.
+    """
+    stem_el = _STEM_ELEMENT.get(cycle_stem, "") if cycle_stem else ""
+    branch_el = _BRANCH_MAIN_ELEMENT.get(cycle_branch, "")
+    if not stem_el:
+        return rating, reason
+
+    verdict = yong_shen.get("五行", {}).get(stem_el, {}).get("综合", "平")
+    if verdict == "平":
+        return rating, reason
+
+    # 截脚 — the branch controls the stem, so the stem has no legs to stand on.
+    if branch_el and _CONTROLS.get(branch_el) == stem_el:
+        return rating, reason + f"；运干{cycle_stem}({stem_el}·{verdict})为支所克，截脚无力，不改其断"
+
+    gai_tou = bool(branch_el and _CONTROLS.get(stem_el) == branch_el)
+    if verdict == "忌":
+        note = "盖头克支" if gai_tou else "透干为忌"
+        return _DOWNGRADE[rating], reason + f"；运干{cycle_stem}({stem_el}){note}，降一等"
+    return _UPGRADE[rating], reason + f"；运干{cycle_stem}({stem_el})为用神所喜，升一等"
 
 # 藏干 tiers, in table order — 本气 / 中气 / 余气.
 _ROOT_TIERS = ("本气", "中气", "余气")
@@ -169,49 +225,32 @@ def get_cycle_yun_shi(
         combined = yong_shen.get("五行", {}).get(element, {}).get("综合", "平")
         rating = _RATING_BY_YONG_SHEN.get(combined, "平运")
         reason = f"{name}不取方位表，依运支{cycle_branch}本气{element}为格局所{combined}"
-
-        # 天干破格 — the stem half of 破格's 位置. A 忌 stem attacks the structure directly,
-        # so it drags the verdict down one step. It can never lift it: the branch owns the
-        # direction (运看地支为重), the stem only spoils.
-        stem_element = _STEM_ELEMENT.get(cycle_stem, "") if cycle_stem else ""
-        if stem_element:
-            stem_verdict = yong_shen.get("五行", {}).get(stem_element, {}).get("综合", "平")
-            if stem_verdict == "忌" and rating != "忌运":
-                rating = _DOWNGRADE[rating]
-                reason += f"；然运干{cycle_stem}({stem_element})为格局所忌，透干破格，降一等"
-
+        rating, reason = _apply_stem(rating, reason, cycle_stem, cycle_branch, yong_shen)
         return {"评级": rating, "依据": reason, "来源": "从格用神"}
 
     xi = yong_shen.get("大运喜", [])
     ji = yong_shen.get("大运忌", [])
 
-    if xi or ji:  # chart is curated — the table owns the verdict
+    if xi or ji:  # chart is curated — the table owns the BRANCH direction
         if cycle_branch in xi:
-            return {
-                "评级": "喜运",
-                "依据": f"运支{cycle_branch}属大运喜用方位",
-                "来源": "金不换",
-            }
-        if cycle_branch in ji:
-            return {
-                "评级": "忌运",
-                "依据": f"运支{cycle_branch}属大运忌避方位",
-                "来源": "金不换",
-            }
-        return {
-            "评级": "平运",
-            "依据": f"运支{cycle_branch}不在大运喜忌方位之内",
-            "来源": "金不换",
-        }
+            rating, reason = "喜运", f"运支{cycle_branch}属大运喜用方位"
+        elif cycle_branch in ji:
+            rating, reason = "忌运", f"运支{cycle_branch}属大运忌避方位"
+        else:
+            rating, reason = "平运", f"运支{cycle_branch}不在大运喜忌方位之内"
+        # …and the STEM is judged against the 用神. The 方位表 is silent on stems because 方位
+        # IS a branch concept — but a 大运 is a 干支 pair and both act (运以支为重，天干为辅).
+        # Treating the table's silence as "stems are irrelevant" left half the pillar unread.
+        rating, reason = _apply_stem(rating, reason, cycle_stem, cycle_branch, yong_shen)
+        return {"评级": rating, "依据": reason, "来源": "金不换"}
 
     # Uncurated chart — read the branch's own qi against the chart-fixed 用神.
     element = _BRANCH_MAIN_ELEMENT.get(cycle_branch, "")
     combined = yong_shen.get("五行", {}).get(element, {}).get("综合", "平")
-    return {
-        "评级": _RATING_BY_YONG_SHEN.get(combined, "平运"),
-        "依据": f"方位表未载，依运支{cycle_branch}本气{element}为用神所{combined}",
-        "来源": "用神五行",
-    }
+    rating = _RATING_BY_YONG_SHEN.get(combined, "平运")
+    reason = f"方位表未载，依运支{cycle_branch}本气{element}为用神所{combined}"
+    rating, reason = _apply_stem(rating, reason, cycle_stem, cycle_branch, yong_shen)
+    return {"评级": rating, "依据": reason, "来源": "用神五行"}
 
 
 # 十神 → (关系, 十神类, 方向). The DM-relative 生克 axis is already fully encoded by the

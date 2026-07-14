@@ -795,14 +795,26 @@ class TestYunShi:
 
     # ── End-to-end through the orchestrator ──────────────────────────────────
     def test_desmond_fire_decades_are_xi_yun(self, desmond_cycles):
-        """癸未/壬午/辛巳 (37-66) are Desmond's 南方火运 — the classically best decades."""
+        """癸未/壬午/辛巳 (37-66) are Desmond's 南方火运 — his curated 大运喜 方位.
+
+        All three carry a 忌 stem (癸水/壬水/辛金), and 盖头/截脚 is what tells them apart:
+            癸未  未土 克 癸水 → 截脚, the 忌 水 is defanged   → 喜运 survives
+            辛巳  巳火 克 辛金 → 截脚, same                    → 喜运 survives
+            壬午  壬水 克 午火 → 盖头, the 忌 水 SMOTHERS 午   → downgraded to 平运
+        A flat "忌 stem downgrades" rule would have wrecked all three and destroyed the
+        curated 方位 judgment. Only 壬午 is genuinely compromised.
+        """
         cycles, _ = desmond_cycles
         by_gan_zhi = {d["干支"]: d for d in cycles["大运"] if d["序号"] != 0}
-        for gz in ("癸未", "壬午", "辛巳"):
+        for gz in ("癸未", "辛巳"):                      # 忌 stem, but 截脚 → powerless
             assert by_gan_zhi[gz]["运势"]["评级"] == "喜运", gz
+            assert "截脚" in by_gan_zhi[gz]["运势"]["依据"], gz
+        assert by_gan_zhi["壬午"]["运势"]["评级"] == "平运"   # 盖头 — the one real casualty
+        assert "盖头" in by_gan_zhi["壬午"]["运势"]["依据"]
+        assert by_gan_zhi["丙戌"]["运势"]["评级"] == "喜运"   # 丙 (调候用神) 生 戌土 → potent
         for gz in ("乙酉", "庚辰", "己卯"):
             assert by_gan_zhi[gz]["运势"]["评级"] == "忌运", gz
-        for gz in ("丙戌", "甲申", "戊寅"):
+        for gz in ("甲申", "戊寅"):
             assert by_gan_zhi[gz]["运势"]["评级"] == "平运", gz
 
     def test_every_analysed_pillar_carries_a_verdict(self, desmond_cycles):
@@ -1396,25 +1408,109 @@ class TestHuaQiGePoGe:
                             interactions=ix)
         assert ys["格局详情"]["忌五行"] == ["水"]
 
-        # 忌 stem on a 喜 branch → downgraded a step, and the reason is recorded
-        v = get_cycle_yun_shi("午", ys, "壬")          # 壬(水) 克化神, 午 IS the 化神
+        # 壬(水) 克s 午(火) → 盖头: the 忌 stem smothers the 化神's own branch → downgrade
+        v = get_cycle_yun_shi("午", ys, "壬")
         assert v["评级"] == "平运"
-        assert "透干破格" in v["依据"]
+        assert "盖头" in v["依据"]
         assert get_cycle_yun_shi("午", ys)["评级"] == "喜运"   # branch alone would say 喜运
 
         # a friendly stem must NOT lift the verdict
         assert get_cycle_yun_shi("午", ys, "丙")["评级"] == "喜运"   # 丙 IS the 化神
         assert get_cycle_yun_shi("寅", ys, "甲")["评级"] == "喜运"   # 甲 生化神
 
-    def test_zheng_ge_stays_branch_only(self):
-        """正格 charts must ignore the stem. The 金不换 表 is a 方位 (direction) table, and
-        directions ARE branches — reading stems into it would invent data it does not have."""
+    def test_zheng_ge_also_reads_the_stem(self):
+        """正格 charts read the stem too — the 金不换 表 is silent on stems because 方位 IS a
+        branch concept, not because stems are irrelevant. But 截脚 stems cannot act.
+
+        Desmond, 午 branch (a 大运喜 方位, so base = 喜运):
+            壬(水, 忌) — 水克火 → 盖头, smothers 午        → 平运
+            辛(金, 忌) — 火克金 → 截脚, powerless          → 喜运 (unchanged)
+            丙(火, 喜) — same element as 午                → 喜运 (already max)
+        """
         from apps.backend.astronomer_logic.cycles.cycle_wu_xing import get_cycle_yun_shi
 
         chart, _ = calculate_natal_chart(**DESMOND)
         ys = chart["用神"]
         assert ys["格局"] == "正格"
-        for stem in ("甲", "庚", "壬", "丙"):
-            v = get_cycle_yun_shi("午", ys, stem)
-            assert v["评级"] == get_cycle_yun_shi("午", ys)["评级"]
-            assert v["来源"] == "金不换"
+        assert get_cycle_yun_shi("午", ys)["评级"] == "喜运"          # branch alone
+
+        v = get_cycle_yun_shi("午", ys, "壬")                        # 盖头
+        assert v["评级"] == "平运" and "盖头" in v["依据"]
+        v = get_cycle_yun_shi("午", ys, "辛")                        # 截脚 —忌 but powerless
+        assert v["评级"] == "喜运" and "截脚" in v["依据"]
+        assert get_cycle_yun_shi("午", ys, "丙")["评级"] == "喜运"
+        # the 方位表 still owns the direction
+        assert get_cycle_yun_shi("午", ys, "壬")["来源"] == "金不换"
+
+
+class TestGaiTouJieJiao:
+    """盖头 / 截脚 — a cycle stem's power depends on the branch it sits on.
+
+    盖头 — the stem 克s its own branch: potent, and it SMOTHERS the branch.
+    截脚 — the branch 克s the stem: the stem is cut off at the root and cannot act at all.
+
+    Without this, a flat "忌 stem → downgrade" wrecks curated judgments (all three of
+    Desmond's 南方火 decades carry a 忌 stem, yet two are 截脚'd and keep their 喜运).
+    """
+
+    def test_jie_jiao_stem_cannot_move_the_verdict_either_way(self):
+        from apps.backend.astronomer_logic.cycles.cycle_wu_xing import get_cycle_yun_shi
+
+        chart, _ = calculate_natal_chart(**DESMOND)   # 正格, 喜用 木火土, 忌 金水
+        ys = chart["用神"]
+        base = get_cycle_yun_shi("午", ys)["评级"]      # 午 is a 大运喜 方位 → 喜运
+        assert base == "喜运"
+        # 辛(金) is 忌 — but 午火 克 辛金 → 截脚. Powerless: verdict unmoved.
+        v = get_cycle_yun_shi("午", ys, "辛")
+        assert v["评级"] == "喜运" and "截脚" in v["依据"]
+        # 甲(木) is 喜 — but on 申, 申金 克 甲木 → 截脚. Also powerless: no upgrade.
+        b = get_cycle_yun_shi("申", ys)["评级"]
+        v = get_cycle_yun_shi("申", ys, "甲")
+        assert v["评级"] == b and "截脚" in v["依据"]
+
+    def test_gai_tou_ji_stem_smothers_a_good_branch(self):
+        from apps.backend.astronomer_logic.cycles.cycle_wu_xing import get_cycle_yun_shi
+
+        chart, _ = calculate_natal_chart(**DESMOND)
+        ys = chart["用神"]
+        v = get_cycle_yun_shi("午", ys, "壬")   # 壬水 克 午火 → 盖头
+        assert v["评级"] == "平运" and "盖头" in v["依据"]
+
+    def test_cong_cai_ge_bi_jie_duo_cai(self):
+        """从财格: a 比劫 stem 盖头-ing the 财 branch is 比劫夺财 — the textbook 破格.
+
+        This is not hand-coded; it falls out of 盖头/截脚. And the mirror case is equally
+        right: a 印 stem (土) on a 财 branch (木) is 截脚'd — the 财 controls the 印, so the
+        印 cannot 生身 and the structure holds.
+        """
+        from apps.backend.astronomer_logic.cycles.cycle_wu_xing import get_cycle_yun_shi
+
+        chart, _ = calculate_natal_chart(**TestGeJu.CONG_CAI)
+        ys = chart["用神"]
+        assert ys["格局"] == "从财格"
+
+        for gz in ("庚寅", "辛卯"):                        # 比劫(金) 盖头 the 财(木) branch
+            v = get_cycle_yun_shi(gz[1], ys, gz[0])
+            assert v["评级"] == "平运", gz
+            assert "盖头" in v["依据"], gz
+        for gz in ("戊寅", "己卯"):                        # 印(土) 截脚'd by the 财(木) branch
+            v = get_cycle_yun_shi(gz[1], ys, gz[0])
+            assert v["评级"] == "喜运", gz
+            assert "截脚" in v["依据"], gz
+
+    def test_structural_po_ge_is_absolute(self):
+        """A 化气 复根 verdict is NOT softened by a friendly stem — a shattered structure is
+        not repaired by a helpful 天干."""
+        from apps.backend.astronomer_logic.cycles.cycle_wu_xing import get_cycle_yun_shi
+
+        ix = {"作用": {"柱位动态": [{
+            "类型": "天干合", "形态": "化气格",
+            "组合明细": {"日柱": "癸", "时柱": "戊"},
+            "合化条件": {"合化元素": "火"},
+        }]}}
+        ys = make_yong_shen("丁", "火", "巳", "极旺", ling=4, di=4, shi=4, root="深根",
+                            interactions=ix)
+        v = get_cycle_yun_shi("子", ys, "甲")   # 子 re-roots the 癸; 甲(木) is 喜 (生化神)
+        assert v["评级"] == "忌运"
+        assert v["来源"] == "化气破格"
+        assert "升一等" not in v["依据"]        # the friendly stem does NOT lift it

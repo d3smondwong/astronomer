@@ -259,7 +259,15 @@ export interface YongShen {
 export interface YunShi {
   /** 喜运 | 平运 | 忌运. */
   评级: "喜运" | "平运" | "忌运";
-  /** Why this rating — names the branch and the rule that fired. */
+  /**
+   * Why this rating — names the branch, the rule that fired, and (when the stem moved the
+   * verdict) the 盖头/截脚 relationship that let it.
+   *
+   * A 大运 is a 干支 pair and both act (运以支为重，天干为辅). The branch sets the direction;
+   * the stem moves it at most ONE step — but only if it has the power to. A stem the branch
+   * 克s (截脚) is cut off at the root and cannot act at all, friendly or hostile; a stem that
+   * 克s its own branch (盖头) smothers it.
+   */
   依据: string;
   /**
    * "金不换"     — the curated 方位表 (正格 charts only).
