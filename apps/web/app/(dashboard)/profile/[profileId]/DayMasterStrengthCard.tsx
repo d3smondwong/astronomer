@@ -9,7 +9,7 @@ import {
   useGaugeState,
 } from '@mui/x-charts/Gauge';
 import { ELEMENT_ICONS } from '@/lib/elements';
-import { strengthScale } from '@/lib/theme';
+import { goldAlpha, palette, strengthScale } from '@/lib/theme';
 
 interface DayMasterStrengthCardProps {
   chartData: any;
@@ -104,11 +104,27 @@ function GaugePointer({ color }: { color: string }) {
 function ElementRow({ elem, dimmed }: { elem: string; dimmed?: boolean }) {
   const Icon = ELEMENT_ICONS[elem];
   return (
-    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px', opacity: dimmed ? 0.5 : 1 }}>
-      {Icon && <Icon sx={{ fontSize: '24px', color: 'rgba(115,92,0,0.6)' }} />}
-      <div style={{ fontSize: '18px', fontFamily: '"Noto Sans SC", sans-serif', color: 'rgba(115,92,0,0.7)', fontWeight: 600 }}>
+    <div className={`flex flex-row items-center gap-2 ${dimmed ? 'opacity-50' : ''}`}>
+      {Icon && <Icon style={{ fontSize: 24, color: goldAlpha(0.6) }} />}
+      <div className="text-lg font-zh-sans font-semibold text-gold-deep/70">
         {elem}
       </div>
+    </div>
+  );
+}
+
+// One vertical bar gauge (得令 / 得地 / 得势) — height/fill are score-driven.
+function ScoreBar({ score, label }: { score: number; label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1.5 flex-1">
+      <div className="relative w-7 h-20 rounded-md bg-gold-deep/10 overflow-hidden">
+        <div
+          className="absolute bottom-0 w-full rounded-md transition-[height,background] duration-300"
+          style={{ height: `${(score / 4) * 100}%`, background: getBarFillColor(score, 4) }}
+        />
+      </div>
+      <div className="text-sm text-gold-deep/60 tracking-wide uppercase">{label}</div>
+      <div className="text-sm text-gold-deep/70 font-semibold">{score} / 4</div>
     </div>
   );
 }
@@ -157,53 +173,31 @@ export default function DayMasterStrengthCard({ chartData, language }: DayMaster
   const jieqiScore = 得地?.分数 ?? 0;
   const shiliScore = 得势?.分数 ?? 0;
 
-
   return (
-    <div style={{ marginTop: '16px' }}>
+    <div className="mt-4">
       <Card
-        style={{ border: '1px solid rgba(115,92,0,0.15)', borderRadius: '12px', background: '#faf8f2' }}
+        style={{ border: `1px solid ${goldAlpha(0.15)}`, borderRadius: '12px', background: palette.parchment }}
         styles={{ body: { padding: '20px 20px 16px' } }}
       >
         {/* Title */}
-        <h3 style={{
-          fontFamily: 'Noto Serif, serif',
-          fontSize: '13px',
-          fontWeight: 600,
-          color: 'rgba(115,92,0,0.6)',
-          margin: '0 0 20px 0',
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-        }}>
+        <h3 className="text-[13px] font-semibold text-gold-deep/60 m-0 mb-5 tracking-[0.08em] uppercase">
           {tr.dayMasterStrength[language]}
         </h3>
 
-        {/* Main Section: Day Master Info (left) + Gauge + Bars (right) */}
-        <div style={{
-          display: isMobile ? 'flex' : 'grid',
-          gridTemplateColumns: isTablet && !isMobile ? '1fr' : 'auto 1fr 2fr',
-          gap: '24px',
-          marginBottom: '24px',
-          alignItems: 'stretch',
-          ...(isMobile && { flexDirection: 'column' }),
-        }}>
+        {/* Main Section: Day Master Info (left) + Gauge + Bars (right).
+            Layout switches are JS-breakpoint-driven — they stay inline. */}
+        <div
+          className="gap-6 mb-6 items-stretch"
+          style={{
+            display: isMobile ? 'flex' : 'grid',
+            gridTemplateColumns: isTablet && !isMobile ? '1fr' : 'auto 1fr 2fr',
+            ...(isMobile && { flexDirection: 'column' as const }),
+          }}
+        >
           {/* Left: Day Master Info Vertical Stack */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '16px',
-            minWidth: '180px',
-          }}>
+          <div className="flex flex-col items-center justify-center gap-4 min-w-[180px]">
             {/* Stem Character */}
-            <div style={{
-              fontFamily: '"Ma Shan Zheng", serif',
-              fontSize: '40px',
-              color: '#4d4635',
-              lineHeight: 1,
-              fontWeight: 700,
-              textAlign: 'center',
-            }}>
+            <div className="font-zh text-[40px] text-bronze-muted leading-none font-bold text-center">
               {天干}
             </div>
 
@@ -217,24 +211,11 @@ export default function DayMasterStrengthCard({ chartData, language }: DayMaster
               if (!hasTransform) return <ElementRow elem={五行} />;
 
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                <div className="flex flex-col items-center gap-1">
                   <ElementRow elem={现五行!} />
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ opacity: 0.45, fontSize: '20px', color: '#4d4635' }}>↑</span>
-                    <span style={{
-                      position: 'absolute',
-                      left: '50%',
-                      marginLeft: '8px',
-                      fontSize: '12px',
-                      fontFamily: '"Noto Sans SC", sans-serif',
-                      color: 'rgba(30, 90, 170, 0.85)',
-                      background: 'rgba(30, 90, 170, 0.08)',
-                      border: '1px dashed rgba(30, 90, 170, 0.5)',
-                      borderRadius: '20px',
-                      padding: '1px 7px',
-                      whiteSpace: 'nowrap',
-                      lineHeight: 1.6,
-                    }}>
+                  <div className="relative flex items-center justify-center">
+                    <span className="opacity-45 text-xl text-bronze-muted">↑</span>
+                    <span className="absolute left-1/2 ml-2 text-xs font-zh-sans text-info-blue/85 bg-info-blue/8 border border-dashed border-info-blue/50 rounded-[20px] px-[7px] py-px whitespace-nowrap leading-[1.6]">
                       天干合·化气格
                     </span>
                   </div>
@@ -246,8 +227,8 @@ export default function DayMasterStrengthCard({ chartData, language }: DayMaster
           </div>
 
           {/* Center: Gauge */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ position: 'relative', width: '300px', height: '190px' }}>
+          <div className="flex flex-col items-center justify-center">
+            <div className="relative w-[300px] h-[190px]">
               <GaugeContainer
                 width={300}
                 height={190}
@@ -255,123 +236,34 @@ export default function DayMasterStrengthCard({ chartData, language }: DayMaster
                 endAngle={110}
                 value={scoreToGaugeValue(强弱分数)}
               >
-                <GaugeReferenceArc style={{ stroke: 'rgba(115,92,0,0.08)' }} />
+                <GaugeReferenceArc style={{ stroke: goldAlpha(0.08) }} />
                 <GaugeColorBands />
                 <GaugePointer color={getTierForScore(强弱分数).color} />
               </GaugeContainer>
 
               {/* End labels */}
-              <div style={{ position: 'absolute', bottom: '-25px', left: '8px', fontSize: '14px', fontFamily: '"Noto Serif", serif', color: 'rgba(115,92,0,0.55)', fontWeight: 500 }}>
+              <div className="absolute bottom-[-25px] left-2 text-sm text-gold-deep/55 font-medium">
                 {language === 'ch' ? '极弱' : 'Very Weak'}
               </div>
-              <div style={{ position: 'absolute', bottom: '-25px', right: '8px', fontSize: '14px', fontFamily: '"Noto Serif", serif', color: 'rgba(115,92,0,0.55)', fontWeight: 500 }}>
+              <div className="absolute bottom-[-25px] right-2 text-sm text-gold-deep/55 font-medium">
                 {language === 'ch' ? '极旺' : 'Very Strong'}
               </div>
             </div>
 
-            {/* Verdict text below gauge */}
-            <div style={{
-              fontFamily: language === 'ch' ? '"Ma Shan Zheng", serif' : '"Noto Serif", serif',
-              fontSize: '28px',
-              color: getTierForScore(强弱分数).color,
-              fontWeight: 700,
-              lineHeight: 1,
-              marginTop: '12px',
-            }}>
+            {/* Verdict text below gauge — color is tier-driven */}
+            <div
+              className={`text-[28px] font-bold leading-none mt-3 ${language === 'ch' ? 'font-zh' : 'font-serif'}`}
+              style={{ color: getTierForScore(强弱分数).color }}
+            >
               {language === 'ch' ? 强弱 : getTierForScore(强弱分数).label.en}
             </div>
           </div>
 
           {/* Right: 3 Vertical Bar Gauges */}
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            justifyContent: 'space-around',
-            alignItems: 'flex-end',
-          }}>
-            {/* 得令 Bar */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
-              <div style={{
-                position: 'relative',
-                width: '28px',
-                height: '80px',
-                borderRadius: '6px',
-                background: 'rgba(115,92,0,0.1)',
-                overflow: 'hidden',
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  width: '100%',
-                  height: `${(jielingScore / 4) * 100}%`,
-                  background: getBarFillColor(jielingScore, 4),
-                  borderRadius: '6px',
-                  transition: 'height 0.3s ease, background 0.3s ease',
-                }} />
-              </div>
-              <div style={{ fontSize: '14px', fontFamily: '"Noto Serif", serif', color: 'rgba(115,92,0,0.6)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                {tr.dmSeasonalAuth[language]}
-              </div>
-              <div style={{ fontSize: '14px', fontFamily: '"Noto Serif", serif', color: 'rgba(115,92,0,0.7)', fontWeight: 600 }}>
-                {jielingScore} / 4
-              </div>
-            </div>
-
-            {/* 得地 Bar */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
-              <div style={{
-                position: 'relative',
-                width: '28px',
-                height: '80px',
-                borderRadius: '6px',
-                background: 'rgba(115,92,0,0.1)',
-                overflow: 'hidden',
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  width: '100%',
-                  height: `${(jieqiScore / 4) * 100}%`,
-                  background: getBarFillColor(jieqiScore, 4),
-                  borderRadius: '6px',
-                  transition: 'height 0.3s ease, background 0.3s ease',
-                }} />
-              </div>
-              <div style={{ fontSize: '14px', fontFamily: '"Noto Serif", serif', color: 'rgba(115,92,0,0.6)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                {tr.dmRooting[language]}
-              </div>
-              <div style={{ fontSize: '14px', fontFamily: '"Noto Serif", serif', color: 'rgba(115,92,0,0.7)', fontWeight: 600 }}>
-                {jieqiScore} / 4
-              </div>
-            </div>
-
-            {/* 得势 Bar */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
-              <div style={{
-                position: 'relative',
-                width: '28px',
-                height: '80px',
-                borderRadius: '6px',
-                background: 'rgba(115,92,0,0.1)',
-                overflow: 'hidden',
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  width: '100%',
-                  height: `${(shiliScore / 4) * 100}%`,
-                  background: getBarFillColor(shiliScore, 4),
-                  borderRadius: '6px',
-                  transition: 'height 0.3s ease, background 0.3s ease',
-                }} />
-              </div>
-              <div style={{ fontSize: '14px', fontFamily: '"Noto Serif", serif', color: 'rgba(115,92,0,0.6)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                {tr.dmSupport[language]}
-              </div>
-              <div style={{ fontSize: '14px', fontFamily: '"Noto Serif", serif', color: 'rgba(115,92,0,0.7)', fontWeight: 600 }}>
-                {shiliScore} / 4
-              </div>
-            </div>
+          <div className="flex gap-3 justify-around items-end">
+            <ScoreBar score={jielingScore} label={tr.dmSeasonalAuth[language]} />
+            <ScoreBar score={jieqiScore} label={tr.dmRooting[language]} />
+            <ScoreBar score={shiliScore} label={tr.dmSupport[language]} />
           </div>
         </div>
 

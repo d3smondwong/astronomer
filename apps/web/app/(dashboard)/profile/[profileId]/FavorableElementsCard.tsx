@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card } from 'antd';
 import { ELEMENT_ICONS, ELEMENT_EN, ELEMENT_COLOR } from '@/lib/elements';
-import { palette, strengthScale } from '@/lib/theme';
+import { goldAlpha, palette, strengthScale } from '@/lib/theme';
 import { BaziChartData } from '@/types/baziChart';
 import { YongShen } from '@/types/cyclesChart';
 import { translations } from '@/lib/translations';
@@ -52,37 +52,15 @@ function ElementChip({
   const Icon = ELEMENT_ICONS[element];
   return (
     <div
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: isMobile ? '6px 10px' : '8px 14px',
-        borderRadius: 20,
-        background: `${accent}14`,
-        border: `1px solid ${accent}55`,
-      }}
+      className={`inline-flex items-center gap-1.5 rounded-[20px] ${isMobile ? 'px-2.5 py-1.5' : 'px-3.5 py-2'}`}
+      style={{ background: `${accent}14`, border: `1px solid ${accent}55` }}
     >
       {Icon && <Icon style={{ fontSize: 18, color: ELEMENT_COLOR[element] }} />}
-      <span
-        style={{
-          fontFamily: '"Ma Shan Zheng", serif',
-          fontSize: isMobile ? 18 : 22,
-          fontWeight: 700,
-          color: '#4d4635',
-          lineHeight: 1,
-        }}
-      >
+      <span className={`font-zh font-bold text-bronze-muted leading-none ${isMobile ? 'text-lg' : 'text-[22px]'}`}>
         {element}
       </span>
       {language === 'en' && (
-        <span
-          style={{
-            fontFamily: '"Noto Serif", serif',
-            fontSize: 12,
-            color: 'rgba(115,92,0,0.6)',
-            letterSpacing: '0.03em',
-          }}
-        >
+        <span className="text-xs text-gold-deep/60 tracking-[0.03em]">
           {ELEMENT_EN[element]}
         </span>
       )}
@@ -93,15 +71,8 @@ function ElementChip({
 function GroupLabel({ text, accent }: { text: string; accent: string }) {
   return (
     <div
-      style={{
-        fontFamily: '"Noto Serif", serif',
-        fontSize: 12,
-        fontWeight: 600,
-        color: accent,
-        letterSpacing: '0.06em',
-        textTransform: 'uppercase',
-        marginBottom: 8,
-      }}
+      className="text-xs font-semibold tracking-[0.06em] uppercase mb-2"
+      style={{ color: accent }}
     >
       {text}
     </div>
@@ -134,89 +105,38 @@ export default function FavorableElementsCard({ chartData, language }: Favorable
   const reasonKey = REASON_KEY[yongShen.强弱];
 
   return (
-    <div style={{ marginTop: '16px' }}>
+    <div className="mt-4">
       <Card
-        style={{ border: '1px solid rgba(115,92,0,0.15)', borderRadius: 12, background: '#faf8f2' }}
+        style={{ border: `1px solid ${goldAlpha(0.15)}`, borderRadius: 12, background: palette.parchment }}
         styles={{ body: { padding: '20px 20px 16px' } }}
       >
         {/* Title */}
-        <h3
-          style={{
-            fontFamily: '"Noto Serif", serif',
-            fontSize: 13,
-            fontWeight: 600,
-            color: 'rgba(115,92,0,0.6)',
-            margin: '0 0 4px 0',
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-          }}
-        >
+        <h3 className="text-[13px] font-semibold text-gold-deep/60 m-0 mb-1 tracking-[0.08em] uppercase">
           {tr.luckyElements[language]}
         </h3>
-        <div
-          style={{
-            fontFamily: '"Noto Serif", serif',
-            fontSize: 12,
-            color: 'rgba(115,92,0,0.45)',
-            marginBottom: 16,
-          }}
-        >
+        <div className="text-xs text-gold-deep/45 mb-4">
           {tr.luckyElemDesc[language]}
         </div>
 
         {/* Special-structure banner (非正格 only) — the structure, not day-master support, decides 喜忌 */}
         {!isZhengGe && (
           <div
-            style={{
-              display: 'flex',
-              flexDirection: isMobile ? 'column' : 'row',
-              alignItems: isMobile ? 'flex-start' : 'center',
-              gap: isMobile ? 6 : 12,
-              padding: '10px 14px',
-              marginBottom: 16,
-              borderRadius: 8,
-              background: 'rgba(30, 90, 170, 0.06)',
-              border: '1px dashed rgba(30, 90, 170, 0.4)',
-            }}
+            className={`flex px-3.5 py-2.5 mb-4 rounded-lg bg-info-blue/6 border border-dashed border-info-blue/40 ${
+              isMobile ? 'flex-col items-start gap-1.5' : 'flex-row items-center gap-3'
+            }`}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              <span
-                style={{
-                  fontFamily: '"Ma Shan Zheng", serif',
-                  fontSize: 20,
-                  fontWeight: 700,
-                  color: 'rgba(30, 90, 170, 0.9)',
-                  lineHeight: 1,
-                }}
-              >
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="font-zh text-xl font-bold text-info-blue/90 leading-none">
                 {yongShen.格局详情?.名称 ?? yongShen.格局}
               </span>
               {yongShen.格局详情?.真假 && (
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontFamily: '"Noto Sans SC", sans-serif',
-                    color: 'rgba(30, 90, 170, 0.85)',
-                    background: 'rgba(30, 90, 170, 0.1)',
-                    border: '1px solid rgba(30, 90, 170, 0.35)',
-                    borderRadius: 20,
-                    padding: '1px 8px',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
+                <span className="text-[11px] font-zh-sans text-info-blue/85 bg-info-blue/10 border border-info-blue/35 rounded-[20px] px-2 py-px whitespace-nowrap">
                   {yongShen.格局详情.真假}
                 </span>
               )}
             </div>
             {structKey && (
-              <div
-                style={{
-                  fontFamily: '"Noto Serif", serif',
-                  fontSize: 13,
-                  color: 'rgba(30, 90, 170, 0.85)',
-                  lineHeight: 1.5,
-                }}
-              >
+              <div className="text-[13px] text-info-blue/85 leading-normal">
                 {tr[structKey][language]}
               </div>
             )}
@@ -224,21 +144,14 @@ export default function FavorableElementsCard({ chartData, language }: Favorable
         )}
 
         {/* Favorable / Unfavorable chip groups */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-            gap: isMobile ? 16 : 24,
-            marginBottom: 16,
-          }}
-        >
+        <div className={`grid mb-4 ${isMobile ? 'grid-cols-1 gap-4' : 'grid-cols-2 gap-6'}`}>
           {favorable.length > 0 && (
             <div>
               <GroupLabel
                 text={`${tr.favorableLabel[language]}${language === 'en' ? ' · 喜用' : ''}`}
                 accent={FAVORABLE_COLOR}
               />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div className="flex flex-wrap gap-2">
                 {favorable.map((element) => (
                   <ElementChip
                     key={element}
@@ -257,7 +170,7 @@ export default function FavorableElementsCard({ chartData, language }: Favorable
                 text={`${tr.unfavorableLabel[language]}${language === 'en' ? ' · 忌' : ''}`}
                 accent={UNFAVORABLE_COLOR}
               />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div className="flex flex-wrap gap-2">
                 {unfavorable.map((element) => (
                   <ElementChip
                     key={element}
@@ -274,32 +187,19 @@ export default function FavorableElementsCard({ chartData, language }: Favorable
 
         {/* Plain-language reason (正格 only — the banner explains special structures) */}
         {isZhengGe && reasonKey && (
-          <div
-            style={{
-              fontFamily: '"Noto Serif", serif',
-              fontSize: 13,
-              color: 'rgba(115,92,0,0.65)',
-              lineHeight: 1.6,
-              marginBottom: climateElements.length > 0 ? 16 : 4,
-            }}
-          >
+          <div className={`text-[13px] text-gold-deep/65 leading-relaxed ${climateElements.length > 0 ? 'mb-4' : 'mb-1'}`}>
             {tr[reasonKey][language]}
           </div>
         )}
 
         {/* Climate needs (调候适用 only) */}
         {climateElements.length > 0 && (
-          <div
-            style={{
-              paddingTop: 12,
-              borderTop: '1px solid rgba(115,92,0,0.1)',
-            }}
-          >
+          <div className="pt-3 border-t border-gold-deep/10">
             <GroupLabel
               text={`${tr.climateLabel[language]}${language === 'en' ? ' · 调候' : ''}`}
               accent={CLIMATE_COLOR}
             />
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <div className="flex flex-wrap gap-2">
               {climateElements.map((element) => (
                 <ElementChip
                   key={element}

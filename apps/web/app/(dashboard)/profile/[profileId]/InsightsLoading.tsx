@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { ELEMENT_COLOR } from '@/lib/elements';
 
 // Five elements in the generative (生) cycle, with the chart's element colors.
+// 金 gets a warmer tone here — the shared grey is invisible against parchment glow.
 const ELEMENTS = [
-  { glyph: '木', color: '#2d6a2d' },
-  { glyph: '火', color: '#b42424' },
-  { glyph: '土', color: '#8a6200' },
+  { glyph: '木', color: ELEMENT_COLOR['木'] },
+  { glyph: '火', color: ELEMENT_COLOR['火'] },
+  { glyph: '土', color: ELEMENT_COLOR['土'] },
   { glyph: '金', color: '#8a7a3a' },
-  { glyph: '水', color: '#1e5a9a' },
+  { glyph: '水', color: ELEMENT_COLOR['水'] },
 ];
 
 // Themed status lines, cycled while the LLM composes the report.

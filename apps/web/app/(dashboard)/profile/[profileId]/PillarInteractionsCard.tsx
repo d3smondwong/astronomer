@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card } from 'antd';
 import { ELEMENT_ICONS } from '@/lib/elements';
+import { goldAlpha, palette } from '@/lib/theme';
 import { translations } from '@/lib/translations';
 
 interface PillarInteractionsCardProps {
@@ -46,7 +47,7 @@ const CATEGORY_STYLES: Record<Category, { bg: string; border: string; accent: st
   po:    { bg: 'rgba(195, 100, 0, 0.07)',   border: 'rgba(195, 100, 0, 0.28)',   accent: '#c46000', text: '#8b4600', label: { en: 'Break',   ch: '破' } },
   yin:   { bg: 'rgba(90, 60, 120, 0.06)',   border: 'rgba(90, 60, 120, 0.22)',   accent: '#5a3c78', text: '#3d2856', label: { en: 'Duplicate', ch: '吟' } },
   xu:    { bg: 'rgba(80, 80, 120, 0.06)',   border: 'rgba(80, 80, 120, 0.22)',   accent: '#505090', text: '#383870', label: { en: 'Virtual', ch: '拱' } },
-  other: { bg: 'rgba(115, 92, 0, 0.06)',   border: 'rgba(115, 92, 0, 0.2)',     accent: '#735c00', text: '#4d4635', label: { en: 'Other',   ch: '其他' } },
+  other: { bg: goldAlpha(0.06),             border: goldAlpha(0.2),              accent: palette.goldDeep, text: palette.bronzeMuted, label: { en: 'Other', ch: '其他' } },
 };
 
 const STRENGTH_LABEL: Record<string, { en: string; ch: string; opacity: number }> = {
@@ -139,24 +140,25 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
     const rowOpacity = ix.强度 === '消融吸收' ? 0.6 : 1;
 
     return (
-        <div key={rowKey} style={{ position: 'relative', height: '60px', width: '100%', cursor: 'default', opacity: rowOpacity }}>
+        <div key={rowKey} className="relative h-[60px] w-full cursor-default" style={{ opacity: rowOpacity }}>
           {pillars.map(pi => {
             const centerPct = (pi + 0.5) * 25;
             const char = getPillarChar(ix, pi);
             return (
-              <div key={pi} style={{
-                position: 'absolute', left: `${centerPct}%`, transform: 'translateX(-50%)',
-                top: 0, height: '36px', display: 'flex', flexDirection: 'column', alignItems: 'center',
-              }}>
-                <span style={{ fontFamily: '"Ma Shan Zheng", cursive', fontSize: '16px', color: catStyle.text, lineHeight: 1.1, whiteSpace: 'nowrap' }}>
+              <div
+                key={pi}
+                className="absolute -translate-x-1/2 top-0 h-9 flex flex-col items-center"
+                style={{ left: `${centerPct}%` }}
+              >
+                <span className="font-zh text-base leading-[1.1] whitespace-nowrap" style={{ color: catStyle.text }}>
                   {char || ' '}
                 </span>
-                <div style={{ width: 0, height: 0, borderLeft: '3.5px solid transparent', borderRight: '3.5px solid transparent', borderTop: `4px solid ${catStyle.accent}`, margin: '2px 0', flexShrink: 0 }} />
-                <div style={{ width: '1.5px', background: catStyle.accent, flex: 1, marginBottom: '-2px' }} />
+                <div className="w-0 h-0 my-0.5 shrink-0 border-l-[3.5px] border-r-[3.5px] border-l-transparent border-r-transparent border-t-4" style={{ borderTopColor: catStyle.accent }} />
+                <div className="w-[1.5px] flex-1 -mb-0.5" style={{ background: catStyle.accent }} />
               </div>
             );
           })}
-          <div style={{ position: 'absolute', left: `${leftCenterPct}%`, width: `${rightCenterPct - leftCenterPct}%`, top: '36px', height: '2px', background: catStyle.accent }} />
+          <div className="absolute top-9 h-0.5" style={{ left: `${leftCenterPct}%`, width: `${rightCenterPct - leftCenterPct}%`, background: catStyle.accent }} />
           {/* Element display (above the line) */}
           {(() => {
             let elementChar = '';
@@ -174,24 +176,20 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
             return (
               <>
                 {gapMidpoints.map((gapPct, gi) => (
-                  <div key={gi} style={{ position: 'absolute', left: `${gapPct}%`, transform: 'translateX(-50%)', top: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div key={gi} className="absolute -translate-x-1/2 top-3 flex items-center gap-1" style={{ left: `${gapPct}%` }}>
                     {React.createElement(ELEMENT_ICONS[elementChar], {
-                      sx: { fontSize: '14px', color: catStyle.accent }
+                      style: { fontSize: '14px', color: catStyle.accent }
                     })}
-                    <span style={{ fontFamily: '"Noto Sans SC", sans-serif', fontSize: '12px', fontWeight: 500, color: catStyle.text, whiteSpace: 'nowrap' }}>
+                    <span className="font-zh-sans text-xs font-medium whitespace-nowrap" style={{ color: catStyle.text }}>
                       {elementChar}
                     </span>
                     {tenGodChar && !isMobile && (
-                      <div style={{
-                        display: 'inline-flex', flexDirection: 'row', alignItems: 'center', gap: '4px',
-                        border: '1px solid rgba(115, 92, 0, 0.25)', borderRadius: '6px', padding: '2px 6px',
-                        background: 'rgba(115, 92, 0, 0.06)', marginLeft: '4px',
-                      }}>
-                        <span style={{ fontSize: '13px', color: 'rgba(115, 92, 0, 0.75)', fontFamily: '"Ma Shan Zheng", serif', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                      <div className="inline-flex flex-row items-center gap-1 ml-1 border border-gold-deep/25 rounded-md px-1.5 py-0.5 bg-gold-deep/6">
+                        <span className="font-zh text-[13px] text-gold-deep/75 leading-none whitespace-nowrap">
                           {tenGodChar}
                         </span>
                         {language === 'en' && (
-                          <span style={{ fontSize: '10px', color: 'rgba(115, 92, 0, 0.6)', fontFamily: '"Noto Serif", serif', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                          <span className="text-[10px] text-gold-deep/60 leading-none whitespace-nowrap">
                             {SHI_SHEN_LABELS[tenGodChar] || tenGodChar}
                           </span>
                         )}
@@ -200,27 +198,19 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
                   </div>
                 ))}
                 {tenGodChar && isMobile && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '10px',
-                    ...(pillOutsideRight
-                      ? { left: `calc(${rightCenterPct}% + 8px)` }
-                      : { left: `calc(${leftCenterPct}% - 8px)`, transform: 'translateX(-100%)' }
-                    ),
-                    display: 'inline-flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '1px',
-                    border: '1px solid rgba(115, 92, 0, 0.25)',
-                    borderRadius: '6px',
-                    padding: '2px 6px',
-                    background: 'rgba(115, 92, 0, 0.06)',
-                  }}>
-                    <span style={{ fontSize: '13px', color: 'rgba(115, 92, 0, 0.75)', fontFamily: '"Ma Shan Zheng", serif', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                  <div
+                    className="absolute top-2.5 inline-flex flex-col items-center gap-px border border-gold-deep/25 rounded-md px-1.5 py-0.5 bg-gold-deep/6"
+                    style={
+                      pillOutsideRight
+                        ? { left: `calc(${rightCenterPct}% + 8px)` }
+                        : { left: `calc(${leftCenterPct}% - 8px)`, transform: 'translateX(-100%)' }
+                    }
+                  >
+                    <span className="font-zh text-[13px] text-gold-deep/75 leading-none whitespace-nowrap">
                       {tenGodChar}
                     </span>
                     {language === 'en' && (
-                      <span style={{ fontSize: '10px', color: 'rgba(115, 92, 0, 0.6)', fontFamily: '"Noto Serif", serif', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                      <span className="text-[10px] text-gold-deep/60 leading-none whitespace-nowrap">
                         {SHI_SHEN_LABELS[tenGodChar] || tenGodChar}
                       </span>
                     )}
@@ -229,19 +219,27 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
               </>
             );
           })()}
-          <div style={{ position: 'absolute', left: `${midPct}%`, transform: 'translateX(-50%)', top: '46px', display: 'flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}>
-            <span style={{ fontFamily: '"Noto Sans SC", sans-serif', fontSize: '12px', fontWeight: 500, color: catStyle.text }}>
+          <div className="absolute -translate-x-1/2 top-[46px] flex items-center gap-[3px] whitespace-nowrap" style={{ left: `${midPct}%` }}>
+            <span className="font-zh-sans text-xs font-medium" style={{ color: catStyle.text }}>
               {ix.类型}
             </span>
             {ix.形态 && (
               <>
-                <span style={{ fontSize: '12px', color: catStyle.accent, opacity: 0.75, margin: '0 1px' }}>·</span>
-                <span style={{ fontFamily: '"Noto Sans SC", sans-serif', fontSize: '11px', fontStyle: 'italic', color: catStyle.accent, opacity: 0.75 }}>
+                <span className="text-xs opacity-75 mx-px" style={{ color: catStyle.accent }}>·</span>
+                <span className="font-zh-sans text-[11px] italic opacity-75" style={{ color: catStyle.accent }}>
                   {ix.形态}
                 </span>
               </>
             )}
-            <span style={{ fontFamily: 'Noto Serif, serif', fontSize: '10px', color: catStyle.accent, background: `${catStyle.accent}18`, border: `1px solid ${catStyle.accent}40`, borderRadius: '3px', padding: '1px 4px', marginLeft: '5px', opacity: ix.强度 !== '消融吸收' ? (STRENGTH_LABEL[ix.强度]?.opacity ?? 1) : 1 }}>
+            <span
+              className="text-[10px] rounded-[3px] px-1 py-px ml-[5px]"
+              style={{
+                color: catStyle.accent,
+                background: `${catStyle.accent}18`,
+                border: `1px solid ${catStyle.accent}40`,
+                opacity: ix.强度 !== '消融吸收' ? (STRENGTH_LABEL[ix.强度]?.opacity ?? 1) : 1,
+              }}
+            >
               {STRENGTH_LABEL[ix.强度]?.[language] ?? ix.强度}
             </span>
           </div>
@@ -258,66 +256,69 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
     const ElemIcon   = ELEMENT_ICONS[item.元素];
     const mechanisms: string[] = item.开库机制 ?? [];
 
+    const openAccent = CATEGORY_STYLES.he.accent;
+
     return (
-      <div key={key} style={{
-        gridColumn: colIndex + 1,
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: '4px', padding: '8px 6px 0 5px', borderRadius: '7px', textAlign: 'center',
-        background: vs.bg,
-        border: `1px solid ${vs.border}`,
-        borderLeft: `1px solid ${vs.border}`,
-        overflow: 'hidden',
-      }}>
+      <div
+        key={key}
+        className="flex flex-col items-center gap-1 pt-2 pr-1.5 pl-[5px] rounded-[7px] text-center overflow-hidden"
+        style={{
+          gridColumn: colIndex + 1,
+          background: vs.bg,
+          border: `1px solid ${vs.border}`,
+        }}
+      >
         {/* Element icon + vault label */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {ElemIcon && React.createElement(ElemIcon, { sx: { fontSize: '15px', color: elemAccent } })}
-          <span style={{ fontFamily: language === 'en' ? '"Noto Sans SC", sans-serif' : '"Ma Shan Zheng", cursive', fontSize: language === 'en' ? '12px' : '14px', fontWeight: language === 'en' ? 500 : undefined, color: vs.text, lineHeight: 1.1 }}>
+        <div className="flex items-center gap-1">
+          {ElemIcon && React.createElement(ElemIcon, { style: { fontSize: '15px', color: elemAccent } })}
+          <span
+            className={`leading-[1.1] ${language === 'en' ? 'font-zh-sans text-xs font-medium' : 'font-zh text-sm'}`}
+            style={{ color: vs.text }}
+          >
             {language === 'en' ? labelEn : item.标签}
           </span>
         </div>
         {/* Mechanisms */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div className="flex items-center gap-[3px] flex-wrap justify-center">
           {mechanisms.length > 0 ? mechanisms.map((m, i) => (
-            <span key={i} style={{ fontFamily: '"Noto Sans SC", sans-serif', fontSize: '11px', fontStyle: 'italic', color: vs.accent, opacity: 0.85 }}>
-              {i > 0 && <span style={{ margin: '0 2px', opacity: 0.5 }}>·</span>}{m}
+            <span key={i} className="font-zh-sans text-[11px] italic opacity-85" style={{ color: vs.accent }}>
+              {i > 0 && <span className="mx-0.5 opacity-50">·</span>}{m}
             </span>
           )) : (
-            <span style={{ fontSize: '11px', color: vs.accent, opacity: 0.25 }}>—</span>
+            <span className="text-[11px] opacity-25" style={{ color: vs.accent }}>—</span>
           )}
         </div>
         {/* Released stem + seasonal state */}
-        <div style={{ fontFamily: '"Noto Sans SC", sans-serif', fontSize: '11px', color: vs.accent, opacity: 0.75 }}>
+        <div className="font-zh-sans text-[11px] opacity-75" style={{ color: vs.accent }}>
           {language === 'en'
             ? `${item.释放} · ${SEASONAL_STATE_EN[item.季节状态] ?? item.季节状态}`
             : `释放${item.释放} · 库气${item.季节状态}`}
         </div>
         {/* Ten God badge */}
         {item.释放十神 && (
-          <div style={{
-            display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-            border: `1px solid ${vs.border}`, borderRadius: '6px', padding: '6px 6px',
-            background: vs.bg,
-          }}>
-            <span style={{ fontSize: '13px', color: vs.text, fontFamily: '"Ma Shan Zheng", serif', lineHeight: 1, whiteSpace: 'nowrap' }}>
+          <div
+            className="inline-flex flex-col items-center gap-1 rounded-md p-1.5"
+            style={{ border: `1px solid ${vs.border}`, background: vs.bg }}
+          >
+            <span className="font-zh text-[13px] leading-none whitespace-nowrap" style={{ color: vs.text }}>
               {item.释放十神}
             </span>
             {language === 'en' && (
-              <span style={{ fontSize: '10px', color: vs.accent, fontFamily: '"Noto Serif", serif', lineHeight: 1, whiteSpace: 'nowrap' }}>
+              <span className="text-[10px] leading-none whitespace-nowrap" style={{ color: vs.accent }}>
                 {SHI_SHEN_LABELS[item.释放十神] || item.释放十神}
               </span>
             )}
           </div>
         )}
         {/* Open / Sealed footer strip */}
-        <div style={{
-          alignSelf: 'stretch',
-          marginLeft: '-5px', marginRight: '-6px', marginTop: '4px',
-          padding: '4px 6px',
-          background: isOpen ? '#1e7a3a18' : `${vs.accent}12`,
-          borderTop: `1px solid ${isOpen ? '#1e7a3a40' : vs.border}`,
-          textAlign: 'center',
-        }}>
-          <span style={{ fontFamily: 'Noto Serif, serif', fontSize: '10px', color: isOpen ? '#1e7a3a' : vs.accent }}>
+        <div
+          className="self-stretch ml-[-5px] mr-[-6px] mt-1 px-1.5 py-1 text-center"
+          style={{
+            background: isOpen ? `${openAccent}18` : `${vs.accent}12`,
+            borderTop: `1px solid ${isOpen ? `${openAccent}40` : vs.border}`,
+          }}
+        >
+          <span className="text-[10px]" style={{ color: isOpen ? openAccent : vs.accent }}>
             {isOpen ? (language === 'en' ? 'Open' : '开泄') : (language === 'en' ? 'Sealed' : '封藏')}
           </span>
         </div>
@@ -331,64 +332,43 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
   const weakEntries = entries.filter(e => e.interaction.强度 === '大幅衰减');
   const absorbedEntries = entries.filter(e => e.interaction.强度 === '消融吸收');
 
-  const renderDivider = (strengthKey: string) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '2px 0' }}>
-      <div style={{ flex: 1, height: '1px', background: 'rgba(115,92,0,0.15)' }} />
-      <span style={{ fontFamily: 'Noto Serif, serif', fontSize: '10px', color: 'rgba(115,92,0,0.4)', whiteSpace: 'nowrap' }}>
-        {STRENGTH_LABEL[strengthKey]?.[language] ?? strengthKey}
-      </span>
-      <div style={{ flex: 1, height: '1px', background: 'rgba(115,92,0,0.15)' }} />
+  const renderDivider = (labelText: string) => (
+    <div className="flex items-center gap-2 my-0.5">
+      <div className="flex-1 h-px bg-gold-deep/15" />
+      <span className="text-[10px] text-gold-deep/40 whitespace-nowrap">{labelText}</span>
+      <div className="flex-1 h-px bg-gold-deep/15" />
     </div>
   );
 
   return (
-    <div style={{ marginTop: '16px' }}>
+    <div className="mt-4">
       <Card
-        style={{ border: '1px solid rgba(115,92,0,0.15)', borderRadius: '12px', background: '#faf8f2' }}
+        style={{ border: `1px solid ${goldAlpha(0.15)}`, borderRadius: '12px', background: palette.parchment }}
         styles={{ body: { padding: '20px 20px 16px' } }}
       >
         {/* Title */}
-        <h3 style={{
-          fontFamily: 'Noto Serif, serif',
-          fontSize: '13px',
-          fontWeight: 600,
-          color: 'rgba(115,92,0,0.6)',
-          margin: '0 0 16px 0',
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-        }}>
+        <h3 className="text-[13px] font-semibold text-gold-deep/60 m-0 mb-4 tracking-[0.08em] uppercase">
           {tr.pillarInteractions[language]}
         </h3>
 
         {/* Pillar column headers */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '10px' }}>
+        <div className="grid grid-cols-4 mb-2.5">
           {PILLAR_ORDER.map((pillarKey, pi) => {
             const pillarData = chartData?.四柱实体?.[pillarKey];
             const isLast = pi === 3;
             return (
               <div
                 key={pillarKey}
-                style={{
-                  textAlign: 'center',
-                  borderRight: isLast ? 'none' : '1px dashed rgba(115,92,0,0.12)',
-                  padding: '0 4px 8px',
-                }}
+                className={`text-center px-1 pb-2 ${isLast ? '' : 'border-r border-dashed border-gold-deep/12'}`}
               >
-                <div style={{
-                  fontSize: '10px',
-                  color: 'rgba(115,92,0,0.4)',
-                  fontFamily: 'Noto Serif, serif',
-                  letterSpacing: '0.06em',
-                  marginBottom: '3px',
-                  textTransform: 'uppercase',
-                }}>
+                <div className="text-[10px] text-gold-deep/40 tracking-[0.06em] mb-[3px] uppercase">
                   {pillarDisplayLabels[pillarKey]}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '2px' }}>
-                  <span style={{ fontFamily: '"Ma Shan Zheng", cursive', fontSize: '20px', color: '#4d4635', lineHeight: 1 }}>
+                <div className="flex justify-center gap-0.5">
+                  <span className="font-zh text-xl text-bronze-muted leading-none">
                     {pillarData?.天干?.天干 ?? '—'}
                   </span>
-                  <span style={{ fontFamily: '"Ma Shan Zheng", cursive', fontSize: '20px', color: '#4d4635', lineHeight: 1 }}>
+                  <span className="font-zh text-xl text-bronze-muted leading-none">
                     {pillarData?.地支?.地支 ?? '—'}
                   </span>
                 </div>
@@ -399,40 +379,34 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
 
         {/* Interaction bars */}
         {entries.length === 0 && vaultItems.length === 0 ? (
-          <p style={{ textAlign: 'center', color: 'rgba(115,92,0,0.35)', fontFamily: 'Noto Serif, serif', fontSize: '12px', margin: '8px 0' }}>
+          <p className="text-center text-gold-deep/35 text-xs my-2">
             {tr.noInteractions[language]}
           </p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div className="flex flex-col gap-3.5">
             {topEntries.map((e, i) => renderRow(e, `top-${i}`))}
             {moderateEntries.length > 0 && (
               <>
-                {renderDivider('中等衰减')}
+                {renderDivider(STRENGTH_LABEL['中等衰减'][language])}
                 {moderateEntries.map((e, i) => renderRow(e, `moderate-${i}`))}
               </>
             )}
             {weakEntries.length > 0 && (
               <>
-                {renderDivider('大幅衰减')}
+                {renderDivider(STRENGTH_LABEL['大幅衰减'][language])}
                 {weakEntries.map((e, i) => renderRow(e, `weak-${i}`))}
               </>
             )}
             {absorbedEntries.length > 0 && (
               <>
-                {renderDivider('消融吸收')}
+                {renderDivider(STRENGTH_LABEL['消融吸收'][language])}
                 {absorbedEntries.map((e, i) => renderRow(e, `absorbed-${i}`))}
               </>
             )}
             {vaultItems.length > 0 && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '2px 0' }}>
-                  <div style={{ flex: 1, height: '1px', background: 'rgba(115,92,0,0.15)' }} />
-                  <span style={{ fontFamily: 'Noto Serif, serif', fontSize: '10px', color: 'rgba(115,92,0,0.4)', whiteSpace: 'nowrap' }}>
-                    {language === 'en' ? 'Vault Dynamics' : '库藏动态'}
-                  </span>
-                  <div style={{ flex: 1, height: '1px', background: 'rgba(115,92,0,0.15)' }} />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                {renderDivider(language === 'en' ? 'Vault Dynamics' : '库藏动态')}
+                <div className="grid grid-cols-4 gap-1.5">
                   {vaultItems.map((item, i) => renderVaultCard(item, `vault-${i}`))}
                 </div>
               </>
@@ -442,36 +416,28 @@ export default function PillarInteractionsCard({ chartData, language }: PillarIn
 
         {/* Legend */}
         {presentCategories.length > 0 && (
-          <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px solid rgba(115,92,0,0.1)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', color: 'rgba(115,92,0,1)', fontFamily: 'Noto Serif, serif', flexShrink: 0 }}>
+          <div className="mt-3.5 pt-2.5 border-t border-gold-deep/10 flex flex-col gap-2">
+            <div className="flex gap-2.5 flex-wrap items-center">
+              <span className="text-[13px] text-gold-deep shrink-0">
                 {language === 'ch' ? '强度：' : 'Strength:'}
               </span>
               {Object.entries(STRENGTH_LABEL).map(([, s]) => (
                 <span
                   key={s.en}
-                  style={{
-                    fontSize: '12px',
-                    fontFamily: 'Noto Serif, serif',
-                    color: 'rgba(115,92,0,0.8)',
-                    background: 'rgba(115,92,0,0.08)',
-                    border: '1px solid rgba(115,92,0,0.2)',
-                    borderRadius: '3px',
-                    padding: '1px 5px',
-                    opacity: s.opacity,
-                  }}
+                  className="text-xs text-gold-deep/80 bg-gold-deep/8 border border-gold-deep/20 rounded-[3px] px-[5px] py-px"
+                  style={{ opacity: s.opacity }}
                 >
                   {s[language]}
                 </span>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+            <div className="flex gap-3.5 flex-wrap">
               {presentCategories.map(cat => {
                 const s = CATEGORY_STYLES[cat];
                 return (
-                  <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <div style={{ width: '12px', height: '3px', background: s.accent, borderRadius: '4px' }} />
-                    <span style={{ fontSize: '13px', color: 'rgba(115,92,0,1)', fontFamily: 'Noto Serif, serif' }}>
+                  <div key={cat} className="flex items-center gap-[5px]">
+                    <div className="w-3 h-[3px] rounded" style={{ background: s.accent }} />
+                    <span className="text-[13px] text-gold-deep">
                       {s.label[language]}
                     </span>
                   </div>
