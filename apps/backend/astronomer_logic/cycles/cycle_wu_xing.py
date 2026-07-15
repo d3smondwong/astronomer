@@ -317,7 +317,7 @@ _MOVE_PHRASE = {
 }
 def _element_reading(
     element: str, ten_god: str, state: str, change: str, role: str,
-    note: str, cycle_label: str,
+    note: str, cycle_label: str, is_primary: bool = False,
 ) -> str:
     """One-line LLM-facing reading fusing 用神(角色) × movement × domain.
 
@@ -331,17 +331,30 @@ def _element_reading(
     The 仇神 arm is why the role must be a real field rather than a 综合 lookup: a 仇神 is
     still 综合 == "平", so deriving the role from 综合 would call it 闲神 and report a rising
     one as 「平和应对」 — harmless — when it is in fact feeding the 忌神 the chart fears.
+
+    `is_primary` flags THE singular 用神 (五神.用神 == this element). It is deliberately NOT
+    a 角色 value: 用神 is a singleton SELECTION, not a set membership like the four roles, so
+    it lives in 五神.用神 and is passed in here as a boolean. When set (the element is always
+    a 喜用神), the reading names it 用神 and gives it the strongest verdict — a period feeding
+    the chart's single most critical element is the headline signal, not a generic 喜神.
     """
     move = _MOVE_PHRASE.get(change, "力量持平")
     rising = change in ("大升", "升")
     falling = change in ("大降", "降")
 
     if role == "喜用神":
-        verdict = (
-            "喜神得势，运势得力，为吉" if rising
-            else "喜神受挫，助力转弱，宜固本培元" if falling
-            else "喜神平稳，得其滋养"
-        )
+        if is_primary:
+            verdict = (
+                "用神得地，运势之枢，为大吉" if rising
+                else "用神受制，根基动摇，最宜谨守" if falling
+                else "用神安居，根基得守"
+            )
+        else:
+            verdict = (
+                "喜神得势，运势得力，为吉" if rising
+                else "喜神受挫，助力转弱，宜固本培元" if falling
+                else "喜神平稳，得其滋养"
+            )
     elif role == "忌神":
         verdict = (
             "忌神增势，压力渐显，宜谨慎防范" if rising
@@ -357,7 +370,8 @@ def _element_reading(
     else:
         verdict = "闲神随运流转，平和应对"
 
-    reading = f"{ten_god}（{element}）为{role}，本{cycle_label}居{state}、{move}，{verdict}。"
+    role_label = "用神" if is_primary else role
+    reading = f"{ten_god}（{element}）为{role_label}，本{cycle_label}居{state}、{move}，{verdict}。"
     if note:
         reading += f"（{note}）"
     return reading
@@ -507,6 +521,7 @@ def get_cycle_wu_xing(
     dm_element = LunarUtil.WU_XING_GAN.get(ctx.effective_day_stem, "")
     base_map = baseline if baseline is not None else ctx.natal_five_elements
     ys = ctx.yong_shen["五行"]
+    primary_yong = ctx.yong_shen.get("五神", {}).get("用神", "")  # singleton; "" iff 喜用 空
     five = {}
     for el in ELEMENTS:
         change = _delta(combined[el]["力量"], base_map[el]["力量"])
@@ -523,7 +538,8 @@ def get_cycle_wu_xing(
             # DATA, not only in the 解读 prose, so consumers need not parse the sentence.
             "角色": role,
             "解读": _element_reading(
-                el, tg, combined[el]["状态"], change, role, ys[el]["备注"], cycle_label
+                el, tg, combined[el]["状态"], change, role, ys[el]["备注"], cycle_label,
+                is_primary=(el == primary_yong),
             ),
         }
         if baseline is not None:  # 流年 only — the enclosing 大运's level for this element

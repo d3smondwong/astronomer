@@ -242,6 +242,21 @@ export interface GeJuDetail {
   提示: string | null;
 }
 
+/**
+ * The classical Five Gods, as a view over YongShen's sets (see YongShen.五神).
+ * 用神 ∪ 喜神 partitions 喜用; 用神 is "" only when 喜用 is empty (a 中和 chart with no
+ * curated 调候 row). 忌神/仇神/闲神 equal YongShen.忌/仇/闲.
+ */
+export interface WuShen {
+  /** The single primary remedy — one element of 喜用, or "" when 喜用 is empty. */
+  用神: string;
+  /** The rest of 喜用 (supporters of 用神), NOT elements that 生 the 用神. */
+  喜神: string[];
+  忌神: string[];
+  仇神: string[];
+  闲神: string[];
+}
+
 /** Chart-fixed 用神 (调候用神 + 扶抑用神, or the structure). Same shape on /natal and /cycles. */
 export interface YongShen {
   /** Day-master STRENGTH verdict. Previously (mis)named 格局 — they are different things. */
@@ -249,6 +264,13 @@ export interface YongShen {
   /** The chart's STRUCTURE — decides whether 喜忌 are 扶抑-derived or structure-derived. */
   格局: GeJuDetail["格局"];
   格局详情: GeJuDetail;
+  /**
+   * The classical 五神 (Five Gods) as an ADDITIVE presentation split of the sets below —
+   * NOT a re-derivation. 用神 names which single element of 喜用 leads; 喜神 is the rest of
+   * the SAME 喜用 set (its supporters), never "生用神". 忌神/仇神/闲神 mirror 忌/仇/闲 exactly.
+   * Read 综合/角色 (in 五行) for the authoritative engine axes; 五神 is human/LLM-facing.
+   */
+  五神: WuShen;
   /**
    * Is the 调候 (climate) layer IN FORCE? False for 从格/专旺格/化气格, which follow 顺其势 —
    * 调候 is a 正格 concept. The 调候* fields below stay populated as CONTEXT (indexed on the

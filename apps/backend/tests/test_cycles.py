@@ -561,6 +561,90 @@ class TestChouShen:
         assert "闲神随运流转" not in tu["解读"]
 
 
+# ── 五神 — additive singular 用神 + the 喜用 split ────────────────────────────
+
+
+class TestWuShen:
+    """五神 names ONE primary 用神 and splits 喜用 into 用神 + 喜神, WITHOUT re-deriving
+    忌/仇/闲. It stays a pure view over the day-master-anchored sets: re-anchoring
+    favourability on the 用神 (喜神 = 生用神, 忌神 = 克用神, …) would demote a real
+    day-master 忌 (食伤 leaking a weak DM) to 仇/闲 — exactly the inversion this layer avoids.
+    """
+
+    def test_weak_dm_primary_is_the_both_systems_element(self):
+        """戊 in 亥, 弱: 火(印) is BOTH a 调候用神 (丙) and the 扶抑 support → it leads. The
+        官杀 木 — a 调候用神 too, but 扶抑-忌 — is a supporter (喜神), never the primary."""
+        wu = make_yong_shen("戊", "土", "亥", "弱")["五神"]
+        assert wu["用神"] == "火"
+        assert wu["喜神"] == ["木", "土"]
+
+    def test_zhong_he_primary_follows_climate_priority(self):
+        """中和: 扶抑 is silent, so 调候喜[0] (甲=木) leads and the rest of 喜用 support it."""
+        ys = make_yong_shen("戊", "土", "亥", "中和")
+        wu = ys["五神"]
+        assert wu["用神"] == ys["调候喜五行"][0] == "木"
+        assert set(wu["喜神"]) | {wu["用神"]} == set(ys["喜用"])
+
+    def test_cong_ge_primary_is_the_dominant_force(self):
+        """非正格: the primary 用神 is the 主导 force's element (财星 for 从财格), read off the
+        structure — not a 调候/扶抑 pick. 辛(金) DM → 财 = 木."""
+        ys = calculate_natal_chart(**TestGeJu.CONG_CAI)[0]["用神"]
+        assert ys["格局详情"]["主导"] == "财星"
+        assert ys["五神"]["用神"] == "木"
+
+    def test_wu_shen_is_a_view_over_the_sets(self):
+        """用神 ∪ 喜神 partitions 喜用, and 忌/仇/闲 pass through unchanged. The engine axes
+        (综合/角色) are never re-derived from the 用神 — 五神 is presentation only."""
+        charts = [
+            make_yong_shen("戊", "土", "亥", "弱"),
+            make_yong_shen("甲", "木", "寅", "旺"),
+            make_yong_shen("戊", "土", "亥", "中和"),
+            calculate_natal_chart(**TestGeJu.CONG_CAI)[0]["用神"],
+        ]
+        for ys in charts:
+            wu = ys["五神"]
+            assert wu["忌神"] == ys["忌"]      # sets pass through, not re-derived
+            assert wu["仇神"] == ys["仇"]
+            assert wu["闲神"] == ys["闲"]
+            if ys["喜用"]:
+                assert wu["用神"] in ys["喜用"]
+                assert wu["用神"] not in wu["喜神"]
+                assert set(wu["喜神"]) | {wu["用神"]} == set(ys["喜用"])
+            else:
+                assert wu["用神"] == ""
+
+    def test_primary_reading_is_the_headline_not_a_generic_xi_shen(self):
+        """The singular 用神 reads as 用神 with the strongest verdict; a 喜用神 supporter reads
+        as 喜神. is_primary is a boolean flag, NOT a 角色 value — 角色 stays 喜用神 for both."""
+        from apps.backend.astronomer_logic.cycles.cycle_wu_xing import _element_reading
+
+        primary = _element_reading(
+            "火", "印星", "帝旺", "升", "喜用神", "", "大运", is_primary=True
+        )
+        assert "为用神" in primary and "用神得地" in primary and "大吉" in primary
+
+        supporter = _element_reading(
+            "木", "官杀", "帝旺", "升", "喜用神", "", "大运", is_primary=False
+        )
+        assert "为喜用神" in supporter and "喜神得势" in supporter
+        assert "用神得地" not in supporter
+
+    def test_primary_is_wired_from_five_shen_end_to_end(self, desmond_ctx):
+        """五神.用神 (火 for Desmond) drives the real cycle reading — 火 reads 为用神 while 木,
+        a 喜用神 supporter, stays 为喜用神. Proves the wiring, not just the pure function."""
+        from apps.backend.astronomer_logic.cycles.cycle_wu_xing import get_cycle_wu_xing
+
+        assert desmond_ctx.yong_shen["五神"]["用神"] == "火"
+        pillar = build_cycle_pillar("丙", "午", "", desmond_ctx, "大运")
+        ix = get_cycle_interactions(
+            "丙", "午", desmond_ctx, cycle_label="大运",
+            cycle_stem_rooting=pillar["天干"]["根基强度"],
+        )
+        five = get_cycle_wu_xing("丙", "午", desmond_ctx, ix, pillar, "大运")["五行"]
+        assert "为用神" in five["火"]["解读"]
+        assert "为喜用神" in five["木"]["解读"]   # a 喜用神, but not THE primary
+
+
 # ── 1×4 interaction engine (hand-built fixtures) ────────────────────────────
 
 

@@ -52,6 +52,10 @@ Detection gate (all must hold): 得令 = 0, 得地 = 无根, 得势 = 0, **and �
 
 **仇神/闲神 are a SPLIT of the 平 bucket — 角色 and 综合 are different axes.** `yong_shen.py` assigns every element both a favourability verdict `综合` (喜/忌/平) and a 五神 role `角色` (喜用神/忌神/仇神/闲神). **仇神 = 生忌神者** — an element that is neither wanted nor feared in itself but *feeds* one the chart fears (火生土 when 土 is 忌). Because 喜用/忌 are **sets** (调候 ∪ 扶抑, or structure-derived), an element that generates a 忌 element may already be the 用神 (土生金 on a weak 戊 that fears 金) — so **喜/忌 always win the label** and 仇神 is assigned in a second pass over the `平` leftovers only. The `克喜用神者` formulation is deliberately NOT encoded: under 扶抑, whatever attacks the 用神 is already tagged 忌.
 
+**The `五神` block is a VIEW over those sets, never a re-derivation.** `_select_yong_shen` names one primary `用神` (化气格 → 化神; 从/专旺 → 主导 force's element; 正格 弱/旺 → the 扶抑 winner, preferring the element 调候 also concurs on; 正格 中和 → 调候喜[0]) and splits `喜用` into `用神` ∪ `喜神` — 喜神 is *the rest of the same 喜用 set*, its supporters, and `忌神/仇神/闲神` equal `忌/仇/闲` verbatim. The classical 生克 chain (`喜神 = 生用神`, `忌神 = 克用神`, `仇神 = 生忌神`) is deliberately NOT used to compute these: that chain re-anchors favourability on the **用神**, but 扶抑 anchors on the **日主** — a weak DM has three distinct 忌 categories (官杀克身/财耗身/食伤泄身), and a single-node 生克 chain would demote a real 忌 (食伤 leaking the DM) to 仇/闲. `五神` is human/LLM-facing; `综合`/`角色` stay the authoritative axes `cycle_wu_xing`/评级 read.
+
+**用神 is a singleton SELECTION, never a fifth `角色` value.** The per-element `角色` keeps four values (`喜用神/忌神/仇神/闲神`); the primary 用神 is named once in `五神.用神` and its per-element `角色` stays `喜用神`. Overloading `角色` with a `用神` value would (a) lose the "exactly one" invariant a categorical enum cannot express, and (b) break every `role == "喜用神"` site — the primary would fall through to the 闲神 arm and read 「平和应对」, the same 仇神-as-闲神 bug class the module already guards. Instead `_element_reading` takes an `is_primary` boolean (derived at read time from `五神.用神`, single source of truth) and gives the primary a headline verdict (`用神得地，运势之枢，为大吉`) distinct from a 喜神 supporter's — presentation richness without touching the role axis or `YongShenRole`.
+
 Consequences that look like bugs but are not: on a **弱/旺 正格 chart `仇` and `闲` are BOTH empty** — 扶抑 tags all five elements 喜 or 忌 and nothing is left idle. 仇神 only fires on **中和 charts** (~24%, where 扶抑 is silent and only 调候 speaks) and on **非正格** charts. And **仇神 never moves `运势.评级`**: 评级 reads `综合`, and a 仇神 is still `平` → 平运. `角色` is a *reading*, `综合` is the *verdict* — orthogonal axes, same discipline as 警示 vs 评级 in the 岁运 layer. `cycle_wu_xing.py` must READ `角色` from the 用神 block, never re-derive a role from `综合` — doing so is what made a 仇神 report 「闲神随运流转，平和应对」 (harmless) while it was strengthening the chart's 忌神.
 
 **假化 never gets 化气格 用神:** `ten_gods.py` applies the DM element change for `形态 == "化气格"` ONLY. If 用神 treated 假化 as transformed, the 十神 layer would label every god against the ORIGINAL day master while 用神 reasoned about the 化神 — the two layers would disagree about what the day master *is*. 假化 falls through to normal detection and carries an advisory.
@@ -133,8 +137,10 @@ class CyclesInput(BirthInput):
 ```json
 {
   "起运": { "顺逆": "顺推|逆推", "起运阳历": "...", "起运计岁": "...", "性别": "..." },
-  "用神": { "强弱", "格局", "格局详情", "调候适用", "调候用神", "调候忌神", "调候喜五行", "调候忌五行",
+  "用神": { "强弱", "格局", "格局详情", "五神", "调候适用", "调候用神", "调候忌神", "调候喜五行", "调候忌五行",
            "喜用", "忌", "仇", "闲", "大运喜", "大运忌", "五行", "经典" },
+  // 五神 = { 用神 (singular; "" iff 喜用 空), 喜神 (rest of 喜用), 忌神, 仇神, 闲神 } — additive
+  //   presentation split of the sets; 综合/角色 stay authoritative. See yong_shen._select_yong_shen.
   // 五行[元素] = { 十神, 扶抑, 调候, 综合 (喜|忌|平), 角色 (喜用神|忌神|仇神|闲神), 备注 }
   "大运": [
     { "序号": 0, "阶段": "未行大运", "干支": "", "开始年份", "结束年份", "开始年龄", "结束年龄", "流年": [] },

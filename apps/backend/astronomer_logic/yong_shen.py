@@ -63,6 +63,69 @@ _STRONG = frozenset({"极旺", "旺"})
 # ten-god categories that SUPPORT the day master (帮身/生身)
 _SUPPORTIVE = frozenset({"印星", "比劫"})
 
+# Preference order for the SINGLE primary 用神 when 扶抑 is decisive (弱/旺 正格) and the two
+# systems (调候 ∩ 扶抑) do not already agree on one element. Classical default, not a hard
+# rule — it only ranks WITHIN the 扶抑-喜 categories, never invents a verdict:
+#   weak DM  → 印 (continuous 生身) before 比 (帮身).
+#   strong DM → 泄 (食伤, 秀气流行) before 耗 (财) before 克 (官杀).
+_WEAK_PRIMARY_PREF = ("印星", "比劫")
+_STRONG_PRIMARY_PREF = ("食伤", "财星", "官杀")
+
+
+def _select_yong_shen(
+    ge_ju: dict,
+    dm_element: str,
+    dm_strength: str,
+    climate_elements: list[str],
+    per_element: dict[str, dict],
+    favorable: list[str],
+) -> str:
+    """Pick the SINGLE primary 用神 element — the chart's most critical remedy.
+
+    Purely additive over the set-based 喜用: this only names WHICH element of 喜用 leads.
+    It never re-derives 忌/仇/闲 — those stay day-master-anchored sets (see module docstring).
+    The returned element is always a member of `favorable`, except the degenerate case of a
+    chart with no favourable element at all (中和 with no 调候 table), where it is "".
+
+    Priority:
+      • 化气格 → the 化神.
+      • 从格 / 专旺格 → the 主导 force's element.
+      • 正格 弱/旺 → the 扶抑 winner; when 调候 concurs on one of those elements it leads
+        (both systems agree → strongest primary), else classical preference within the
+        扶抑-喜 categories.
+      • 正格 中和 → 调候喜[0] (the climate table is priority-ordered).
+    """
+    if ge_ju["格局"] == "化气格":
+        return ge_ju.get("化神") or (favorable[0] if favorable else "")
+    if ge_ju["格局"] != "正格":
+        dominant = ge_ju.get("主导")
+        for el in ELEMENTS:
+            if element_ten_god_class(el, dm_element) == dominant:
+                return el
+        return favorable[0] if favorable else ""
+
+    # 正格. When 强弱 is decisive, 扶抑 owns the primary; when 中和, 扶抑 is silent and 调候 leads.
+    if dm_strength in _WEAK or dm_strength in _STRONG:
+        fu_yi_xi = [el for el in favorable if per_element[el]["扶抑"] == "喜"]
+        # both systems concur on an element → strongest possible primary
+        for el in climate_elements:
+            if el in fu_yi_xi:
+                return el
+        # else rank within the 扶抑-喜 categories by classical preference
+        pref = _WEAK_PRIMARY_PREF if dm_strength in _WEAK else _STRONG_PRIMARY_PREF
+        for cat in pref:
+            for el in fu_yi_xi:
+                if per_element[el]["十神"] == cat:
+                    return el
+        if fu_yi_xi:
+            return fu_yi_xi[0]
+
+    # 中和 (or no 扶抑 winner survived): 调候 leads, in its priority order.
+    for el in climate_elements:
+        if el in favorable:
+            return el
+    return favorable[0] if favorable else ""
+
 
 def _fu_yi_stance(ten_god_class: str, dm_strength: str) -> str:
     """扶抑 stance for an element's ten-god category vs the day master strength.
@@ -117,6 +180,11 @@ def get_yong_shen(
           "强弱": "极旺|旺|中和|弱|极弱",   # the day-master STRENGTH verdict
           "格局": "正格|从财格|…|化气格",    # the chart's STRUCTURE (see ge_ju)
           "格局详情": {...},                # full ge_ju block (真假/主导/依据/破格/提示)
+          "五神": {                        # classical Five Gods — ADDITIVE split of the sets
+            "用神": "火",                  #   singular primary remedy ("" iff 喜用 is empty)
+            "喜神": ["木"],                #   the rest of 喜用 (supporters), NOT 生用神
+            "忌神": [...], "仇神": [...], "闲神": [...],  # == 忌 / 仇 / 闲 below, unchanged
+          },
           "调候适用": bool,                # False for 从/专旺/化气 — context, not rules
           "调候用神": [stems],
           "调候忌神": [stems],
@@ -252,10 +320,28 @@ def get_yong_shen(
             entry_el["角色"] = "闲神"
             idle.append(el)
 
+    # 五神 — the classical Five Gods, as an ADDITIVE presentation split of the sets above,
+    # NOT a re-derivation. 用神 names which element of 喜用 is primary; 喜神 is the rest of the
+    # SAME 喜用 set (its supporters), never "生用神" — deriving 喜/忌/仇 off the 用神 via 生克
+    # would re-anchor favourability on the 用神 and demote real day-master 忌 (e.g. 食伤 leaking
+    # a weak DM) to 仇/闲. 忌神/仇神/闲神 are the sets computed above, unchanged. 综合/角色 remain
+    # the authoritative axes read by cycle_wu_xing/评级; 五神 is a human/LLM-facing convenience.
+    yong = _select_yong_shen(
+        ge_ju, dm_element, dm_strength, climate_elements, per_element, favorable
+    )
+    wu_shen = {
+        "用神": yong,                                  # singular primary remedy ("" iff 喜用 empty)
+        "喜神": [el for el in favorable if el != yong],  # the rest of 喜用 — supporters of 用神
+        "忌神": unfavorable,
+        "仇神": chou,
+        "闲神": idle,
+    }
+
     return {
         "强弱": dm_strength,
         "格局": ge_ju["格局"],
         "格局详情": ge_ju,
+        "五神": wu_shen,
         # 调候适用 — is the climate layer IN FORCE for this chart?
         #
         # False for 从格/专旺格/化气格: those follow 顺其势 (go with the dominant force), and
