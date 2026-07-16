@@ -250,9 +250,11 @@ export default function DayMasterStrengthCard({ chartData, language }: DayMaster
               </div>
             </div>
 
-            {/* Verdict text below gauge — color is tier-driven */}
+            {/* Verdict text below gauge — color is tier-driven. English labels ("Very Strong")
+                are far wider than the 2-char Chinese, so they run smaller to clear the gauge's
+                end labels. */}
             <div
-              className={`text-[28px] font-bold leading-none mt-3 ${language === 'ch' ? 'font-zh' : 'font-serif'}`}
+              className={`font-bold leading-none mt-4 ${language === 'ch' ? 'font-zh text-[28px]' : 'font-serif text-[19px]'}`}
               style={{ color: getTierForScore(强弱分数).color }}
             >
               {language === 'ch' ? 强弱 : getTierForScore(强弱分数).label.en}

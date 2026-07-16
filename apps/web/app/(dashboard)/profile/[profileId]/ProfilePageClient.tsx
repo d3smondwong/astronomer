@@ -508,10 +508,10 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
                       </div>
                     );
                   })()}
-                  <FiveElementsCard chartData={chartData} language={language} />
-                  <PillarInteractionsCard chartData={chartData} language={language} />
                   <DayMasterStrengthCard chartData={chartData} language={language} />
+                  <FiveElementsCard chartData={chartData} language={language} />
                   <FavorableElementsCard chartData={chartData} language={language} />
+                  <PillarInteractionsCard chartData={chartData} language={language} />
                 </div>
               ),
             },
