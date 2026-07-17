@@ -297,7 +297,12 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       // Success needs no announcement — navigating away from the deleted profile is the feedback.
-      router.push('/');
+      // Go to '/' and let the server component pick the destination: it redirects to the newest
+      // remaining chart, or renders the landing page if that was the last one. Keeping that
+      // choice in one place means this handler never needs the profile list.
+      // replace(), not push(): the deleted profile must not stay in history, where Back would
+      // land on a profile that no longer resolves.
+      router.replace('/');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error('Error deleting profile:', error);
