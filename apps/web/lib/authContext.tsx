@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   type User,
   onIdTokenChanged,
@@ -88,11 +89,39 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState<ModalConfig>({});
   const [spotlightCreateForm, setSpotlightCreateForm] = useState(false);
+  // Identity the server tree was last re-rendered for, as `uid:isAnonymous`.
+  const syncedIdentityRef = useRef<string | null>(null);
+
+  /**
+   * Mint/refresh the session cookie, then re-render the server tree if the identity it
+   * represents actually changed.
+   *
+   * Server Components read identity from the cookie, but the cookie is established
+   * asynchronously *after* first paint — so a server-rendered tree (the dashboard sidebar)
+   * would otherwise render for "no session" and never update. router.refresh() re-runs it
+   * once the cookie lands.
+   *
+   * Keyed on `uid:isAnonymous`, not uid alone: linkWithCredential (the common guest→account
+   * upgrade) preserves the uid while flipping isAnonymous, and that transition changes what
+   * the server should render. Without the key, the hourly silent token refresh would re-render
+   * the whole tree every hour for nothing.
+   */
+  const syncSession = async (u: User): Promise<boolean> => {
+    const ok = await establishSessionCookie(u);
+    if (!ok) return false;
+    const identity = `${u.uid}:${u.isAnonymous}`;
+    if (syncedIdentityRef.current !== identity) {
+      syncedIdentityRef.current = identity;
+      router.refresh();
+    }
+    return true;
+  };
 
   useEffect(() => {
     // onIdTokenChanged (not onAuthStateChanged) so that linking a credential onto the
@@ -113,13 +142,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(u);
       setLoading(false);
       // Establish/refresh the server session cookie for SSR ownership checks + route gating.
-      await establishSessionCookie(u);
+      await syncSession(u);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refreshSession = async (): Promise<boolean> => {
     if (!auth.currentUser) return false;
-    return establishSessionCookie(auth.currentUser);
+    return syncSession(auth.currentUser);
   };
 
   const signOut = async () => {

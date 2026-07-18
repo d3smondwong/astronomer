@@ -12,6 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { verifyToken } from '@/lib/firebaseAdmin';
 import { reassignProfiles } from '@/lib/profilesDb';
 
@@ -46,5 +47,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const migrated = await reassignProfiles(source.uid, dest.uid);
+
+  // Ownership just changed, so the server-rendered sidebar (and app/page.tsx's redirect
+  // decision) are both stale for the destination account. Easy to miss because this runs
+  // *after* the upgrade: without it, a guest who signs into an existing account sees the
+  // pre-migration list until a hard reload.
+  if (migrated > 0) revalidatePath('/', 'layout');
+
   return NextResponse.json({ migrated });
 }

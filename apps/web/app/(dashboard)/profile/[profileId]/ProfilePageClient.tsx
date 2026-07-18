@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { type VoidStatus, type VoidCondition } from '@/types/baziLibraryTypes';
-import { type ProfileRecord } from '@/lib/profilesDb';
+import { type ProfileRecord } from '@/types/profile';
 import { type InsightsResponse, type StructuredSection } from '@/lib/fastApiClient';
 import { Alert, Card, Tabs, Button, Popconfirm, Tooltip, Collapse } from 'antd';
 import dayjs from 'dayjs';
@@ -13,6 +13,7 @@ import { useLanguage } from '@/lib/languageContext';
 import { translations } from '@/lib/translations';
 import { useAuth } from '@/lib/authContext';
 import { reportClientError } from '@/lib/errorReporter';
+import { deleteProfileAction } from '@/app/actions/profiles';
 import { goldAlpha, palette } from '@/lib/theme';
 import PillarCard from './PillarCard';
 import FiveElementsCard from './FiveElementsCard';
@@ -138,7 +139,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
   const { language } = useLanguage();
   const tr = translations.profile;
   const trAuth = translations.auth;
-  const { user, openAuthModal } = useAuth();
+  const { user, openAuthModal, setSpotlightCreateForm } = useAuth();
   const router = useRouter();
   // Ensures the auto insights generation fires at most once per mount.
   const insightsRequestedRef = useRef(false);
@@ -291,11 +292,12 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
     setDeleteError(false);
     try {
       const idToken = user ? await user.getIdToken() : null;
-      const res = await fetch(`/api/profiles/${profileRecord.profileId}`, {
-        method: 'DELETE',
-        headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!idToken) throw new Error('No auth token');
+      const res = await deleteProfileAction(idToken, profileRecord.profileId);
+      if (!res.ok) throw new Error(res.code);
+      // That was their last chart → spotlight the landing form so the next step is the only
+      // lit thing on screen (same treatment a brand-new account gets after sign-up).
+      if (res.remaining === 0) setSpotlightCreateForm(true);
       // Success needs no announcement — navigating away from the deleted profile is the feedback.
       // Go to '/' and let the server component pick the destination: it redirects to the newest
       // remaining chart, or renders the landing page if that was the last one. Keeping that

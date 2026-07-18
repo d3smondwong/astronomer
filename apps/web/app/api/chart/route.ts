@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import {
   fetchNatalChart,
   BirthInputPayload,
@@ -141,6 +142,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Write profile document (references chart/insights by chartKey)
     await createProfile(profileRecord);
+
+    // The dashboard sidebar is server-rendered from this collection, and app/page.tsx's
+    // redirect decision reads it too — both must see the new profile. 'layout' rooted at '/'
+    // is what reaches a shared layout. Route handlers can revalidate just like Server Actions,
+    // which is why chart creation didn't need converting to one.
+    revalidatePath('/', 'layout');
 
     // Return response with cache headers
     return NextResponse.json(

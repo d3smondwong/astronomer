@@ -7,30 +7,16 @@
  * Firestore emulator). All functions are async.
  */
 
+import 'server-only';
 import { getDb } from '@/lib/firebaseAdmin';
 import { deleteCachedInsights } from '@/lib/insightsCacheDb';
+import { type ProfileRecord } from '@/types/profile';
 
 const COLLECTION = 'profiles';
 
-export interface ProfileRecord {
-  profileId: string;
-  name: string;
-  birthLocation: string;
-  birthData: {
-    year: number;
-    month: number;
-    day: number;
-    hour: number;
-    minute: number;
-    gender: number;
-    latitude: number;
-    longitude: number;
-    use_solar_time_correction: boolean;
-  };
-  createdAt: string;
-  chartKey?: string;
-  userId?: string;
-}
+// The shape lives in types/ so client components can import it without pulling this
+// server-only module into their bundle. Re-exported here for existing server-side callers.
+export type { ProfileRecord };
 
 export async function readProfiles(userId?: string): Promise<ProfileRecord[]> {
   if (!userId) return [];
