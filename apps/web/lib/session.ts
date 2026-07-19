@@ -12,6 +12,7 @@
  */
 
 import 'server-only';
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { getAdminAuth, type VerifiedUser } from '@/lib/firebaseAdmin';
 
@@ -39,20 +40,35 @@ export async function createSessionCookie(idToken: string): Promise<string> {
 }
 
 /**
- * Resolve the current caller from the session cookie, or null if absent/invalid.
+ * Resolve the current caller from the session cookie, or null if absent/invalid/revoked.
  *
- * checkRevoked is intentionally OFF: it would add a per-request Auth lookup to detect revoked
- * sessions / disabled accounts, but sign-out here only clears the cookie (no revokeRefreshTokens),
- * so there is nothing to detect. If a true "sign out everywhere" / account-disable flow is added,
- * revoke on sign-out and flip this to verifySessionCookie(cookie, true).
+ * checkRevoked is ON. Sign-out calls revokeRefreshTokens (see app/api/auth/session/route.ts),
+ * and this flag is what gives that teeth: without it a leaked cookie stayed valid for its full
+ * 14 days with no way to kill it, because signing out only cleared the cookie in the browser
+ * that clicked the button. Also catches disabled accounts.
+ *
+ * WHY cache(): the flag turns verification from a local JWT check (~0ms, cached public keys)
+ * into a network round-trip to Firebase Auth. A single /profile/<id> render calls this THREE
+ * times — root layout, dashboard layout, page — and those calls cannot be collapsed by
+ * restructuring, because an App Router layout receives `children` as an opaque ReactNode and
+ * so cannot pass data down to a page. React's cache() memoizes per request, turning 3 lookups
+ * into 1. Do not unwrap it as redundant: without it this change triples the Auth traffic of
+ * every page render. Note cache() keys on arguments, so keep this function argument-free and
+ * keep reading the cookie inside it.
+ *
+ * Requests with no cookie return before any network call, so logged-out visitors to the
+ * public landing page cost nothing.
  */
-export async function getSessionUser(): Promise<VerifiedUser | null> {
+export const getSessionUser = cache(async (): Promise<VerifiedUser | null> => {
   const cookie = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!cookie) return null;
   try {
-    const decoded = await getAdminAuth().verifySessionCookie(cookie);
+    const decoded = await getAdminAuth().verifySessionCookie(cookie, true);
     return { uid: decoded.uid, isAnonymous: decoded.firebase?.sign_in_provider === 'anonymous' };
   } catch {
+    // A revoked cookie throws auth/session-cookie-revoked and lands here, so it is treated
+    // exactly like "no session" — which callers already handle (the profile page redirects
+    // to /?login=1). No separate error path is needed.
     return null;
   }
-}
+});
