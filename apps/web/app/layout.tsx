@@ -5,6 +5,7 @@ import { Noto_Serif, Ma_Shan_Zheng, Noto_Sans_SC } from 'next/font/google';
 import { antdTheme } from '@/lib/theme';
 import { LanguageProvider } from '@/lib/languageContext';
 import { ClientRoot } from '@/components/ClientRoot';
+import { getSessionUser } from '@/lib/session';
 
 /**
  * Self-hosted fonts via next/font — no render-blocking Google Fonts CSS.
@@ -40,17 +41,27 @@ export const metadata: Metadata = {
   description: "An ethereal Bazi reading application rooted in ancient wisdom and driven by AI.",
 };
 
-export default function RootLayout({
+/**
+ * Async because it reads the session cookie: AuthProvider needs to know which identity the
+ * SERVER actually rendered for, so it can tell whether a router.refresh() is still needed.
+ * That comparison replaces an "already synced" flag which a remount could reset, causing an
+ * endless refresh loop (see lib/authContext.tsx). Reading cookies here makes every route
+ * dynamic — no loss, they already were.
+ */
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getSessionUser();
+  const serverIdentity = session ? `${session.uid}:${session.isAnonymous}` : null;
+
   return (
     <html lang="en" className={`${notoSerif.variable} ${maShanZheng.variable} ${notoSansSC.variable}`}>
       <body className="antialiased" suppressHydrationWarning>
         <ConfigProvider theme={antdTheme}>
           <LanguageProvider>
-            <ClientRoot>
+            <ClientRoot serverIdentity={serverIdentity}>
               {children}
             </ClientRoot>
           </LanguageProvider>

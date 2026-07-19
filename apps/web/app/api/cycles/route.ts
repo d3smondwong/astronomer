@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchCycles, type RequestContext } from '@/lib/fastApiClient';
 import { findProfile } from '@/lib/profilesDb';
 import { verifyIdToken } from '@/lib/firebaseAdmin';
+import { toClientError } from '@/lib/errors';
 
 interface CyclesRequestBody {
   profileId: string;
@@ -80,8 +81,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
   } catch (error) {
+    // Log everything (incl. the raw upstream body), return only the sanitized prose.
     console.error('Error in /api/cycles:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+
+    const { message, status, code } = toClientError(error);
+    return NextResponse.json({ error: message, code }, { status });
   }
 }

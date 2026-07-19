@@ -38,6 +38,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         profileId: clip(body?.profileId),
         section: clip(body?.section),
         status: typeof body?.status === 'number' ? body.status : undefined,
+        // This handler reads a FIXED field list — anything not named here is dropped.
+        // digest is the join key from a boundary report to Next's own masked server-side
+        // error log; boundary says which error.tsx caught it.
+        digest: clip(body?.digest),
+        boundary: clip(body?.boundary),
         url: clip(body?.url),
         userAgent: clip(request.headers.get('user-agent') ?? undefined),
         ts: typeof body?.ts === 'number' ? body.ts : Date.now(),

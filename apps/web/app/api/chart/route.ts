@@ -19,6 +19,7 @@ import {
 import { createProfile, readProfiles, type ProfileRecord } from '@/lib/profilesDb';
 import { verifyToken } from '@/lib/firebaseAdmin';
 import { setCachedChart } from '@/lib/chartCacheDb';
+import { toClientError } from '@/lib/errors';
 
 interface ChartRequestBody {
   year: number;
@@ -163,13 +164,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     );
   } catch (error) {
+    // The log keeps everything — a FastApiError's message carries the raw upstream
+    // body. The client gets only toClientError's fixed prose, which is why the two
+    // lines below must never be collapsed into one.
     console.error('Error in /api/chart:', error);
 
-    // Return error response
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    );
+    const { message, status, code } = toClientError(error);
+    return NextResponse.json({ error: message, code }, { status });
   }
 }

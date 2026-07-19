@@ -96,6 +96,11 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
       // and ties a failure report to the server-side natal compute logs.
       const requestId = crypto.randomUUID();
       let status: number | undefined;
+      // The server's own user-facing message, when it sent one. /api/chart runs every
+      // failure through lib/errors.ts toClientError, so this is both safe to display and
+      // more specific than anything we can say here — it distinguishes a timeout from an
+      // outage from bad birth data. Null when no response arrived (network failure).
+      let serverMessage: string | null = null;
       try {
         const birthInput = {
           year: values.dob.year(),
@@ -136,7 +141,8 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `HTTP ${response.status}`);
+          serverMessage = typeof errorData.error === 'string' ? errorData.error : null;
+          throw new Error(serverMessage || `HTTP ${response.status}`);
         }
 
         const { profileId } = await response.json();
@@ -146,7 +152,9 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
         // right after an anonymous→permanent upgrade). If it can't be established even after
         // retries, don't walk into that redirect loop — the chart was saved; tell the user.
         if (!(await refreshSession())) {
-          setFormError(translations.auth.sessionError[language]);
+          // The chart exists and is saved — only the cookie refresh failed. Use the
+          // chart-saved variant so the user refreshes rather than generating a duplicate.
+          setFormError(translations.auth.sessionErrorChartSaved[language]);
           return;
         }
         // Success needs no announcement — onSuccess navigates to the new chart.
@@ -155,7 +163,8 @@ const BaziProfileForm = forwardRef<BaziProfileFormRef, BaziProfileFormProps>(
         const message = error instanceof Error ? error.message : String(error);
         console.error(`Error generating Bazi chart [req:${requestId}]:`, error);
         reportClientError({ context: 'chart_generation', requestId, uid: user?.uid, status, message });
-        setFormError(tr.errorGenerated[language]);
+        // Prefer the server's specific message; fall back only when none arrived.
+        setFormError(serverMessage ?? tr.errorGenerated[language]);
       } finally {
         setLoading(false);
       }

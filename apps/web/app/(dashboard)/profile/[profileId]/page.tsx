@@ -25,26 +25,48 @@ export default async function ProfilePage({ params }: { params: Promise<{ profil
   // gets it from the backend, which now returns chart_key alongside the chart.
   let chartKey = profileRecord.chartKey ?? '';
 
-  let chartData: any = null;
-  let insights: InsightsResponse | null = null;
+  // FATAL. The chart IS the page — every card below reads from it. Previously a failure
+  // here was swallowed and chartData stayed null, which ProfilePageClient optional-chains
+  // away into a screen of empty cards with no explanation. It now re-throws to
+  // app/(dashboard)/error.tsx, which keeps the sidebar and offers a retry.
+  let chartData: any;
   try {
     // Read the chart from cache; recompute and backfill on a miss (or a keyless legacy profile).
     const cached = chartKey ? await getCachedChart(chartKey) : null;
     if (cached) {
       chartData = cached.data;
     } else {
-      const chart = await fetchNatalChart(profileRecord.birthData);
+      const chart = await fetchNatalChart(profileRecord.birthData, {
+        uid: session.uid,
+        profileId,
+      });
       chartData = chart.data;
       if (!chartKey) chartKey = chart.chart_key; // legacy profile had no stored key
-      await setCachedChart(chartKey, chartData);
-    }
 
-    // Insights are cached per-profile (not by chartKey), so two profiles with identical
-    // birth inputs each get their own interpretation. A miss here means the client will
-    // generate them progressively on mount.
+      // Non-fatal: we already have the chart in hand. A Firestore write hiccup costs a
+      // recompute next visit; it must not blank a chart we computed successfully.
+      try {
+        await setCachedChart(chartKey, chartData);
+      } catch (error) {
+        console.error('Non-fatal: chart cache write failed', { profileId, chartKey, error });
+      }
+    }
+  } catch (error) {
+    // Log then re-throw: the log keeps the full FastApiError (including the raw upstream
+    // body) with correlation ids attached, while the client sees only Next's digest.
+    console.error('Fatal: chart load failed', { profileId, chartKey, error });
+    throw error;
+  }
+
+  // NON-FATAL. Insights are cached per-profile (not by chartKey), so two profiles with
+  // identical birth inputs each get their own interpretation. A cache miss and a cache
+  // *error* look identical to the client — it generates them progressively on mount —
+  // so this degrades rather than failing the page.
+  let insights: InsightsResponse | null = null;
+  try {
     insights = await getCachedInsights(profileId);
   } catch (error) {
-    console.error('Error loading chart/insights:', error);
+    console.error('Non-fatal: insights cache read failed', { profileId, error });
   }
 
   return <ProfilePageClient profileRecord={profileRecord} chartData={chartData} insights={insights} chartKey={chartKey} />;

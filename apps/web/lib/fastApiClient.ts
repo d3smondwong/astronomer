@@ -5,8 +5,67 @@
  * Used by Next.js Server Components and Route Handlers.
  */
 
+import { FastApiError } from './errors';
+
 const FASTAPI_URL = process.env.FASTAPI_URL ?? 'http://localhost:8000';
 const FASTAPI_BEARER_TOKEN = process.env.FASTAPI_BEARER_TOKEN ?? '';
+
+/**
+ * Timeouts. Before these existed a wedged backend hung the request for the platform
+ * default, which on an SSR path meant a hung page render.
+ */
+
+/** Deterministic BaZi math — 10s already exceeds patience during SSR. Below ~5s risks
+ *  false positives against a cold Cloud Run instance. */
+const CHART_TIMEOUT_MS = 10_000;
+
+/** One non-streamed LLM section. Generous because a false timeout costs a regeneration. */
+const INSIGHTS_TIMEOUT_MS = 60_000;
+
+/**
+ * Streaming budget — deliberately much larger, and NOT a connect timeout.
+ *
+ * AbortSignal.timeout() covers the entire exchange including body consumption (the
+ * Fetch API has no headers-only timeout), so this bounds TOTAL generation time. A
+ * stream still happily emitting deltas at T+185s would be killed. Do not "align" this
+ * with INSIGHTS_TIMEOUT_MS — that would cut off long but healthy generations.
+ */
+const STREAM_TIMEOUT_MS = 180_000;
+
+/**
+ * The one place a FastAPI call is made.
+ *
+ * Returns the raw Response rather than parsed JSON so fetchInsightsStream can reuse it
+ * and add only its own `!res.body` guard. Every failure leaves here as a FastApiError;
+ * route handlers pass those to toClientError() and never to the client directly.
+ */
+async function postJson(
+  endpoint: string,
+  body: unknown,
+  ctx: RequestContext | undefined,
+  timeoutMs: number,
+): Promise<Response> {
+  let res: Response;
+  try {
+    res = await fetch(`${FASTAPI_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(FASTAPI_BEARER_TOKEN ? { Authorization: `Bearer ${FASTAPI_BEARER_TOKEN}` } : {}),
+        ...contextHeaders(ctx),
+      },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (err) {
+    // Timeout or network failure — no response was ever received.
+    throw FastApiError.fromThrown(endpoint, err);
+  }
+
+  if (!res.ok) throw await FastApiError.fromResponse(endpoint, res);
+  return res;
+}
 
 /**
  * Per-request log/trace context, forwarded to FastAPI as X-* headers so its logs
@@ -91,22 +150,7 @@ export async function fetchNatalChart(
   input: BirthInputPayload,
   ctx?: RequestContext,
 ): Promise<ChartResponse> {
-  const res = await fetch(`${FASTAPI_URL}/v1/chart/natal`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(FASTAPI_BEARER_TOKEN ? { Authorization: `Bearer ${FASTAPI_BEARER_TOKEN}` } : {}),
-      ...contextHeaders(ctx),
-    },
-    body: JSON.stringify(input),
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`FastAPI /v1/chart/natal failed: ${res.status} ${error}`);
-  }
-
+  const res = await postJson('/v1/chart/natal', input, ctx, CHART_TIMEOUT_MS);
   return res.json();
 }
 
@@ -121,22 +165,7 @@ export async function fetchCycles(
   input: CyclesInputPayload,
   ctx?: RequestContext,
 ): Promise<CyclesApiResponse> {
-  const res = await fetch(`${FASTAPI_URL}/v1/chart/cycles`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(FASTAPI_BEARER_TOKEN ? { Authorization: `Bearer ${FASTAPI_BEARER_TOKEN}` } : {}),
-      ...contextHeaders(ctx),
-    },
-    body: JSON.stringify(input),
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`FastAPI /v1/chart/cycles failed: ${res.status} ${error}`);
-  }
-
+  const res = await postJson('/v1/chart/cycles', input, ctx, CHART_TIMEOUT_MS);
   return res.json();
 }
 
@@ -153,22 +182,12 @@ export async function fetchInsights(
   section?: string,
   ctx?: RequestContext,
 ): Promise<InsightsResponse> {
-  const res = await fetch(`${FASTAPI_URL}/v1/chart/insights`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(FASTAPI_BEARER_TOKEN ? { Authorization: `Bearer ${FASTAPI_BEARER_TOKEN}` } : {}),
-      ...contextHeaders(ctx),
-    },
-    body: JSON.stringify({ data: chartData, ...(section ? { section } : {}) }),
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`FastAPI /v1/chart/insights failed: ${res.status} ${error}`);
-  }
-
+  const res = await postJson(
+    '/v1/chart/insights',
+    { data: chartData, ...(section ? { section } : {}) },
+    ctx,
+    INSIGHTS_TIMEOUT_MS,
+  );
   return res.json();
 }
 
@@ -186,20 +205,13 @@ export async function fetchInsightsStream(
   section: string,
   ctx?: RequestContext,
 ): Promise<Response> {
-  const res = await fetch(`${FASTAPI_URL}/v1/chart/insights/stream`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(FASTAPI_BEARER_TOKEN ? { Authorization: `Bearer ${FASTAPI_BEARER_TOKEN}` } : {}),
-      ...contextHeaders(ctx),
-    },
-    body: JSON.stringify({ data: chartData, section }),
-    cache: 'no-store',
-  });
+  const endpoint = '/v1/chart/insights/stream';
+  const res = await postJson(endpoint, { data: chartData, section }, ctx, STREAM_TIMEOUT_MS);
 
-  if (!res.ok || !res.body) {
-    const error = await res.text().catch(() => '');
-    throw new Error(`FastAPI /v1/chart/insights/stream failed: ${res.status} ${error}`);
+  // postJson already rejected every non-ok status; a 200 with no body is the one
+  // failure it cannot see, and it's fatal here since the caller reads res.body.
+  if (!res.body) {
+    throw new FastApiError('upstream_error', endpoint, res.status, 'stream response had no body');
   }
 
   return res;
@@ -209,20 +221,6 @@ export async function fetchInsightsStream(
  * Fetch full chart (natal + five elements).
  */
 export async function fetchFullChart(input: BirthInputPayload): Promise<ChartResponse> {
-  const res = await fetch(`${FASTAPI_URL}/v1/chart/full`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(FASTAPI_BEARER_TOKEN ? { Authorization: `Bearer ${FASTAPI_BEARER_TOKEN}` } : {}),
-    },
-    body: JSON.stringify(input),
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`FastAPI /v1/chart/full failed: ${res.status} ${error}`);
-  }
-
+  const res = await postJson('/v1/chart/full', input, undefined, CHART_TIMEOUT_MS);
   return res.json();
 }

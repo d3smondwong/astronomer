@@ -88,24 +88,51 @@ const AuthContext = createContext<AuthContextType>({
   setSpotlightCreateForm: () => {},
 });
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({
+  children,
+  /**
+   * Identity the SERVER tree was actually rendered for, as `uid:isAnonymous` (null when
+   * the request carried no session cookie). Supplied by app/layout.tsx from the cookie,
+   * and refreshed automatically whenever the server tree re-renders.
+   */
+  serverIdentity,
+}: {
+  children: ReactNode;
+  serverIdentity: string | null;
+}) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState<ModalConfig>({});
   const [spotlightCreateForm, setSpotlightCreateForm] = useState(false);
-  // Identity the server tree was last re-rendered for, as `uid:isAnonymous`.
-  const syncedIdentityRef = useRef<string | null>(null);
+
+  // Mirror the prop into a ref so the long-lived onIdTokenChanged callback below (registered
+  // once, with [] deps) reads the CURRENT value instead of the one captured at mount.
+  //
+  // This is not the latch that caused the 404 refresh loop. That one accumulated state
+  // ("have I refreshed yet?") and so was destroyed by a remount, re-arming the loop. This
+  // ref only ever mirrors a prop — it is re-derived from server state on every render, so a
+  // remount reinitialises it to the correct value rather than a blank one.
+  const serverIdentityRef = useRef(serverIdentity);
+  serverIdentityRef.current = serverIdentity;
 
   /**
-   * Mint/refresh the session cookie, then re-render the server tree if the identity it
-   * represents actually changed.
+   * Mint/refresh the session cookie, then re-render the server tree if the server and the
+   * client currently disagree about who the user is.
    *
    * Server Components read identity from the cookie, but the cookie is established
    * asynchronously *after* first paint — so a server-rendered tree (the dashboard sidebar)
    * would otherwise render for "no session" and never update. router.refresh() re-runs it
    * once the cookie lands.
+   *
+   * WHY A COMPARISON RATHER THAN A "already synced" FLAG: a flag is memory, and memory dies
+   * with the component. When the tree remounted (as it does on a 404 route) the flag reset,
+   * the sync looked un-done, and this refreshed forever — an endless
+   * 404 → POST /api/auth/session → 404 loop. Comparing server identity against client
+   * identity is a convergence condition, not memory: once a refresh lands, the server holds
+   * the cookie, the two agree, and the condition is false no matter how many times this
+   * component is torn down and rebuilt.
    *
    * Keyed on `uid:isAnonymous`, not uid alone: linkWithCredential (the common guest→account
    * upgrade) preserves the uid while flipping isAnonymous, and that transition changes what
@@ -116,8 +143,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const ok = await establishSessionCookie(u);
     if (!ok) return false;
     const identity = `${u.uid}:${u.isAnonymous}`;
-    if (syncedIdentityRef.current !== identity) {
-      syncedIdentityRef.current = identity;
+    if (serverIdentityRef.current !== identity) {
+      // Optimistically record what the refresh is about to make true. Without this a second
+      // token event arriving before the server re-render completes would fire a duplicate
+      // refresh; the next server render overwrites it with the authoritative value anyway.
+      serverIdentityRef.current = identity;
       router.refresh();
     }
     return true;

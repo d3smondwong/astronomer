@@ -18,7 +18,9 @@ export interface ClientErrorReport {
     | 'insights_section'
     | 'auth_token'
     | 'profile_migrate'
-    | 'profile_delete';
+    | 'profile_delete'
+    /** An error.tsx boundary caught a throw. Covers Server Component throws too. */
+    | 'error_boundary';
   /** Human-readable error message (err.message or response text). */
   message: string;
   /** Correlation/anchor fields — present when the flow has them (a guest has no uid). */
@@ -29,6 +31,16 @@ export interface ClientErrorReport {
   section?: string;
   /** HTTP status, when the failure was a non-ok response. */
   status?: number;
+  /**
+   * Next's `error.digest` — the ONLY join key back to the server log.
+   *
+   * In production Next replaces `error.message` with a generic string and logs the
+   * real stack server-side keyed solely by this digest. Without it a boundary report
+   * reads "An error occurred in the Server Components render" and joins to nothing.
+   */
+  digest?: string;
+  /** Which boundary caught it — gives blast radius at a glance. */
+  boundary?: 'global' | 'root' | 'dashboard';
 }
 
 export function reportClientError(report: ClientErrorReport): void {

@@ -26,7 +26,12 @@ export const translations = {
     generatingInsights:  { en: 'Generating your insights…', ch: '正在生成分析…' },
     generateInsights:    { en: 'Generate Insights',         ch: '生成分析' },
     migrateFailed:       { en: "Successfully signed in. We were unable to securely save the chart you made as a guest. Please re-generate it to keep it on your account.", ch: '您已成功登录。未能安全保存您以访客身份生成的命盘，请重新生成以保存至您的账户。' },
-    sessionError:        { en: "We're having trouble keeping you signed in. Please try again.", ch: '登录状态保持遇到问题，请重试。' },
+    // Two session-failure strings, not one: the recovery differs by where it fires.
+    // In AuthModal the modal stays open, so the user retries with the Continue button.
+    sessionError:        { en: "We're having trouble keeping you signed in. Please select Continue to try again.", ch: '登录状态保持遇到问题，请点击「继续」重试。' },
+    // On the landing form the chart has ALREADY been created and saved — only the
+    // session cookie refresh failed. Saying so prevents a duplicate re-generation.
+    sessionErrorChartSaved: { en: "Your chart is saved, but we're having trouble keeping you signed in. Please refresh the page to open it.", ch: '您的命盘已保存，但登录状态保持遇到问题。请刷新页面以查看。' },
   },
   profile: {
     // Day Master badge
@@ -150,10 +155,20 @@ export const translations = {
     deleteCancel:     { en: 'Cancel',           ch: '取消' },
     deleteOk:         { en: 'Delete',           ch: '删除' },
     // Inline feedback (errors only — success is communicated by the UI change itself)
-    deleteError:      { en: 'Failed to delete the profile. Please try again.', ch: '删除命盘失败，请重试。' },
-    errorInsights:    { en: "We couldn't generate part of your reading. Please retry.",
-                        ch: '部分解读暂时无法生成，请重试。' },
-    retryInsights:    { en: 'Retry',            ch: '重试' },
+    // "chart" not "profile": the ch side already said 命盘, and the rest of the app calls
+    // it a chart.
+    //
+    // Names the delete ICON, not the Popconfirm's "Delete" button — deliberately.
+    // handleDeleteProfile catches its own error and returns normally, so the confirm
+    // popup has already CLOSED by the time this message renders; "Delete" is no longer
+    // on screen. The real recourse is to click the trash icon again to reopen it.
+    deleteError:      { en: 'We are not able to delete this chart. Please select the delete icon to try again.', ch: '无法删除此命盘，请再次点击删除图标重试。' },
+    // Names the adjacent button (retryInsights) rather than saying "please retry".
+    // "part of" is load-bearing: sections fail independently and the button re-requests
+    // ONLY the failed ones, so this is never a full five-section regeneration.
+    errorInsights:    { en: "We couldn't generate part of your reading. Please select Regenerate insights.",
+                        ch: '部分解读暂时无法生成，请点击「重新生成解读」。' },
+    retryInsights:    { en: 'Regenerate insights', ch: '重新生成解读' },
     profileNotFound:  { en: 'Profile not found', ch: '找不到命盘' },
     loadingProfile:   { en: 'Loading profile...', ch: '加载中...' },
     tdLabel:          { en: 'Coming Soon',      ch: '敬请期待' },
@@ -237,8 +252,14 @@ export const translations = {
     labelFemale:        { en: 'Female',                 ch: '女' },
     btnGenerate:        { en: 'Generate My Bazi Chart', ch: '生成八字命盘' },
     solarTime:          { en: 'Solar Time',             ch: '真太阳时' },
-    errorGenerated:     { en: 'Failed to generate Bazi chart. Please try again.', ch: '生成八字命盘失败，请重试。' },
-    notReady:           { en: 'Just a moment — getting things ready. Please try again.', ch: '正在准备中，请稍候重试。' },
+    // FALLBACK ONLY. When /api/chart answers, its own message (from lib/errors.ts
+    // toClientError) is shown instead — it knows whether the failure was a timeout, an
+    // outage or bad birth data. This covers the case where no response arrived at all.
+    // Wording deliberately matches toClientError's 502 so the two read identically.
+    errorGenerated:     { en: 'There is an error generating your chart. Please refresh the page and generate it again.', ch: '生成命盘时出现错误，请刷新页面后重新生成。' },
+    // Fires in the brief window before anonymous sign-in completes. Names the submit
+    // button (btnGenerate) as the retry, and says to wait — the condition is transient.
+    notReady:           { en: 'Just a moment — we are getting things ready. Please select Generate My Bazi Chart again in a few seconds.', ch: '正在准备中，请稍候几秒后再次点击「生成八字命盘」。' },
     btnDemo:            { en: "Try Demo (Desmond's Profile)", ch: '试用示例（Desmond 命盘）' },
     newLabel:           { en: 'New?',                   ch: '初次使用？' },
   },
@@ -248,5 +269,41 @@ export const translations = {
     Earth: { en: 'Earth', ch: '土' },
     Metal: { en: 'Metal', ch: '金' },
     Water: { en: 'Water', ch: '水' },
+  },
+  // Error boundaries + 404. Its own namespace rather than an extension of `profile`
+  // because app/error.tsx and app/not-found.tsx have nothing to do with profiles.
+  //
+  // Copy rules (same as lib/errors.ts, which handles the API-response side):
+  //  - The TITLE names the artifact that failed ("Unable to load your chart"), never
+  //    the event ("Something went wrong"). The user learns what broke from the
+  //    headline alone, and the body is then free to carry only the action.
+  //  - The BODY names its button by the exact visible label below, so copy and
+  //    affordance cannot drift. Change a label -> change the body with it.
+  //  - Never name infrastructure (no "service"/"backend"/"server").
+  error: {
+    chartTitle:    { en: 'Unable to load your chart', ch: '无法加载命盘' },
+    // No positional word ("below"): ErrorState passes these to an antd Alert whose
+    // action button renders INSIDE the alert on the right, not beneath it. Name the
+    // action, never where it sits. (global-error.tsx does say "below" — there the
+    // button really is beneath the text, in a plain flex column.)
+    //
+    // The chart boundary speaks in terms of the user's own action ("generate your chart
+    // again" / Regenerate chart) rather than a generic retry: it is the more reassuring
+    // and more concrete framing. Under the hood the button re-runs the page load, which
+    // usually serves the chart straight from cache — but "regenerate" is the right
+    // user-facing mental model, and the outcome is identical either way.
+    chartBody:     { en: 'Please generate your chart again.', ch: '请重新生成您的命盘。' },
+    // Chart-specific action label. Distinct from `retry` because ErrorState is shared
+    // with the root boundary, where a page-level crash has no chart to regenerate.
+    regenerateChart: { en: 'Regenerate chart',      ch: '重新生成命盘' },
+    pageTitle:     { en: 'Unable to load this page', ch: '无法加载页面' },
+    pageBody:      { en: 'Please select Try again.', ch: '请点击「重试」。' },
+    // No notFound* strings: app/not-found.tsx redirects to '/' instead of rendering a
+    // page, so there is nothing to translate. See that file for why.
+    // Deliberately duplicates profile.retryInsights rather than sharing it — the copy
+    // differs ('Try again' vs 'Retry') and the two controls must stay relabelable
+    // independently.
+    retry:         { en: 'Try again',               ch: '重试' },
+    refId:         { en: 'Reference',               ch: '错误编号' },
   },
 } as const;
