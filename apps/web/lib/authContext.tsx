@@ -42,6 +42,18 @@ async function establishSessionCookie(u: User): Promise<boolean> {
   return false;
 }
 
+/**
+ * Re-mint the session cookie at most once an hour per identity.
+ *
+ * Only freshness depends on this value, never correctness — an identity change always mints
+ * regardless of it. It exists because the cookie lasts 14 days (lib/session.ts) and re-minting
+ * on activity is the only thing that keeps it alive: skip forever and an active user's cookie
+ * expires around day 15, after which getSessionUser() returns null and the profile page
+ * redirects them off their own chart. One hour matches Firebase's token-refresh cadence and
+ * leaves that 14-day ceiling a wide margin.
+ */
+const MINT_TTL_MS = 60 * 60 * 1000;
+
 /** Why the auth modal was opened — drives its contextual copy and post-auth behaviour. */
 export type AuthReason = 'login' | 'addChart' | 'pendingChart' | 'insights';
 
@@ -118,6 +130,20 @@ export function AuthProvider({
   serverIdentityRef.current = serverIdentity;
 
   /**
+   * Last successful mint, so a repeat sync for the same identity can skip the round-trip.
+   *
+   * This IS memory, which the comment above warns against — but the failure modes are
+   * opposite. Losing the old "already refreshed" latch caused an infinite refresh loop
+   * (fail-dangerous). Losing this one causes a single redundant mint, which is exactly what
+   * this code did before the ref existed (fail-safe). A remount therefore degrades to the
+   * previous behaviour, never to a loop.
+   */
+  const lastMintRef = useRef<{ identity: string; at: number } | null>(null);
+
+  /** In-flight sync, so concurrent callers for the same identity share one round-trip. */
+  const inFlightRef = useRef<{ identity: string; promise: Promise<boolean> } | null>(null);
+
+  /**
    * Mint/refresh the session cookie, then re-render the server tree if the server and the
    * client currently disagree about who the user is.
    *
@@ -139,18 +165,58 @@ export function AuthProvider({
    * the server should render. Without the key, the hourly silent token refresh would re-render
    * the whole tree every hour for nothing.
    */
-  const syncSession = async (u: User): Promise<boolean> => {
-    const ok = await establishSessionCookie(u);
-    if (!ok) return false;
+  const syncSession = (u: User): Promise<boolean> => {
     const identity = `${u.uid}:${u.isAnonymous}`;
-    if (serverIdentityRef.current !== identity) {
-      // Optimistically record what the refresh is about to make true. Without this a second
-      // token event arriving before the server re-render completes would fire a duplicate
-      // refresh; the next server render overwrites it with the authoritative value anyway.
-      serverIdentityRef.current = identity;
-      router.refresh();
-    }
-    return true;
+
+    // Share an in-flight sync for the SAME identity rather than starting a second.
+    // linkWithCredential wakes the onIdTokenChanged listener at the same moment AuthModal
+    // awaits refreshSession(); both want the identical cookie, milliseconds apart — too
+    // close for the freshness check below to have recorded anything yet.
+    const inFlight = inFlightRef.current;
+    if (inFlight && inFlight.identity === identity) return inFlight.promise;
+
+    const promise = (async () => {
+      // Skip the mint when we already minted THIS identity recently.
+      //
+      // Keyed on identity, never on time alone: both refreshSession() callers run
+      // immediately after an identity change, and a time-only check would return true while
+      // the cookie still held the outgoing uid — the profile page's ownership gate would
+      // then redirect the owner off their own chart. Their contract is "the cookie matches
+      // the current client identity", which an identity-keyed skip satisfies.
+      //
+      // This is what removes the wasted mint during a guest→account upgrade: Firebase fires
+      // onIdTokenChanged twice, and the first fire still reports isAnonymous=true — an
+      // identity that already has a valid cookie and is superseded ~13ms later. That mint
+      // also RACED the permanent one (retry backoff could land it last, stamping a stale
+      // "still a guest" cookie), so dropping it removes the race rather than ordering it.
+      const last = lastMintRef.current;
+      const isFresh = last !== null && last.identity === identity && Date.now() - last.at < MINT_TTL_MS;
+
+      if (!isFresh) {
+        const ok = await establishSessionCookie(u);
+        if (!ok) return false;
+        lastMintRef.current = { identity, at: Date.now() };
+      }
+
+      // Runs on BOTH paths, including the skip: a fresh cookie the server has not yet
+      // rendered for still needs the tree re-rendered, or the sidebar never updates.
+      if (serverIdentityRef.current !== identity) {
+        // Optimistically record what the refresh is about to make true. Without this a second
+        // token event arriving before the server re-render completes would fire a duplicate
+        // refresh; the next server render overwrites it with the authoritative value anyway.
+        serverIdentityRef.current = identity;
+        router.refresh();
+      }
+      return true;
+    })();
+
+    inFlightRef.current = { identity, promise };
+    void promise.finally(() => {
+      // Only clear if still ours — a newer identity may already have replaced the entry.
+      if (inFlightRef.current?.promise === promise) inFlightRef.current = null;
+    });
+
+    return promise;
   };
 
   useEffect(() => {
