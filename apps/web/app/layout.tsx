@@ -39,6 +39,12 @@ const notoSansSC = Noto_Sans_SC({
 export const metadata: Metadata = {
   title: "Celestial Dawn",
   description: "An ethereal Bazi reading application rooted in ancient wisdom and driven by AI.",
+  /**
+   * Referenced from /public rather than moved to the app/icon.svg file convention: the same
+   * asset is the collapsed-sidebar logo in DashboardShell, and one copy beats two that can
+   * drift. This also settles the favicon.ico 404 the browser console logged on every page.
+   */
+  icons: { icon: '/short_huat_life_logo.svg' },
 };
 
 /**
