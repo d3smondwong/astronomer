@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { type VoidStatus, type VoidCondition } from '@/types/baziLibraryTypes';
 import { type ProfileRecord } from '@/types/profile';
-import { type InsightsResponse, type StructuredSection } from '@/lib/fastApiClient';
+// Shapes only — never lib/fastApiClient, which is server-only and reads the backend token.
+import { type InsightsResponse, type StructuredSection } from '@/types/api';
 import { Alert, Card, Tabs, Button, Popconfirm, Tooltip, Collapse } from 'antd';
 import dayjs from 'dayjs';
 import localizedFormat from 'dayjs/plugin/localizedFormat';

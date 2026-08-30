@@ -3,9 +3,24 @@
  *
  * Handles communication with the FastAPI backend running at FASTAPI_URL.
  * Used by Next.js Server Components and Route Handlers.
+ *
+ * `server-only` is not decoration: FASTAPI_BEARER_TOKEN is read at module scope below, so
+ * importing this from a client component would be a credential leak. The guard turns that
+ * into a build error instead of a silent one. The wire-contract types moved to types/api.ts
+ * for exactly this reason — client components need the shapes, never the transport — and are
+ * re-exported here so server-side callers keep their existing import.
  */
 
+import 'server-only';
+
 import { FastApiError } from './errors';
+import type {
+  BirthInputPayload,
+  ChartResponse,
+  CyclesInputPayload,
+  CyclesApiResponse,
+  InsightsResponse,
+} from '@/types/api';
 
 const FASTAPI_URL = process.env.FASTAPI_URL ?? 'http://localhost:8000';
 const FASTAPI_BEARER_TOKEN = process.env.FASTAPI_BEARER_TOKEN ?? '';
@@ -89,59 +104,20 @@ function contextHeaders(ctx?: RequestContext): Record<string, string> {
   };
 }
 
-export interface BirthInputPayload {
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  gender: number; // 1 = male, 0 = female
-  latitude: number;
-  longitude: number;
-  use_solar_time_correction?: boolean;
-}
-
-export interface ChartResponse {
-  lunar_date: string;
-  gender: string;
-  zodiac: string;
-  data: Record<string, any>;
-  is_full?: boolean;
-  // 八字-based cache key (8 GanZhi letters + gender) returned by /v1/chart/natal.
-  // Computed server-side from the pillars — the only trustworthy source for the key.
-  chart_key: string;
-}
-
-export interface CyclesInputPayload extends BirthInputPayload {
-  /** 大运 index (0-9); when set, that decade's 流年 list is populated. */
-  da_yun_index?: number;
-}
-
-export interface CyclesApiResponse {
-  /** 起运 + 大运 list — Chinese-keyed; see types/cyclesChart.ts CyclesData. */
-  data: Record<string, any>;
-  /**
-   * Log-correlation key ONLY. Cycles depend on the exact birth instant, which
-   * this 八字-based key excludes — never cache cycle data under it.
-   */
-  chart_key: string;
-}
-
-// One item inside a structured section: a crisp claim plus its grounded explanation.
-export interface InsightPoint {
-  point: string;
-  explanation: string;
-}
-
-// A structured section (currently: career) -> named groups, each a list of points.
-// e.g. { path_to_success: [...], highlights: [...], challenges: [...], advice: [...] }
-export type StructuredSection = Record<string, InsightPoint[]>;
-
-export interface InsightsResponse {
-  // section key (personality | family | romance | career | wealth | health)
-  // -> either narrative prose (string) or a structured groups object (career).
-  sections: Record<string, string | StructuredSection>;
-}
+/**
+ * The wire contract itself lives in types/api.ts so client components can read the shapes
+ * without importing this module. Re-exported for server-side callers; new client code should
+ * import from '@/types/api' directly.
+ */
+export type {
+  BirthInputPayload,
+  ChartResponse,
+  CyclesInputPayload,
+  CyclesApiResponse,
+  InsightPoint,
+  StructuredSection,
+  InsightsResponse,
+} from '@/types/api';
 
 /**
  * Fetch natal chart (basic 4 pillars).

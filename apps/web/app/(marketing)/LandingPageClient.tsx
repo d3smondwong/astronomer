@@ -3,8 +3,6 @@
 import { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
 
 import {
   Stars,
@@ -158,43 +156,39 @@ export default function LandingPageClient() {
     if (!user || user.isAnonymous) openAuthModal();
   }, [loading, user, router, openAuthModal]);
 
+  // Page content only — the shell (Header, <main>, Footer) belongs to (marketing)/layout.tsx
+  // so pricing and about inherit it without re-creating it.
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
+    <>
+      <section className="max-w-7xl mx-auto px-8 grid md:grid-cols-2 gap-16 items-start">
+        <Hero />
+        <BaziForm />
+      </section>
 
-      <main className="flex-grow pt-32 pb-20">
-        <section className="max-w-7xl mx-auto px-8 grid md:grid-cols-2 gap-16 items-start">
-          <Hero />
-          <BaziForm />
-        </section>
+      <div className="max-w-7xl mx-auto px-8 flex justify-center py-10">
+        <div className="w-px h-20 bg-gradient-to-b from-gold-deep/30 to-transparent"></div>
+      </div>
 
-        <div className="max-w-7xl mx-auto px-8 flex justify-center py-10">
-          <div className="w-px h-20 bg-gradient-to-b from-gold-deep/30 to-transparent"></div>
-        </div>
-
-        <section className="max-w-7xl mx-auto px-8 grid grid-cols-1 md:grid-cols-3 gap-8">
-          <FeatureCard
-            icon={TempleBuddhistIcon}
-            title={tr.featureAncientTitle[language]}
-            description={tr.featureAncientDesc[language]}
-            label={tr.featureAncientLabel[language]}
-          />
-          <FeatureCard
-            icon={Trees}
-            title={tr.featureFiveTitle[language]}
-            description={tr.featureFiveDesc[language]}
-            label={tr.featureFiveLabel[language]}
-          />
-          <FeatureCard
-            icon={TimelineOutlinedIcon}
-            title={tr.featureLuckTitle[language]}
-            description={tr.featureLuckDesc[language]}
-            label={tr.featureLuckLabel[language]}
-          />
-        </section>
-      </main>
-
-      <Footer />
-    </div>
+      <section className="max-w-7xl mx-auto px-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+        <FeatureCard
+          icon={TempleBuddhistIcon}
+          title={tr.featureAncientTitle[language]}
+          description={tr.featureAncientDesc[language]}
+          label={tr.featureAncientLabel[language]}
+        />
+        <FeatureCard
+          icon={Trees}
+          title={tr.featureFiveTitle[language]}
+          description={tr.featureFiveDesc[language]}
+          label={tr.featureFiveLabel[language]}
+        />
+        <FeatureCard
+          icon={TimelineOutlinedIcon}
+          title={tr.featureLuckTitle[language]}
+          description={tr.featureLuckDesc[language]}
+          label={tr.featureLuckLabel[language]}
+        />
+      </section>
+    </>
   );
 }

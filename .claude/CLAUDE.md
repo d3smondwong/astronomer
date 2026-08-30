@@ -215,34 +215,67 @@ apps/
 │
 └── web/ — Next.js application (SSR + client components)
     ├── app/
-    │   ├── layout.tsx — Root layout
-    │   ├── page.tsx — Landing page
+    │   ├── layout.tsx — Root layout (fonts, ConfigProvider, LanguageProvider, ClientRoot)
+    │   ├── error.tsx — Root error boundary (covers everything outside (dashboard))
+    │   ├── global-error.tsx — Last resort; REPLACES the root layout, so it re-declares
+    │   │                     <html>/<body>, globals.css and the three next/font instances
+    │   ├── not-found.tsx — Server-side redirect('/'), renders nothing (see its docblock)
+    │   ├── actions/profiles.ts — Server Actions (bearer auth, revalidatePath, never throw)
+    │   ├── (marketing)/ — Public front door; group adds no URL segment
+    │   │   ├── layout.tsx — Header + <main> + Footer chrome, shared by every page here
+    │   │   ├── page.tsx — Landing "/" (Server Component: redirects returning users)
+    │   │   ├── LandingPageClient.tsx — Hero, create form, feature cards
+    │   │   ├── Header.tsx — Fixed top bar (logo, language toggle, auth)
+    │   │   └── Footer.tsx
     │   ├── api/
     │   │   ├── chart/route.ts — Route handler calling FastAPI backend
     │   │   ├── cycles/route.ts — 大运/流年 (reads profile birthData, owner-only)
-    │   │   └── profiles/[id]/route.ts — Profile API endpoints
+    │   │   ├── insights/route.ts — LLM insights (streamed + non-streamed)
+    │   │   ├── auth/session/route.ts — Mints/revokes the session cookie
+    │   │   ├── clientError/route.ts — Unauthenticated client error sink
+    │   │   └── profiles/
+    │   │       ├── route.ts — GET list (owner's profiles; no create endpoint by design)
+    │   │       └── migrate/route.ts — POST guest→account transfer (two-token auth)
     │   └── (dashboard)/ — Protected dashboard routes
-    │       ├── layout.tsx — Dashboard layout
+    │       ├── layout.tsx — Server Component; reads the sidebar's profile list
+    │       ├── DashboardShell.tsx — Collapsible sidebar chrome (the dashboard's own
+    │       │                        Header equivalent: logo, auth, language toggle)
+    │       ├── error.tsx — Dashboard boundary; renders inside the shell, sidebar survives
     │       ├── profile/[profileId]/
-    │       │   ├── page.tsx — Profile page (Server Component)
+    │       │   ├── page.tsx — Server Component: auth, owner check, chart load
+    │       │   ├── loading.tsx — Streaming fallback
     │       │   ├── ProfilePageClient.tsx — Interactive elements
-    │       │   └── PillarInteractionsCard.tsx — Interaction display
+    │       │   └── PillarCard / FiveElementsCard / PillarInteractionsCard /
+    │       │       DayMasterStrengthCard / FavorableElementsCard / InsightsLoading
     │       ├── compatibility/page.tsx — Compatibility analysis
     │       └── ai_oracle_chat/page.tsx — AI oracle feature
-    ├── components/
-    │   ├── ui/ — Shadcn UI components (button, card, tabs, etc.)
-    │   ├── Header.tsx
-    │   └── Footer.tsx
+    ├── components/ — Only what crosses route groups; route-specific UI is colocated above
+    │   ├── ClientRoot.tsx — AuthProvider + AuthModal wrapper (root layout)
+    │   ├── AuthModal.tsx — Sign in / sign up / guest migration
+    │   ├── ErrorState.tsx — Shared body of both error boundaries
+    │   ├── BaziProfileForm.tsx — Used by landing, sidebar and Server Actions
+    │   └── PlacesAutocompleteInput.tsx
     ├── lib/
-    │   ├── languageContext.tsx — i18n context provider
-    │   └── utils.ts — Utility functions
+    │   ├── (server-only) firebaseAdmin, session, profilesDb, chartCacheDb,
+    │   │   insightsCacheDb, fastApiClient — each guarded by `import 'server-only'`
+    │   ├── (client) authContext, languageContext, firebaseClient, errorReporter,
+    │   │   theme, elements, translations, google-loader
+    │   └── errors.ts — FastApiError + toClientError sanitization boundary
     ├── types/
-    │   └── (TypeScript interfaces matching backend schemas)
-    ├── styles/
-    │   └── globals.css
-    ├── public/ — Static assets (logos, icons, SVGs)
-    └── profiles/ — User profile JSON data
+    │   ├── api.ts — FastAPI wire contract; safe for client components (see below)
+    │   ├── baziChart.ts / cyclesChart.ts — Chinese-keyed chart structures
+    │   ├── baziLibraryTypes.ts / profile.ts
+    ├── styles/ — theme.css (tokens), components.css, dashboard.css, globals.css
+    └── public/ — Static assets (logos, icons, SVGs)
+
+(Profile fixtures live at repo-root fixtures/profiles/, not inside apps/web.)
 ```
+
+**Server/client module boundary:** `lib/fastApiClient.ts` reads `FASTAPI_BEARER_TOKEN` at module
+scope, so it — and every Admin-SDK module — carries `import 'server-only'`. The FastAPI request
+and response *types* therefore live in `types/api.ts`, which both sides may import;
+`fastApiClient` re-exports them for existing server-side callers. A client component that needs a
+response shape imports `@/types/api`, never `@/lib/fastApiClient`.
 
 ## 🛠️ Code Style & Guidelines
 

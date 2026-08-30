@@ -1,14 +1,18 @@
 'use client';
 
 /**
- * Root error boundary — covers everything OUTSIDE the (dashboard) group, i.e. the
- * landing page.
+ * Root error boundary — covers everything OUTSIDE the (dashboard) group, which today
+ * means the (marketing) group: the landing page, and pricing/about as they land.
  *
  * Not redundant with (dashboard)/error.tsx: route groups are real segments for
- * boundary purposes, so a throw in app/page.tsx or LandingPageClient is invisible to
- * the dashboard boundary. Without this file such a throw would escalate all the way to
- * global-error.tsx, and a recoverable client bug on the front door would blow away the
- * root layout, providers and chrome.
+ * boundary purposes, so a throw in (marketing)/page.tsx or LandingPageClient is
+ * invisible to the dashboard boundary. Without this file such a throw would escalate
+ * all the way to global-error.tsx, and a recoverable client bug on the front door
+ * would blow away the root layout, providers and chrome.
+ *
+ * It stays HERE rather than moving into (marketing)/ so it also remains the catch-all
+ * for anything at the root — a boundary inside the group would cover only the group.
+ * Route groups don't block inheritance, so (marketing) is covered either way.
  */
 
 import { useEffect, useTransition } from 'react';

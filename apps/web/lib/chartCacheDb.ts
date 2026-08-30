@@ -1,7 +1,11 @@
 /**
  * chartCache collection — the deterministic natal chart, computed once per
  * unique 八字 and reused. Keyed by the 八字 chart key (NatalChartResponse.chart_key).
+ *
+ * `server-only` — reaches Firestore through the Admin SDK, which bypasses security rules.
  */
+
+import 'server-only';
 
 import { getDb } from '@/lib/firebaseAdmin';
 

@@ -4,7 +4,7 @@
  * Profile Server Actions.
  *
  * Why actions rather than route handlers: these mutations must invalidate server-rendered
- * data (the dashboard sidebar's profile list, and app/page.tsx's redirect decision). An action
+ * data (the dashboard sidebar's profile list, and app/(marketing)/page.tsx's redirect decision). An action
  * can call revalidatePath and let the framework own the cache; a client fetch would leave us
  * hand-patching local state, which is what these replace.
  *
@@ -61,7 +61,7 @@ export async function deleteProfileAction(
 
     // 'layout' rooted at '/' is the only form that reaches the dashboard sidebar, which lives
     // in a shared layout — a page-level revalidation would leave the deleted row on screen.
-    // It also covers app/page.tsx (whose redirect() reads the now-changed list, and which the
+    // It also covers app/(marketing)/page.tsx (whose redirect() reads the now-changed list, and which the
     // client navigates to immediately after) and the deleted profile's own route (so a
     // Back-button hit re-runs the SSR ownership check instead of rendering from cache).
     revalidatePath('/', 'layout');

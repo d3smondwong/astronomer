@@ -10,10 +10,14 @@
  * Caching is always on: insights are read from the database and only regenerated on a miss.
  * To force a fresh regeneration during dev (the "re-generate" button), pass `force` in the
  * /api/insights request — that skips the cache read but still writes the new result back.
+ *
+ * `server-only` — reaches Firestore through the Admin SDK, which bypasses security rules.
  */
 
+import 'server-only';
+
 import { getDb } from '@/lib/firebaseAdmin';
-import type { InsightsResponse, StructuredSection } from '@/lib/fastApiClient';
+import type { InsightsResponse, StructuredSection } from '@/types/api';
 
 const COLLECTION = 'insightsCache';
 

@@ -20,7 +20,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await getSessionUser();
 
   // A Firestore hiccup degrades to an empty sidebar rather than 500ing the whole dashboard —
-  // the page inside still renders. Mirrors the same tradeoff in app/page.tsx.
+  // the page inside still renders. Mirrors the same tradeoff in app/(marketing)/page.tsx.
   let profiles: ProfileRecord[] = [];
   try {
     profiles = await readProfiles(session?.uid);

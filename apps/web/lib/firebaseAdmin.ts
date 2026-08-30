@@ -7,7 +7,12 @@
  *
  * Production (Phase 2): unset FIRESTORE_EMULATOR_HOST and provide service-account
  * credentials via GOOGLE_APPLICATION_CREDENTIALS (or App Hosting's built-in creds).
+ *
+ * `server-only` because this holds privileged credentials and the Admin SDK bypasses every
+ * Firestore security rule. Client-side Firebase belongs in lib/firebaseClient.ts.
  */
+
+import 'server-only';
 
 import { getApps, initializeApp, applicationDefault, cert } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';

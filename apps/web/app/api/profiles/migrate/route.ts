@@ -48,7 +48,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const migrated = await reassignProfiles(source.uid, dest.uid);
 
-  // Ownership just changed, so the server-rendered sidebar (and app/page.tsx's redirect
+  // Ownership just changed, so the server-rendered sidebar (and app/(marketing)/page.tsx's redirect
   // decision) are both stale for the destination account. Easy to miss because this runs
   // *after* the upgrade: without it, a guest who signs into an existing account sees the
   // pre-migration list until a hard reload.
