@@ -524,17 +524,6 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
               ),
             },
             {
-              key: 'elements',
-              label: tr.tabElements[language],
-              children: (
-                <div className="space-y-4">
-                  <Card style={{ borderColor: goldAlpha(0.1) }}>
-                    <p className="text-center text-bronze-muted/70">Coming Soon</p>
-                  </Card>
-                </div>
-              ),
-            },
-            {
               key: 'insights',
               label: tr.tabInsights[language],
               children: (
@@ -646,6 +635,17 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
                       </div>
                     </Card>
                   )}
+                </div>
+              ),
+            },
+            {
+              key: 'cycles',
+              label: tr.tabCycles[language],
+              children: (
+                <div className="space-y-4">
+                  <Card style={{ borderColor: goldAlpha(0.1) }}>
+                    <p className="text-center text-bronze-muted/70">Coming Soon</p>
+                  </Card>
                 </div>
               ),
             },

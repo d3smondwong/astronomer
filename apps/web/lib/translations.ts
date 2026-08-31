@@ -59,7 +59,7 @@ export const translations = {
     shenSha:          { en: 'Shen Sha',          ch: '神煞' },
     // Tab labels
     tabFourPillars:   { en: 'Four Pillars',      ch: '四柱' },
-    tabElements:      { en: 'Elements',          ch: '五行' },
+    tabCycles:        { en: 'Cycles',            ch: '大运流年' },
     tabInsights:      { en: 'Insights',          ch: '命盘解析' },
     // Relationship labels
     relAncestry:      { en: 'ANCESTRY',          ch: '祖先' },
