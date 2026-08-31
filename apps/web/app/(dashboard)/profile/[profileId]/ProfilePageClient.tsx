@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { type VoidStatus, type VoidCondition } from '@/types/baziLibraryTypes';
 import { type ProfileRecord } from '@/types/profile';
@@ -17,6 +17,8 @@ import { reportClientError } from '@/lib/errorReporter';
 import { deleteProfileAction } from '@/app/actions/profiles';
 import { goldAlpha, palette } from '@/lib/theme';
 import PillarCard from './PillarCard';
+import PillarDetailPanel from './PillarDetailPanel';
+import { type PillarKey, PILLAR_ORDER } from './pillarPresentation';
 import FiveElementsCard from './FiveElementsCard';
 import PillarInteractionsCard from './PillarInteractionsCard';
 import DayMasterStrengthCard from './DayMasterStrengthCard';
@@ -111,6 +113,95 @@ const renderStructured = (
       );
     });
 
+/* ────────── Four-pillar derivations ──────────
+   Pure, chart-shaped helpers at module scope: they used to be re-created inside a
+   JSX IIFE on every render, which now matters because clicking a pillar re-renders
+   the tab. */
+
+const PILLAR_LABEL_KEY: Record<PillarKey, keyof typeof translations.profile> = {
+  年柱: 'yearPillar', 月柱: 'monthPillar', 日柱: 'dayPillar', 时柱: 'hourPillar',
+};
+
+// Void condition metadata and supersession rules
+const VOID_CONDITION_META: Record<string, { category: 'primary' | 'oneway' | 'mutual'; ch: string; en: string }> = {
+  被日柱空:    { category: 'primary', ch: '空亡',    en: 'Primary Void'           },
+  被年柱空:    { category: 'oneway',  ch: '被年空',  en: 'Void by Year'           },
+  被月柱空:    { category: 'oneway',  ch: '被月空',  en: 'Void by Month'          },
+  被时柱空:    { category: 'oneway',  ch: '被时空',  en: 'Void by Hour'           },
+  年日互换空亡: { category: 'mutual',  ch: '年日互换', en: 'Mutual Void Year↔Day'  },
+  月日互换空亡: { category: 'mutual',  ch: '月日互换', en: 'Mutual Void Month↔Day' },
+  日时互换空亡: { category: 'mutual',  ch: '日时互换', en: 'Mutual Void Day↔Hour'  },
+};
+const SUPERSEDED_BY: Record<string, string[]> = {
+  被日柱空: ['年日互换空亡', '月日互换空亡', '日时互换空亡'],
+  被年柱空: ['年日互换空亡'],
+  被月柱空: ['月日互换空亡'],
+  被时柱空: ['日时互换空亡'],
+};
+
+const buildVoidStatus = (pillarData: any): VoidStatus => {
+  const v = pillarData?.空亡 ?? {};
+  const activeKeys = new Set<string>();
+  for (const key of Object.keys(VOID_CONDITION_META)) {
+    const val = v[key];
+    const isActive = key === '被日柱空' ? val !== '无' : !!val;
+    if (isActive) activeKeys.add(key);
+  }
+  const conditions: VoidCondition[] = [...activeKeys]
+    .filter(key => !(SUPERSEDED_BY[key] ?? []).some(s => activeKeys.has(s)))
+    .map(key => {
+      const meta = VOID_CONDITION_META[key];
+      return { category: meta.category, label: { ch: meta.ch, en: meta.en } };
+    });
+  return { conditions };
+};
+
+// Element from a naYin phrase (its last character carries the element).
+const extractElementFromNaYin = (naYinPhrase: string): 'Metal' | 'Wood' | 'Water' | 'Fire' | 'Earth' => {
+  const lastChar = naYinPhrase.charAt(naYinPhrase.length - 1);
+  const elementMap: Record<string, 'Metal' | 'Wood' | 'Water' | 'Fire' | 'Earth'> = {
+    '金': 'Metal', '木': 'Wood', '水': 'Water', '火': 'Fire', '土': 'Earth',
+  };
+  return elementMap[lastChar] ?? 'Metal';
+};
+
+// lifeStageData is { 日干: "养", 自坐: "衰" }
+const buildLifeStage = (lifeStageData: any) =>
+  lifeStageData
+    ? {
+        xingYun: { chinese: lifeStageData.日干, english: '' },
+        ziZuo: { chinese: lifeStageData.自坐, english: '' },
+      }
+    : null;
+const buildNaYin = (naYinValue: any) =>
+  naYinValue ? { chinese: naYinValue, english: '', element: extractElementFromNaYin(naYinValue) } : null;
+const buildXunKong = (voidValue: any) =>
+  voidValue && voidValue !== '无' ? { chinese: voidValue, english: '' } : null;
+
+/**
+ * Which other pillars a 化气格 pillar combined its stem with.
+ *
+ * 化气格信息 on the pillar itself is only { 类型, 原五行, 现五行 } — it does not name
+ * the partner. The partner IS in 作用.柱位动态: the 天干合 item's 组合明细 maps every
+ * participating pillar to its character. Returns {} when no such item exists, so the
+ * panel falls back to a bare badge rather than inventing an attribution.
+ */
+const buildHuaPartners = (pillarDynamic: any[] | undefined) => {
+  const out: Record<string, { pillar: string; char: string }[]> = {};
+  for (const item of pillarDynamic ?? []) {
+    if (item?.类型 !== '天干合') continue;
+    const detail = (item.组合明细 ?? {}) as Record<string, string>;
+    const members = Object.keys(detail).filter((k) => k in PILLAR_LABEL_KEY);
+    for (const self of members) {
+      const partners = members
+        .filter((other) => other !== self)
+        .map((other) => ({ pillar: other, char: detail[other] }));
+      if (partners.length > 0) out[self] = [...(out[self] ?? []), ...partners];
+    }
+  }
+  return out;
+};
+
 // A section is "ready" when prose has text, or a structured object has ≥1 item.
 const sectionHasContent = (value: string | StructuredSection | undefined): boolean => {
   if (typeof value === 'string') return value.trim().length > 0;
@@ -137,6 +228,8 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
   // Section keys whose fetch failed — surfaced as an inline alert with Retry in the
   // Insights tab (sections that did succeed keep rendering normally).
   const [failedSections, setFailedSections] = useState<string[]>([]);
+  // Which pillar's detail panel is open (accordion — at most one).
+  const [openPillar, setOpenPillar] = useState<PillarKey | null>(null);
   const { language } = useLanguage();
   const tr = translations.profile;
   const trAuth = translations.auth;
@@ -316,17 +409,45 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
   };
 
 
-  const tianGanHuaMap: Record<string, { 元素: string; 原五行: string; label: string }> = {};
-  const siZhuMeta = (chartData?.["四柱实体"] ?? {}) as Record<string, any>;
-  for (const pillarName of ['年柱', '月柱', '日柱', '时柱']) {
-    const pillar = siZhuMeta[pillarName];
-    if (!pillar) continue;
-    if (pillar.化气格信息?.现五行) {
-      tianGanHuaMap[pillarName] = { 元素: pillar.化气格信息.现五行, 原五行: pillar.化气格信息.原五行, label: `天干合·${pillar.化气格信息.类型}` };
-    }
-  }
+  /* One row per pillar, feeding both the collapsed cards and the open detail panel.
+     maxVoidCount and anyHeavenlyStemBadge are cross-pillar: they reserve space on
+     every card so the four stay row-aligned when only some pillars carry a value. */
+  const pillars = useMemo(() => {
+    const siZhu = (chartData?.四柱实体 ?? {}) as Record<string, any>;
+    const shenShaByPillar = (chartData?.神煞 ?? {}) as Record<string, any>;
 
-  const anyHeavenlyStemBadge = Object.keys(tianGanHuaMap).length > 0;
+    const tianGanHuaMap: Record<string, { 元素: string; 原五行: string; label: string }> = {};
+    for (const pillarName of PILLAR_ORDER) {
+      const hua = siZhu[pillarName]?.化气格信息;
+      if (hua?.现五行) {
+        tianGanHuaMap[pillarName] = { 元素: hua.现五行, 原五行: hua.原五行, label: `天干合·${hua.类型}` };
+      }
+    }
+    const huaPartnerMap = buildHuaPartners(chartData?.作用?.柱位动态);
+
+    const rows = PILLAR_ORDER.map((key, i) => ({
+      key,
+      columnIndex: i,
+      pillarLabel: tr[PILLAR_LABEL_KEY[key]][language],
+      isDayMaster: key === '日柱',
+      pillar: siZhu[key],
+      lifeStages: buildLifeStage(siZhu[key]?.十二长生),
+      naYin: buildNaYin(siZhu[key]?.纳音),
+      xunKong: buildXunKong(siZhu[key]?.空亡?.本柱旬空),
+      voidStatus: buildVoidStatus(siZhu[key]),
+      shenSha: shenShaByPillar[key],
+      tianGanHua: tianGanHuaMap[key],
+      huaPartners: huaPartnerMap[key],
+    }));
+
+    return {
+      rows,
+      maxVoidCount: Math.max(...rows.map((r) => r.voidStatus.conditions.length)),
+      anyHeavenlyStemBadge: Object.keys(tianGanHuaMap).length > 0,
+    };
+  }, [chartData, language, tr]);
+
+  const openRow = pillars.rows.find((r) => r.key === openPillar);
 
 
   // Small uppercase field label / value pair in the midnight header.
@@ -441,81 +562,40 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
               label: tr.tabFourPillars[language],
               children: (
                 <div className="space-y-4" style={{ overflowX: 'hidden' }}>
-                  {(() => {
-                    const siZhu = chartData?.四柱实体 || {};
-
-                    // Void condition metadata and supersession rules
-                    const VOID_CONDITION_META: Record<string, { category: 'primary' | 'oneway' | 'mutual'; ch: string; en: string }> = {
-                      被日柱空:    { category: 'primary', ch: '空亡',    en: 'Primary Void'           },
-                      被年柱空:    { category: 'oneway',  ch: '被年空',  en: 'Void by Year'           },
-                      被月柱空:    { category: 'oneway',  ch: '被月空',  en: 'Void by Month'          },
-                      被时柱空:    { category: 'oneway',  ch: '被时空',  en: 'Void by Hour'           },
-                      年日互换空亡: { category: 'mutual',  ch: '年日互换', en: 'Mutual Void Year↔Day'  },
-                      月日互换空亡: { category: 'mutual',  ch: '月日互换', en: 'Mutual Void Month↔Day' },
-                      日时互换空亡: { category: 'mutual',  ch: '日时互换', en: 'Mutual Void Day↔Hour'  },
-                    };
-                    const SUPERSEDED_BY: Record<string, string[]> = {
-                      被日柱空: ['年日互换空亡', '月日互换空亡', '日时互换空亡'],
-                      被年柱空: ['年日互换空亡'],
-                      被月柱空: ['月日互换空亡'],
-                      被时柱空: ['日时互换空亡'],
-                    };
-
-                    const buildVoidStatus = (pillarData: any): VoidStatus => {
-                      const v = pillarData?.空亡 ?? {};
-                      const activeKeys = new Set<string>();
-                      for (const key of Object.keys(VOID_CONDITION_META)) {
-                        const val = v[key];
-                        const isActive = key === '被日柱空' ? val !== '无' : !!val;
-                        if (isActive) activeKeys.add(key);
-                      }
-                      const conditions: VoidCondition[] = [...activeKeys]
-                        .filter(key => !(SUPERSEDED_BY[key] ?? []).some(s => activeKeys.has(s)))
-                        .map(key => {
-                          const meta = VOID_CONDITION_META[key];
-                          return { category: meta.category, label: { ch: meta.ch, en: meta.en } };
-                        });
-                      return { conditions };
-                    };
-
-                    const yearVS  = buildVoidStatus(siZhu.年柱);
-                    const monthVS = buildVoidStatus(siZhu.月柱);
-                    const dayVS   = buildVoidStatus(siZhu.日柱);
-                    const hourVS  = buildVoidStatus(siZhu.时柱);
-                    const maxVoidCount = Math.max(yearVS.conditions.length, monthVS.conditions.length, dayVS.conditions.length, hourVS.conditions.length);
-
-                    // Helper to extract element from naYin phrase (last character typically contains the element)
-                    const extractElementFromNaYin = (naYinPhrase: string): 'Metal' | 'Wood' | 'Water' | 'Fire' | 'Earth' => {
-                      const lastChar = naYinPhrase.charAt(naYinPhrase.length - 1);
-                      const elementMap: Record<string, 'Metal' | 'Wood' | 'Water' | 'Fire' | 'Earth'> = {
-                        '金': 'Metal', '木': 'Wood', '水': 'Water', '火': 'Fire', '土': 'Earth',
-                      };
-                      return elementMap[lastChar] ?? 'Metal';
-                    };
-
-                    // Helper to build lifeStage, naYin, xunKong objects from pillar data
-                    const buildLifeStage = (lifeStageData: any) => {
-                      if (!lifeStageData) return null;
-                      // lifeStageData is { 日干: "养", 自坐: "衰" }
-                      return {
-                        xingYun: { chinese: lifeStageData.日干, english: '' },
-                        ziZuo: { chinese: lifeStageData.自坐, english: '' }
-                      };
-                    };
-                    const buildNaYin = (naYinValue: any) => naYinValue ? { chinese: naYinValue, english: '', element: extractElementFromNaYin(naYinValue) } : null;
-                    const buildXunKong = (voidValue: any) => voidValue && voidValue !== '无' ? { chinese: voidValue, english: '' } : null;
-
-                    const pillarShenSha = chartData?.神煞 ?? {};
-
-                    return (
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 relative pt-5 min-w-0">
-                        <PillarCard pillarLabel={tr.yearPillar[language]} language={language} anyHeavenlyStemBadge={anyHeavenlyStemBadge}  pillar={siZhu.年柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.年柱?.十二长生)}  naYin={buildNaYin(siZhu.年柱?.纳音)}  xunKong={buildXunKong(siZhu.年柱?.空亡?.本柱旬空)}  voidStatus={yearVS}  maxVoidCount={maxVoidCount} shenSha={pillarShenSha.年柱} tianGanHua={tianGanHuaMap['年柱']} />
-                        <PillarCard pillarLabel={tr.monthPillar[language]} language={language} anyHeavenlyStemBadge={anyHeavenlyStemBadge} pillar={siZhu.月柱} isDayMaster={false} lifeStages={buildLifeStage(siZhu.月柱?.十二长生)} naYin={buildNaYin(siZhu.月柱?.纳音)} xunKong={buildXunKong(siZhu.月柱?.空亡?.本柱旬空)} voidStatus={monthVS} maxVoidCount={maxVoidCount} shenSha={pillarShenSha.月柱} tianGanHua={tianGanHuaMap['月柱']} />
-                        <PillarCard pillarLabel={tr.dayPillar[language]} language={language} anyHeavenlyStemBadge={anyHeavenlyStemBadge}   pillar={siZhu.日柱}   isDayMaster={true}  lifeStages={buildLifeStage(siZhu.日柱?.十二长生)}   naYin={buildNaYin(siZhu.日柱?.纳音)}   xunKong={buildXunKong(siZhu.日柱?.空亡?.本柱旬空)}   voidStatus={dayVS}   maxVoidCount={maxVoidCount} shenSha={pillarShenSha.日柱} tianGanHua={tianGanHuaMap['日柱']} />
-                        <PillarCard pillarLabel={tr.hourPillar[language]} language={language} anyHeavenlyStemBadge={anyHeavenlyStemBadge}  pillar={siZhu.时柱}  isDayMaster={false} lifeStages={buildLifeStage(siZhu.时柱?.十二长生)}  naYin={buildNaYin(siZhu.时柱?.纳音)}  xunKong={buildXunKong(siZhu.时柱?.空亡?.本柱旬空)}  voidStatus={hourVS}  maxVoidCount={maxVoidCount} shenSha={pillarShenSha.时柱} tianGanHua={tianGanHuaMap['时柱']} />
-                      </div>
-                    );
-                  })()}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 relative pt-5 min-w-0">
+                    {pillars.rows.map((p) => (
+                      <PillarCard
+                        key={p.key}
+                        pillarLabel={p.pillarLabel}
+                        pillar={p.pillar}
+                        isDayMaster={p.isDayMaster}
+                        voidStatus={p.voidStatus}
+                        maxVoidCount={pillars.maxVoidCount}
+                        tianGanHua={p.tianGanHua}
+                        language={language}
+                        anyHeavenlyStemBadge={pillars.anyHeavenlyStemBadge}
+                        isExpanded={openPillar === p.key}
+                        onToggle={() => setOpenPillar((k) => (k === p.key ? null : p.key))}
+                      />
+                    ))}
+                  </div>
+                  {openRow && (
+                    <PillarDetailPanel
+                      pillarKey={openRow.key}
+                      pillarLabel={openRow.pillarLabel}
+                      pillar={openRow.pillar}
+                      columnIndex={openRow.columnIndex}
+                      lifeStages={openRow.lifeStages}
+                      naYin={openRow.naYin}
+                      xunKong={openRow.xunKong}
+                      voidStatus={openRow.voidStatus}
+                      shenSha={openRow.shenSha}
+                      tianGanHua={openRow.tianGanHua}
+                      huaPartners={openRow.huaPartners}
+                      language={language}
+                      onClose={() => setOpenPillar(null)}
+                    />
+                  )}
                   <DayMasterStrengthCard chartData={chartData} language={language} />
                   <FiveElementsCard chartData={chartData} language={language} />
                   <FavorableElementsCard chartData={chartData} language={language} />

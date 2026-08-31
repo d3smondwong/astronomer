@@ -14,6 +14,8 @@
  *   .sidebar-*      — Dashboard sidebar surfaces, rows, and buttons (colours only;
  *                     the responsive layout math lives in dashboard.css).
  *   .lang-toggle    — EN / 中文 pill switch.
+ *   .pillar-*       — Clickable four-pillar cards (hover lift, focus ring, open
+ *                     state) plus their detail panel's caret and reveal animation.
  *
  * Hover/active states belong here as :hover / [data-active='true'] rules —
  * never as onMouseEnter style mutation in components.
@@ -60,6 +62,103 @@
   /* Day-master ribbon on the day pillar card (profile page) */
   .day-master-badge {
     background: linear-gradient(135deg, var(--color-gold-deep), #a08000);
+  }
+
+  /* ── Clickable pillar cards + their detail panel (profile page) ──
+     The card is a <button>; the pill on its bottom edge mirrors the
+     day-master ribbon on the top edge. Open state is indigo so the card
+     colour-matches the panel's header card. */
+  .pillar-card {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.25s ease;
+  }
+
+  .pillar-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(115, 92, 0, 0.1);
+  }
+
+  .pillar-card:focus-visible {
+    outline: 2px solid var(--color-gold-light);
+    outline-offset: 3px;
+  }
+
+  .pillar-card[data-expanded='true'] {
+    border-color: rgba(61, 58, 92, 0.45);
+    box-shadow: 0 4px 14px rgba(61, 58, 92, 0.12);
+  }
+
+  .pillar-toggle-pill {
+    background: var(--color-parchment);
+    border: 1px solid rgba(115, 92, 0, 0.28);
+  }
+
+  .pillar-toggle-icon {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .pillar-card[data-expanded='true'] .pillar-toggle-icon {
+    transform: rotate(180deg);
+  }
+
+  /* The "Details" word is revealed on hover / focus / open so the resting
+     card carries only the chevron. */
+  .pillar-toggle-label {
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-width 0.2s ease, opacity 0.2s ease;
+  }
+
+  .pillar-card:hover .pillar-toggle-label,
+  .pillar-card:focus-visible .pillar-toggle-label,
+  .pillar-card[data-expanded='true'] .pillar-toggle-label {
+    max-width: 6rem;
+    opacity: 1;
+  }
+
+  /* Rotated-square notch on the detail panel's header card, aligned to the
+     selected column. Two plain numeric custom properties (set inline by
+     PillarDetailPanel) instead of CSS mod(), so the 4-col and 2-col grids
+     each get their own media query and no viewport listener is needed. */
+  .pillar-caret {
+    position: absolute;
+    top: -6px;
+    width: 11px;
+    height: 11px;
+    background: var(--color-parchment);
+    border-left: 1px solid rgba(61, 58, 92, 0.35);
+    border-top: 1px solid rgba(61, 58, 92, 0.35);
+    transform: translateX(-50%) rotate(45deg);
+    left: calc((var(--pillar-col-2) + 0.5) * 50%);
+    transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @media (min-width: 1024px) {
+    .pillar-caret {
+      left: calc((var(--pillar-col-4) + 0.5) * 25%);
+    }
+  }
+
+  .pillar-detail-panel {
+    animation: pillar-detail-in 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes pillar-detail-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pillar-card,
+    .pillar-toggle-icon,
+    .pillar-toggle-label,
+    .pillar-caret {
+      transition: none;
+    }
+    .pillar-card:hover { transform: none; }
+    .pillar-detail-panel { animation: none; }
   }
 
   /* Indigo call-to-action button (unlock insights, generate insights, auth) */

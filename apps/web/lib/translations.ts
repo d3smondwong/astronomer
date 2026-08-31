@@ -57,6 +57,10 @@ export const translations = {
     pillarStemRef:    { en: "Pillar's Stem",     ch: '柱干' },
     naYin:            { en: 'Na Yin',            ch: '纳音' },
     shenSha:          { en: 'Shen Sha',          ch: '神煞' },
+    // Pillar card expand affordance + detail panel
+    pillarDetails:    { en: 'Details',           ch: '详情' },
+    closeDetails:     { en: 'Close details',     ch: '关闭详情' },
+    stemCombination:  { en: 'Stem Combination',  ch: '天干合化' },
     // Tab labels
     tabFourPillars:   { en: 'Four Pillars',      ch: '四柱' },
     tabCycles:        { en: 'Cycles',            ch: '大运流年' },
