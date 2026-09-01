@@ -9,7 +9,8 @@
  * to the open card above) so the panel reads on its own, and so the rooting bar,
  * void chips and 化气格 badge get room the narrow grid card cannot give them. The
  * caret on its top edge points at the selected column — see .pillar-caret in
- * styles/components.css, which reads the two --pillar-col-* custom properties.
+ * styles/components.css, which reads the --pillar-col-4 custom property. The grid is
+ * 4-up at every width, so one column count covers every viewport.
  *
  * Because exactly one pillar's panel exists at a time, none of the grid's
  * row-alignment placeholders are needed here: absent values render as a plain
@@ -122,10 +123,7 @@ export default function PillarDetailPanel({
     >
       <span
         className="pillar-caret"
-        style={{
-          '--pillar-col-4': columnIndex,
-          '--pillar-col-2': columnIndex % 2,
-        } as React.CSSProperties}
+        style={{ '--pillar-col-4': columnIndex } as React.CSSProperties}
       />
       <button
         type="button"

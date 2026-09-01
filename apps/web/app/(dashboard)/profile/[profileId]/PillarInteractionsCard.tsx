@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Card } from 'antd';
 import { ELEMENT_ICONS } from '@/lib/elements';
 import { goldAlpha, palette } from '@/lib/theme';
+import { useIsMobile } from '@/lib/useBreakpoint';
 import { translations } from '@/lib/translations';
 
 interface PillarInteractionsCardProps {
@@ -80,20 +81,13 @@ function getPillarChar(ix: any, pillarIndex: number): string {
   return (detail[pillarName] as string) ?? '';
 }
 
-const MOBILE_BREAKPOINT = 640;
-
 export default function PillarInteractionsCard({ chartData, language }: PillarInteractionsCardProps) {
   const tr = translations.profile;
   const pillarDynamic = (chartData?.作用?.柱位动态 ?? []) as any[];
 
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT
-  );
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
+  // Shared tier (768px), replacing this card's own 640px resize listener. The mobile
+  // layout therefore now kicks in between 640 and 768 where it previously did not.
+  const isMobile = useIsMobile();
 
   const vaultItems = (chartData?.作用?.库位状态 ?? []) as any[];
 

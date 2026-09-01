@@ -65,6 +65,12 @@ export const translations = {
     tabFourPillars:   { en: 'Four Pillars',      ch: '四柱' },
     tabCycles:        { en: 'Cycles',            ch: '大运流年' },
     tabInsights:      { en: 'Insights',          ch: '命盘解析' },
+    // True Solar Time. The badge sits beside the birth time; the explanation is a
+    // tooltip on desktop and static helper text in the mobile birth-record panel,
+    // because a tooltip has no touch equivalent.
+    tst:              { en: 'TST',               ch: '真太阳时' },
+    tstExplain:       { en: 'True Solar Time conversion is applied to this chart.',
+                        ch: '此命盘已采用真太阳时校正。' },
     // Relationship labels
     relAncestry:      { en: 'ANCESTRY',          ch: '祖先' },
     relParents:       { en: 'PARENTS',           ch: '父母' },
@@ -215,6 +221,19 @@ export const translations = {
     labelFemale:      { en: 'Female',                 ch: '女' },
     btnGenerate:      { en: 'Generate My Bazi Chart', ch: '生成八字命盘' },
     errorGenerated:   { en: "We couldn't generate your chart at this time. Please try regenerating the chart.", ch: '暂时无法生成您的命盘，请重新生成命盘。' },
+    // ── Mobile chrome (chip strip, birth-record panel, bottom tab bar) ──
+    // Compact field labels for the birth-record panel: the label gutter is ~54px on a
+    // phone, so 'Date of Birth' / 'Birth Location' (used on the desktop header) wrap.
+    labelBorn:        { en: 'Born',                   ch: '生辰' },
+    labelTime:        { en: 'Time',                   ch: '时间' },
+    labelPlace:       { en: 'Place',                  ch: '地点' },
+    // Bottom-bar item. 'AI Oracle Chat' does not fit a third of a 375px bar.
+    navOracle:        { en: 'Oracle',                 ch: '神算' },
+    account:          { en: 'Account',                ch: '账户' },
+    // Accessible names for the two jobs the selected chip does.
+    showBirthRecord:  { en: 'Show birth record',      ch: '显示出生资料' },
+    hideBirthRecord:  { en: 'Hide birth record',      ch: '隐藏出生资料' },
+    addProfile:       { en: 'Add profile',            ch: '新增命盘' },
   },
   landing: {
     heroLine1:        { en: 'Timeless Insights,',    ch: '洞悉天机，' },

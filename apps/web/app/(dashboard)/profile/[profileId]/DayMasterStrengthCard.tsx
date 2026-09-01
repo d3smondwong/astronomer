@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { Card } from 'antd';
 import { translations } from '@/lib/translations';
+import { useIsMobile, useIsBelowTablet } from '@/lib/useBreakpoint';
 import {
   GaugeContainer,
   GaugeReferenceArc,
@@ -16,8 +16,6 @@ interface DayMasterStrengthCardProps {
   language: 'en' | 'ch';
 }
 
-const MOBILE_BREAKPOINT = 720;
-const TABLET_BREAKPOINT = 1024;
 
 const VERDICT_TIERS = [
   { threshold: 3.2, key: '极旺', color: strengthScale.veryStrong, label: { en: 'Very Strong', ch: '极旺' } },
@@ -150,20 +148,9 @@ export default function DayMasterStrengthCard({ chartData, language }: DayMaster
   const tr = translations.profile;
   const dayMaster = chartData?.["日主"];
 
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT
-  );
-  const [isTablet, setIsTablet] = useState(
-    typeof window !== 'undefined' && window.innerWidth < TABLET_BREAKPOINT
-  );
-  useEffect(() => {
-    const handler = () => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-      setIsTablet(window.innerWidth < TABLET_BREAKPOINT);
-    };
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
+  // Shared tiers (768 / 1024), replacing this card's own 720/1024 resize listener.
+  const isMobile = useIsMobile();
+  const isTablet = useIsBelowTablet();
 
   if (!dayMaster) return null;
 

@@ -1,9 +1,10 @@
 ﻿'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { type VoidStatus, type VoidCondition } from '@/types/baziLibraryTypes';
 import { type ProfileRecord } from '@/types/profile';
+import { toDisplayProfile } from '@/lib/profileDisplay';
 // Shapes only — never lib/fastApiClient, which is server-only and reads the backend token.
 import { type InsightsResponse, type StructuredSection } from '@/types/api';
 import { Alert, Card, Tabs, Button, Popconfirm, Tooltip, Collapse } from 'antd';
@@ -26,6 +27,20 @@ import FavorableElementsCard from './FavorableElementsCard';
 import InsightsLoading from './InsightsLoading';
 
 dayjs.extend(localizedFormat);
+
+/**
+ * Tab keys, in display order. The Tabs component is controlled from `?tab=` so a view is
+ * addressable: deep-linking to Insights works, reload holds the tab, and Back steps
+ * between tabs instead of leaving the page. That matters most on a phone, where the tab
+ * bar is the primary way around the chart and Android's back gesture is a system control.
+ * 'pillars' is the default and is left out of the URL rather than written as ?tab=pillars.
+ */
+const TAB_KEYS = ['pillars', 'insights', 'cycles'] as const;
+type TabKey = (typeof TAB_KEYS)[number];
+const DEFAULT_TAB: TabKey = 'pillars';
+
+const isTabKey = (value: string | null): value is TabKey =>
+  value !== null && (TAB_KEYS as readonly string[]).includes(value);
 
 // Ordered insight sections (matches the backend SECTION_REGISTRY) -> title translation key.
 const INSIGHT_SECTIONS: { key: string; title: keyof typeof translations.profile }[] = [
@@ -235,6 +250,8 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
   const trAuth = translations.auth;
   const { user, openAuthModal, setSpotlightCreateForm } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   // Ensures the auto insights generation fires at most once per mount.
   const insightsRequestedRef = useRef(false);
 
@@ -370,15 +387,22 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
     void generateInsights();
   }, [user?.uid, user?.isAnonymous]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reconstruct profile object for rendering
-  const profile = {
-    id: profileRecord.profileId,
-    name: profileRecord.name,
-    birthDate: new Date(profileRecord.birthData.year, profileRecord.birthData.month - 1, profileRecord.birthData.day),
-    birthTime: `${String(profileRecord.birthData.hour).padStart(2, '0')}:${String(profileRecord.birthData.minute).padStart(2, '0')}`,
-    birthLocation: profileRecord.birthLocation,
-    gender: profileRecord.birthData.gender === 1 ? 'male' : 'female',
-    usedSolarTime: profileRecord.birthData.use_solar_time_correction,
+  // Storage shape -> display shape. Shared with the mobile birth-record panel so the
+  // two surfaces cannot drift (lib/profileDisplay.ts).
+  const profile = toDisplayProfile(profileRecord);
+
+  const activeTab: TabKey = isTabKey(searchParams.get('tab')) ? (searchParams.get('tab') as TabKey) : DEFAULT_TAB;
+
+  const handleTabChange = (key: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (key === DEFAULT_TAB) params.delete('tab');
+    else params.set('tab', key);
+    const query = params.toString();
+    // push(), not replace(): a tab is a view the reader can back out of. On Android the
+    // back gesture is a system control, so without a history entry it would leave the
+    // chart entirely instead of returning to the previous tab.
+    // scroll:false keeps the reader's place in a long chart.
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
   const handleDeleteProfile = async () => {
@@ -457,12 +481,18 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
   return (
     <div className="h-full overflow-auto overflow-x-hidden">
       <div className="max-w-screen-2xl mx-auto px-4 py-6 space-y-6 overflow-x-hidden">
-        {/* Profile Header */}
-        <Card style={{
-          borderColor: goldAlpha(0.1),
-          background: `linear-gradient(180deg, ${palette.inkNavyLight} 0%, ${palette.inkNavy} 100%)`,
-          position: 'relative',
-        }}>
+        {/* Profile Header — desktop only. On a phone the chip strip carries the name and
+            its drop-down panel carries this birth record, so rendering both would say
+            everything twice; the panel also replaces the TST tooltip below, which needs
+            a hover the phone has no way to perform. */}
+        <Card
+          className="hidden md:block"
+          style={{
+            borderColor: goldAlpha(0.1),
+            background: `linear-gradient(180deg, ${palette.inkNavyLight} 0%, ${palette.inkNavy} 100%)`,
+            position: 'relative',
+          }}
+        >
           <div className="flex items-start justify-between">
             {/* Name + Info Grid */}
             <div className="flex-1 min-w-0">
@@ -470,7 +500,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {/* Date of Birth */}
                 <div className="flex flex-col gap-0.5">
-                  <span className={headerLabelCls}>Date of Birth</span>
+                  <span className={headerLabelCls}>{translations.sidebar.labelDob[language]}</span>
                   <span className={headerValueCls}>
                     <Calendar className="w-3.5 h-3.5 shrink-0" />
                     {dayjs(profile.birthDate).format('LL')}
@@ -479,18 +509,18 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
 
                 {/* Birth Time */}
                 <div className="flex flex-col gap-0.5">
-                  <span className={headerLabelCls}>Birth Time</span>
+                  <span className={headerLabelCls}>{translations.sidebar.labelTimeOfBirth[language]}</span>
                   <span className={headerValueCls}>
                     <Clock className="w-3.5 h-3.5 shrink-0" />
                     {profile.birthTime}
                     {profile.usedSolarTime && (
                       <Tooltip
-                        title="True Solar Time conversion is utilised for this chart"
+                        title={tr.tstExplain[language]}
                         color={palette.parchment}
                         styles={{ root: { color: palette.bronzeMuted } }}
                       >
                         <span className="inline-block bg-frost-label text-ink-navy px-2 py-0.5 rounded-xl text-[10px] font-semibold cursor-help ml-1">
-                          TST
+                          {tr.tst[language]}
                         </span>
                       </Tooltip>
                     )}
@@ -499,7 +529,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
 
                 {/* Birth Location */}
                 <div className="flex flex-col gap-0.5">
-                  <span className={headerLabelCls}>Birth Location</span>
+                  <span className={headerLabelCls}>{translations.sidebar.labelBirthLocation[language]}</span>
                   <span className={headerValueCls}>
                     <MapPin className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">{profile.birthLocation}</span>
@@ -508,7 +538,7 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
 
                 {/* Gender */}
                 <div className="flex flex-col gap-0.5">
-                  <span className={headerLabelCls}>Gender</span>
+                  <span className={headerLabelCls}>{translations.sidebar.labelGender[language]}</span>
                   <span className={headerValueCls}>
                     <User className="w-3.5 h-3.5 shrink-0" />
                     {profile.gender === 'male' ? tr.male[language] : tr.female[language]}
@@ -554,15 +584,22 @@ export default function ProfilePageClient({ profileRecord, chartData, insights, 
           </div>
         </Card>
 
-        {/* Tabs */}
+        {/* Tabs — controlled from ?tab= (see TAB_KEYS). Phone tab-bar styling and the
+            hide-while-a-profile-panel-is-open rule live in styles/components.css. */}
         <Tabs
+          activeKey={activeTab}
+          onChange={handleTabChange}
           items={[
             {
               key: 'pillars',
               label: tr.tabFourPillars[language],
               children: (
                 <div className="space-y-4" style={{ overflowX: 'hidden' }}>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 relative pt-5 min-w-0">
+                  {/* 4-up at every width. It used to wrap to 2×2 below lg, which put half
+                      the chart below the fold on a phone — the four pillars are read as one
+                      row. The width comes out of the cards' own padding and type sizes (see
+                      PillarCard), not out of dropping any of them. */}
+                  <div className="grid grid-cols-4 gap-1.5 md:gap-4 relative pt-5 min-w-0">
                     {pillars.rows.map((p) => (
                       <PillarCard
                         key={p.key}
