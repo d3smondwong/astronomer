@@ -1,12 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Card } from 'antd';
 import { ELEMENT_ICONS, ELEMENT_EN } from '@/lib/elements';
 import { goldAlpha, palette, strengthScale } from '@/lib/theme';
+import { useIsMobile } from '@/lib/useBreakpoint';
 import { BaziChartData, ElementState, FiveElements } from '@/types/baziChart';
-
-const MOBILE_BREAKPOINT = 720;
 
 interface FiveElementsCardProps {
   chartData: BaziChartData;
@@ -37,14 +35,9 @@ const STATE_EN: Record<ElementState, string> = {
 export default function FiveElementsCard({ chartData, language }: FiveElementsCardProps) {
   const wuXing = chartData['五行'] as FiveElements | undefined;
 
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT
-  );
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
+  // Shared tier (768px). This card used to keep its own 720px resize listener seeded
+  // from window.innerWidth, which disagreed with the server HTML on first paint.
+  const isMobile = useIsMobile();
 
   if (!wuXing) return null;
 

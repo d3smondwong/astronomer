@@ -130,8 +130,19 @@ export const VOID_CATEGORY_COLORS: Record<string, { color: string; bg: string }>
   mutual:  { color: '#4A2080', bg: 'rgba(74, 32, 128, 0.08)' },
 };
 
-/* Shared class strings for the repeating patterns across card + panel */
-export const SECTION_LABEL_CLS = 'block text-sm font-semibold text-gold-deep/45 uppercase tracking-[0.12em] mb-2';
+/* Shared class strings for the repeating patterns across card + panel.
+ *
+ * The `md:` pairs exist so four pillar cards fit one row on a phone. Below 768px each
+ * card gets roughly 81px of outer width, and the section labels are what make that
+ * impossible at desktop sizes: 'HEAVENLY STEM' at text-sm with 0.12em tracking measures
+ * ~110px on its own. The labels are kept (they name what the glyph below them is) and
+ * shrunk to ~9px with tighter tracking so they wrap to two lines instead of overflowing.
+ *
+ * Responsive prefixes rather than a JS breakpoint on purpose: CSS is correct on the
+ * first paint, whereas useBreakpoint's server snapshot is always false and would flash
+ * the desktop sizing before hydration.
+ */
+export const SECTION_LABEL_CLS = 'block text-[9px] md:text-sm font-semibold text-gold-deep/45 uppercase tracking-[0.04em] md:tracking-[0.12em] mb-1 md:mb-2';
 /** Left label gutter in the detail panel's rows — same tone, left-aligned, no bottom margin. */
 export const GUTTER_LABEL_CLS = 'text-[11px] font-semibold text-gold-deep/45 uppercase tracking-[0.12em] leading-snug text-left';
 export const SUB_LABEL_CLS = 'text-xs font-semibold text-gold-deep/35 uppercase tracking-[0.1em]';
@@ -139,19 +150,52 @@ export const GLYPH_LG_CLS = 'font-zh text-5xl font-semibold text-bronze-muted le
 export const GLYPH_MD_CLS = 'font-zh text-4xl font-semibold text-bronze-muted leading-none';
 export const CAPTION_CLS = 'text-[13px] text-bronze-muted opacity-75 m-0 italic';
 
+/* Card-only variants of the two above. The detail panel is full-width on a phone and
+   keeps the roomy sizes; only the four-across card has to give up space. */
+export const GLYPH_CARD_CLS = 'font-zh text-[34px] md:text-5xl font-semibold text-bronze-muted leading-none';
+export const CAPTION_CARD_CLS = 'text-[10px] md:text-[13px] text-bronze-muted opacity-75 m-0 italic leading-tight';
+/**
+ * Element-icon wrapper for the card. The icons take a numeric `fontSize` prop, which
+ * CSS cannot scale — so the size comes from this class and the icon is given
+ * `fontSize: 'inherit'`. Colour stays inline: it is data-driven per element.
+ */
+export const ELEMENT_ICON_CARD_CLS = 'inline-flex items-center text-[10px] md:text-[13px]';
+
 export function PillarDivider() {
   return <div className="w-4/5 h-px bg-gold-deep/12 my-4" />;
 }
 
-/** Ten-god chip under a heavenly stem (offset arrow pair when 化气格 relabelled it). */
-export function TenGodCard({ value, language, dimmed }: { value: string; language: 'en' | 'ch'; dimmed?: boolean }) {
+/**
+ * Ten-god chip under a heavenly stem (offset arrow pair when 化气格 relabelled it).
+ *
+ * `compact` tightens the chip for the four-across pillar card on a phone, where the
+ * English label ('Indirect Wealth' and friends) has to wrap rather than overflow. The
+ * detail panel is full-width and passes it off, so its chips are unchanged.
+ */
+export function TenGodCard({ value, language, dimmed, compact }: {
+  value: string;
+  language: 'en' | 'ch';
+  dimmed?: boolean;
+  compact?: boolean;
+}) {
   const char = value === '日主' ? '我' : value;
   const label = value === '日主' ? 'Self' : (SHI_SHEN_LABELS[value] ?? value);
   return (
-    <div className={`inline-flex flex-col items-center border border-gold-deep/25 rounded-lg px-2.5 py-1 bg-gold-deep/6 ${dimmed ? 'opacity-55' : ''}`}>
+    <div className={`inline-flex flex-col items-center border border-gold-deep/25 rounded-lg bg-gold-deep/6 ${
+      compact ? 'px-1 py-0.5 md:px-2.5 md:py-1' : 'px-2.5 py-1'
+    } ${dimmed ? 'opacity-55' : ''}`}>
       <span className="font-zh text-[13px] text-gold-deep/75">{char}</span>
       {language === 'en' && (
-        <span className="text-[10px] text-gold-deep/60 mt-0.5">{label}</span>
+        // min-h reserves the second line on a phone: 'Direct Resource' wraps where
+        // 'Self' does not, and without it each card's 地支 block sat at a different
+        // height. Dropped at md+, where nothing wraps.
+        <span className={`text-gold-deep/60 mt-0.5 ${
+          compact
+            ? 'text-[9px] leading-tight text-center min-h-[2.5em] md:min-h-0 md:text-[10px]'
+            : 'text-[10px]'
+        }`}>
+          {label}
+        </span>
       )}
     </div>
   );

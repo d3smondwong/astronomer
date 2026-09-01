@@ -1,46 +1,65 @@
 /**
- * dashboard.css — Dashboard layout and sidebar responsive behaviour.
+ * dashboard.css — Dashboard layout and responsive behaviour.
  *
  * Handles the structural math of the dashboard shell: sidebar width, content offset,
- * and the breakpoint at which the sidebar collapses from full labels to icon-only mode.
+ * and the single breakpoint at which the chrome changes shape.
  *
- * Breakpoints:
- *   ≥ 1024px  — Expanded sidebar (12% width). Section labels, nav text, and user profile visible.
- *   < 1024px  — Collapsed sidebar (~85px, controlled by JavaScript). Labels hidden,
- *               nav items centred, profile name abbreviated via data-short attribute.
+ * Tiers:
+ *   ≥ 1024px  — Sidebar, 210px. Section labels, nav text and user footer visible.
+ *   < 1024px  — No sidebar. The compact chrome takes over: a profile chip strip that is
+ *               the header, drop-down birth-record / account panels, and a bottom tab
+ *               bar. Both chromes are always rendered; CSS decides which is visible,
+ *               so `children` is only ever built once and nothing flashes on hydration.
  *
- * This file contains layout concerns only (widths, margins, flex direction, visibility).
- * Colours, fonts, and component styles live in theme.css and components.css respectively.
+ * There was a third tier — an 85px icon rail from 768-1023px. It has been deleted: it
+ * showed no labels and, because DashboardShell gated the create-profile `+` on the same
+ * flag and this file hid `.sidebar-login-btn`, a 1000px window could neither add a chart
+ * nor sign in or out. The bottom nav covers that range strictly better.
+ *
+ * The sidebar width is 210px rather than the old `12%`, which had no clamp and resolved
+ * to 123px at 1024px — too narrow for 'Compatibility' (truncated) and 'AI Oracle Chat'
+ * (wrapped to three lines). Keep it in sync with SIDEBAR_WIDTH in DashboardShell: antd's
+ * Sider writes inline min-width/max-width from its prop, and min-width beats a
+ * `width: … !important` from here.
+ *
+ * The content offset is expressed here and ONLY here. It used to be duplicated as an
+ * inline style in DashboardShell, which meant a media query could not zero it.
+ *
+ * This file contains layout concerns only (sizes, positions, visibility). Colours,
+ * fonts and component surfaces live in theme.css and components.css respectively.
  */
 
-/* Dashboard responsive layout using CSS media queries */
+:root {
+  /* Chip strip height. The design budget is ~39px; 44px is the smallest that keeps
+     the chips at a comfortable touch size, and the bottom bar pays for it. */
+  --mobile-topbar-h: 44px;
+  --mobile-bottom-nav-h: 54px;
+  /* Keep in sync with SIDEBAR_WIDTH in app/(dashboard)/DashboardShell.tsx. */
+  --sidebar-w: 210px;
+}
 
-/* Default: Expanded sidebar (12%) */
+/* ── Sidebar (≥ 1024px) ── */
+
 .dashboard-sider {
-  width: 12% !important;
+  width: var(--sidebar-w) !important;
   position: fixed;
-  height: 100vh;
+  /* dvh, not vh: a mobile browser's collapsing URL bar makes 100vh taller than the
+     visible viewport, which cut off the sidebar footer. */
+  height: 100dvh;
   left: 0;
   top: 0;
   z-index: 100;
-  transition: width 0.3s ease;
 }
 
 .dashboard-content {
-  margin-left: 12%;
-  min-height: 100vh;
+  margin-left: var(--sidebar-w);
+  min-height: 100dvh;
   overflow: auto;
-  transition: margin-left 0.3s ease;
 }
 
-.sidebar-section-label,
-.sidebar-nav-label,
-.sidebar-profile-name {
-  display: inline;
-}
-
-.sidebar-divider {
-  display: block;
+/* Passthrough at desktop — the wrapper exists only for the compact flex column. */
+.dashboard-main {
+  display: contents;
 }
 
 .sidebar-nav-item {
@@ -49,60 +68,112 @@
 }
 
 .sidebar-user-profile {
-  /* Always a centred column — the collapsed breakpoint only hides name/login below. */
   flex-direction: column;
   gap: 8px;
 }
 
-.sidebar-user-profile > div:nth-child(2),
-.sidebar-login-btn {
-  display: block;
+/* ── Compact chrome: hidden by default, shown below 1024px ── */
+
+.mobile-topbar,
+.mobile-bottom-nav {
+  display: none;
 }
 
-/* Collapsed: Small screens (< 1024px) - 85px sidebar - handled by JavaScript */
+/* ── Below 1024px: sidebar out, chip strip + bottom bar in ── */
 @media (max-width: 1023px) {
-  /* Hide section labels */
-  .sidebar-section-label {
-    display: none;
+  .dashboard-sider {
+    display: none !important;
   }
 
-  /* Hide divider */
-  .sidebar-divider {
-    display: none;
-  }
-
-  /* Center nav items and hide text */
-  .sidebar-nav-item {
-    justify-content: center !important;
-    padding: 8px 0 !important;
-  }
-
-  .sidebar-nav-label {
-    display: none;
-  }
-
-  /* Show first 3 letters for profile names */
-  .sidebar-profile-name::before {
-    content: attr(data-short);
-  }
-
-  .sidebar-profile-name {
-    font-size: 0;
-  }
-
-  /* Stack user profile vertically and center */
-  .sidebar-user-profile {
+  /* A fixed-height flex column so only the content area scrolls: the strip stays
+     put without position:fixed, and the bottom bar's space is reserved by padding
+     rather than guessed at by the pages inside. */
+  .dashboard-content {
+    margin-left: 0;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
     flex-direction: column;
-    gap: 8px;
-    justify-content: center;
+    padding-bottom: calc(var(--mobile-bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .dashboard-main {
+    display: block;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* In flow (so it cannot be scrolled away) and the positioning context for the
+     panels, which hang below it as an overlay — the strip must not move when one
+     opens, and the chart stays where it was behind it. */
+  .mobile-topbar {
+    display: block;
+    position: relative;
+    flex: 0 0 auto;
+    z-index: 20;
+  }
+
+  .mobile-strip {
+    display: flex;
     align-items: center;
+    gap: 8px;
+    height: var(--mobile-topbar-h);
+    padding: 0 10px;
   }
 
-  .sidebar-user-profile > div:nth-child(2) {
+  /* The chips scroll; the account button stays pinned to the right edge. */
+  .mobile-strip-chips {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .mobile-strip-chips::-webkit-scrollbar {
     display: none;
   }
 
-  .sidebar-login-btn {
-    display: none;
+  .mobile-panel {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: calc(100dvh - var(--mobile-topbar-h) - var(--mobile-bottom-nav-h));
+    overflow-y: auto;
+  }
+
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    /* Above the sider's z-100 so it survives if the sider is ever shown here. */
+    z-index: 110;
+    height: calc(var(--mobile-bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Items share the width evenly but stop growing past a comfortable target — on a
+     ~1000px tablet three full-thirds left them scattered across the bar. */
+  .mobile-bottom-nav {
+    justify-content: center;
+  }
+
+  .bottom-nav-item {
+    flex: 1 1 0;
+    max-width: 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
   }
 }

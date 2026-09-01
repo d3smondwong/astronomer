@@ -1,14 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Card } from 'antd';
 import { ELEMENT_ICONS, ELEMENT_EN, ELEMENT_COLOR } from '@/lib/elements';
 import { goldAlpha, palette, strengthScale } from '@/lib/theme';
+import { useIsMobile } from '@/lib/useBreakpoint';
 import { BaziChartData } from '@/types/baziChart';
 import { YongShen } from '@/types/cyclesChart';
 import { translations } from '@/lib/translations';
-
-const MOBILE_BREAKPOINT = 720;
 
 interface FavorableElementsCardProps {
   chartData: BaziChartData;
@@ -104,14 +102,8 @@ export default function FavorableElementsCard({ chartData, language }: Favorable
   const tr = translations.profile;
   const yongShen = chartData['用神'] as YongShen | undefined;
 
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT
-  );
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
+  // Shared tier (768px), replacing this card's own 720px resize listener.
+  const isMobile = useIsMobile();
 
   // Old cached charts predate the 用神 field — omit the card silently (sibling convention).
   if (!yongShen) return null;

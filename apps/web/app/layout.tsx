@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "@/styles/globals.css"; // includes antd reset (layered) — see globals.css header
 import { ConfigProvider } from 'antd';
 import { Noto_Serif, Ma_Shan_Zheng, Noto_Sans_SC } from 'next/font/google';
@@ -45,6 +45,17 @@ export const metadata: Metadata = {
    * drift. This also settles the favicon.ico 404 the browser console logged on every page.
    */
   icons: { icon: '/short_huat_life_logo.svg' },
+};
+
+/**
+ * Stated explicitly rather than left to Next's default, now that the dashboard has a
+ * real phone layout. maximumScale/userScalable are deliberately NOT set: capping zoom
+ * is an accessibility failure, and the chart's 9px section labels are exactly the kind
+ * of thing a reader will want to pinch.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 /**
