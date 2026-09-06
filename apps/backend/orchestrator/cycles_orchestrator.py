@@ -11,6 +11,32 @@ analysis (运柱 / 作用 / 神煞 / 五行动态) for each.
 populated 流年 list. Every 流年 entry carries an empty "流月" list — the
 reserved seam for the future monthly layer.
 
+Timeline — TWO INDEPENDENT AXES, and conflating them is the classic error:
+
+    大运 boundaries are INDIVIDUAL. A decade begins at the 起运 instant and every
+    10 years on that anniversary (交运). Desmond: 1991-11-04 16:14:27, then
+    2001-11-04, 2011-11-04 …
+    流年 boundaries are UNIVERSAL. A year begins at 立春 — the same instant for
+    everyone alive. 2021: 2021-02-03 22:58:48 → 2022-02-04 04:50:47.
+
+Nothing aligns the two. A 流年 straddling a 交运 is therefore lived partly under
+each decade and appears in BOTH decades' 流年 lists, flagged 交运年 — analysed
+once per decade, with that decade as its companion, which is exactly the classical
+"read the 交运 year against both decades" and needs no extra machinery.
+
+This is why lunar-python's DaYun.getLiuNian() is NOT used: it groups years by
+calendar year counted off the decade's start year (1991-2000 for a decade that
+actually runs Nov 1991 → Nov 2001), silently snapping the individual axis onto the
+universal one. The years are enumerated here instead — see _overlapping_liu_nian_years.
+
+Ages are ENDPOINT ages, read at the period's own boundaries, so a decade's
+结束虚岁 equals the next decade's 开始虚岁 exactly as their instants coincide.
+虚岁 is anchored on 立春 (see _xu_sui), not on the calendar year.
+
+All instants are naive datetimes in the same frame as the (TST-corrected) birth
+instant and every 节气 lunar-python reports — they are never mixed with wall-clock
+UTC, and callers comparing "now" against them must convert first.
+
 岁运: a 大运 is analysed against the natal chart alone (1×4) — a decade exists
 independently of any year inside it. A 流年 is analysed against the natal chart
 PLUS its enclosing 大运 (1×5), and carries an extra "岁运" block: the classical
@@ -30,6 +56,10 @@ The chart_key returned here is for log correlation only.
 import json
 from dataclasses import dataclass, replace
 from datetime import datetime
+from functools import lru_cache
+
+from lunar_python import Solar
+from lunar_python.util import LunarUtil
 
 from apps.backend.astronomer_logic.bazi_key import encode_bazi_key
 from apps.backend.astronomer_logic.bazi_pillars import get_bazi_pillars
@@ -82,6 +112,105 @@ _BRANCH_SHENG_XIAO = dict(zip("子丑寅卯辰巳午未申酉戌亥", "鼠牛虎
 
 # lunar-python's Yun.getDaYun() default — index 0 is the pre-运 stub.
 _DA_YUN_COUNT = 10
+
+# Instant format, matching lunar-python's Solar.toYmdHms() so 起运阳历 and every
+# boundary emitted here read identically.
+_TS = "%Y-%m-%d %H:%M:%S"
+
+# A date solidly inside a solar year, used to probe lunar-python for that year's facts.
+# Jan/Feb probes sit either side of 立春 and land in an ambiguous lunar year; a mid-year
+# probe never does.
+_MID_YEAR = (6, 1, 12, 0, 0)
+
+
+# ── timeline primitives (see the two-axes note in the module docstring) ──────
+
+
+def _to_datetime(solar) -> datetime:
+    """lunar-python Solar → naive datetime, in the chart's own (TST-shifted) frame."""
+    return datetime(
+        solar.getYear(), solar.getMonth(), solar.getDay(),
+        solar.getHour(), solar.getMinute(), solar.getSecond(),
+    )
+
+
+@lru_cache(maxsize=None)
+def _li_chun(year: int) -> datetime:
+    """The 立春 instant that OPENS solar `year` — the universal 流年 boundary."""
+    month, day, hour, minute, second = _MID_YEAR
+    jie_qi = (
+        Solar.fromYmdHms(year, month, day, hour, minute, second)
+        .getLunar()
+        .getJieQiTable()["立春"]
+    )
+    return _to_datetime(jie_qi)
+
+
+@lru_cache(maxsize=None)
+def _year_gan_zhi(year: int) -> str:
+    """干支 of the 立春-year opening in solar `year` (立春-exact, never calendar-exact)."""
+    month, day, hour, minute, second = _MID_YEAR
+    return (
+        Solar.fromYmdHms(year, month, day, hour, minute, second)
+        .getLunar()
+        .getYearInGanZhiExact()
+    )
+
+
+def _li_chun_year(moment: datetime) -> int:
+    """The 立春-year containing `moment` — i.e. the year whose 立春 has already passed."""
+    return moment.year if moment >= _li_chun(moment.year) else moment.year - 1
+
+
+def _plus_years(moment: datetime, years: int) -> datetime:
+    """`moment` shifted by whole years; a 2-29 anniversary clamps to 2-28.
+
+    Every decade boundary is computed from 起运 with its FULL offset (not by repeatedly
+    adding 10 to the previous one), so a clamp can never accumulate into drift.
+    """
+    try:
+        return moment.replace(year=moment.year + years)
+    except ValueError:
+        return moment.replace(year=moment.year + years, day=28)
+
+
+def _zhou_sui(birth: datetime, moment: datetime) -> int:
+    """周岁 — completed years lived at `moment`. Birthday-accurate, not calendar-year.
+
+    `年份 - 出生年` (what lunar-python's age arithmetic reduces to) answers a different
+    question: the age ATTAINED during that year. At 立春 2021 a subject born 1985-11-25
+    is 35 and turns 36 that November, so the coherent partner of 虚岁 37 is 35, not 36.
+    """
+    years = moment.year - birth.year
+    if _plus_years(birth, years) > moment:
+        years -= 1
+    return years
+
+
+def _xu_sui(birth_li_chun_year: int, moment: datetime) -> int:
+    """虚岁 at `moment`: 1 throughout the 立春-year of birth, +1 at every 立春.
+
+    Anchored on 立春, NOT on the calendar year. lunar-python derives 虚岁 as
+    `year - 出生年 + 1` (DaYun.getStartAge, inherited by LiuNian.getAge), which agrees
+    for anyone born after 立春 but is off by one for LIFE for a January-born subject —
+    whose birth 立春-year is the PREVIOUS solar year.
+    """
+    return _li_chun_year(moment) - birth_li_chun_year + 1
+
+
+def _overlapping_liu_nian_years(start: datetime, end: datetime) -> range:
+    """The 立春-years whose own window overlaps the period [start, end).
+
+    A decade normally touches ELEVEN of them: 交运 falls mid-立春-year at both ends, so
+    the first and last are partial and are shared with the neighbouring decade. Only a
+    起运 landing exactly on 立春 yields a clean ten.
+    """
+    first = _li_chun_year(start)
+    last = _li_chun_year(end)
+    if _li_chun(last) >= end:
+        # The period ends exactly on a 立春 — that year opens with the NEXT period.
+        last -= 1
+    return range(first, last + 1)
 
 
 @dataclass(frozen=True)
@@ -348,27 +477,67 @@ def _tai_sui_check(liu_nian_branch: str, ctx: NatalContext) -> dict:
 
 
 def _liu_nian_entry(
-    liu_nian, birth_year: int, ctx: NatalContext, decade: _DecadeContext | None = None
+    year: int,
+    period: tuple[datetime, datetime],
+    birth: datetime,
+    birth_li_chun_year: int,
+    ctx: NatalContext,
+    decade: _DecadeContext | None = None,
 ) -> dict:
     """One fully-analysed 流年 entry (read 岁运并临 inside its `decade`).
+
+    `period` is the enclosing 大运's [起始, 结束) window — used ONLY to decide 交运年.
+    The year's own 起始/结束 are its 立春 pair and owe nothing to the decade: the two
+    axes are independent (module docstring).
 
     decade is None only for the pre-起运 stub (未行大运) — there is no 大运 yet, so the
     year acts on the natal chart alone (natal + 流年) with 变化 measured against birth,
     and carries no 岁运 block: there is nothing for it to relate to.
     """
-    gan_zhi = liu_nian.getGanZhi()
+    start, end = _li_chun(year), _li_chun(year + 1)
+    period_start, period_end = period
+    gan_zhi = _year_gan_zhi(year)
     stem, branch = gan_zhi[0], gan_zhi[1]
-    entry = {
-        "年份": liu_nian.getYear(),
-        "虚岁": liu_nian.getAge(),
-        "周岁": liu_nian.getYear() - birth_year,
+    # Ages are read at the moment the subject actually ENTERS the year. That is 立春 for
+    # every year but one: the birth year's 立春 predates birth, and measuring there would
+    # report 周岁 -1 (and 虚岁 0) for a person not yet born.
+    aged_at = max(start, birth)
+    return {
+        "年份": year,
+        "起始": start.strftime(_TS),
+        "结束": end.strftime(_TS),
+        # The year's 立春 window is not wholly inside this period — it straddles a 交运,
+        # so the year is shared with the neighbouring decade and appears in both lists.
+        # On the pre-起运 stub the two partial years are cut by birth and by 起运 instead.
+        "交运年": start < period_start or end > period_end,
+        "虚岁": _xu_sui(birth_li_chun_year, aged_at),
+        "周岁": _zhou_sui(birth, aged_at),
         "干支": gan_zhi,
         "生肖": _BRANCH_SHENG_XIAO.get(branch, ""),
-        **_analyse_cycle_pillar(stem, branch, liu_nian.getXunKong(), ctx, "流年", decade=decade),
+        **_analyse_cycle_pillar(
+            stem, branch, LunarUtil.getXunKong(gan_zhi), ctx, "流年", decade=decade
+        ),
         "太岁": _tai_sui_check(branch, ctx),
         "流月": [],  # reserved seam for the future monthly layer
     }
-    return entry
+
+
+def _liu_nian_list(
+    period: tuple[datetime, datetime],
+    birth: datetime,
+    birth_li_chun_year: int,
+    ctx: NatalContext,
+    decade: _DecadeContext | None = None,
+) -> list[dict]:
+    """Every 流年 overlapping `period`, each analysed inside `decade`.
+
+    Normally ELEVEN entries: the two 交运 years are partial and are also carried by the
+    neighbouring decade, where they are analysed again against THAT companion.
+    """
+    return [
+        _liu_nian_entry(year, period, birth, birth_li_chun_year, ctx, decade)
+        for year in _overlapping_liu_nian_years(*period)
+    ]
 
 
 def calculate_cycles(
@@ -407,19 +576,36 @@ def calculate_cycles(
 
     yun = bazi.getYun(gender)
     qi_yun_solar = yun.getStartSolar()
-    birth_year = lunar_birthday.getSolar().getYear()
+
+    # The individual axis. Every decade boundary is 起运 + a whole multiple of 10 years;
+    # the pre-运 stub runs from birth to 起运.
+    birth_dt = _to_datetime(lunar_birthday.getSolar())
+    qi_yun = _to_datetime(qi_yun_solar)
+    birth_li_chun_year = _li_chun_year(birth_dt)
 
     da_yun_entries = []
     for da_yun in yun.getDaYun(_DA_YUN_COUNT):
         i = da_yun.getIndex()
+        start, end = (
+            (birth_dt, qi_yun) if i == 0
+            else (_plus_years(qi_yun, (i - 1) * 10), _plus_years(qi_yun, i * 10))
+        )
+        # Endpoint ages, read at the period's own boundaries — so 结束虚岁 equals the next
+        # decade's 开始虚岁, exactly as their instants coincide.
+        start_xu, end_xu = (
+            _xu_sui(birth_li_chun_year, start),
+            _xu_sui(birth_li_chun_year, end),
+        )
         base = {
             "序号": i,
             "干支": da_yun.getGanZhi(),
-            "开始年份": da_yun.getStartYear(),
-            "结束年份": da_yun.getEndYear(),
-            "开始年龄": da_yun.getStartAge(),
-            "结束年龄": da_yun.getEndAge(),
-            "周期": f"{da_yun.getStartAge()}-{da_yun.getEndAge()}岁",
+            "起始": start.strftime(_TS),
+            "结束": end.strftime(_TS),
+            "开始虚岁": start_xu,
+            "结束虚岁": end_xu,
+            "开始周岁": _zhou_sui(birth_dt, start),
+            "结束周岁": _zhou_sui(birth_dt, end),
+            "周期": f"{start_xu}-{end_xu}岁",  # 虚岁, endpoint to endpoint
         }
 
         if i == 0:
@@ -427,9 +613,9 @@ def calculate_cycles(
             # Its 流年 (birth → 起运) are still analysable when requested.
             stub = {**base, "阶段": "未行大运", "流年": []}
             if da_yun_index == 0:
-                stub["流年"] = [
-                    _liu_nian_entry(ln, birth_year, ctx) for ln in da_yun.getLiuNian()
-                ]
+                stub["流年"] = _liu_nian_list(
+                    (start, end), birth_dt, birth_li_chun_year, ctx
+                )
             da_yun_entries.append(stub)
             continue
 
@@ -442,12 +628,15 @@ def calculate_cycles(
         }
 
         if da_yun_index is not None and i == da_yun_index:
-            decade = _build_decade_context(
-                ctx, stem, branch, entry["作用"], entry["运柱"], da_yun.getXunKong()
+            entry["流年"] = _liu_nian_list(
+                (start, end),
+                birth_dt,
+                birth_li_chun_year,
+                ctx,
+                _build_decade_context(
+                    ctx, stem, branch, entry["作用"], entry["运柱"], da_yun.getXunKong()
+                ),
             )
-            entry["流年"] = [
-                _liu_nian_entry(ln, birth_year, ctx, decade) for ln in da_yun.getLiuNian()
-            ]
 
         da_yun_entries.append(entry)
 

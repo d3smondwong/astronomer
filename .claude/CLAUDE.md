@@ -143,15 +143,18 @@ class CyclesInput(BirthInput):
   //   presentation split of the sets; 综合/角色 stay authoritative. See yong_shen._select_yong_shen.
   // 五行[元素] = { 十神, 扶抑, 调候, 综合 (喜|忌|平), 角色 (喜用神|忌神|仇神|闲神), 备注 }
   "大运": [
-    { "序号": 0, "阶段": "未行大运", "干支": "", "开始年份", "结束年份", "开始年龄", "结束年龄", "流年": [] },
-    { "序号": 1, "干支": "丙戌", "周期": "7-16岁", ...,
+    { "序号": 0, "阶段": "未行大运", "干支": "", "起始", "结束",
+      "开始虚岁", "结束虚岁", "开始周岁", "结束周岁", "周期", "流年": [] },
+    { "序号": 1, "干支": "丙戌", "起始": "1991-11-04 16:14:27", "结束": "2001-11-04 16:14:27",
+      "开始虚岁": 7, "结束虚岁": 17, "开始周岁": 5, "结束周岁": 15, "周期": "7-17岁", ...,
       "运柱": { 天干/地支/藏干/十二长生/纳音/空亡/季节状态/制化 },
       "作用": { "关系总览": [...], "柱位动态": [...] },
       "神煞": [ { "名称", "来源", "解读" } ],
       "运势": { "评级": "喜运|平运|忌运", "依据": "...", "来源": "金不换|用神五行" },
       "五行动态": { "五行", "对日主", "引动" },
       // 五行[元素] = { 状态, 本命, 运基 (流年 only), 变化, 十神, 喜忌, 角色, 解读 }
-      "流年": [ { "年份", "虚岁", "周岁", "干支", "生肖", "运柱", "作用", "神煞",
+      "流年": [ { "年份", "起始", "结束", "交运年", "虚岁", "周岁", "干支", "生肖",
+                 "运柱", "作用", "神煞",
                  "运势": { ..., "警示": ["岁运并临（重）：…"] },
                  "五行动态",
                  "岁运": { "关系总览": [...], "特殊组合": [ {"名称","级别","说明"} ],
@@ -168,7 +171,15 @@ class CyclesInput(BirthInput):
 
 **The 方位表 is 正格-authored — 非正格 charts bypass it entirely.** It assumes the day master stands and must be balanced, so for a 从格/专旺格/化气格 its directions are not merely unhelpful but *backwards*. `get_cycle_yun_shi` therefore skips it whenever `格局 != 正格` and reads the structure-derived 用神 instead (`来源: "从格用神"`). This is the general form of a real bug: 癸午's source clause (`喜从火财 忌申(无根夭)`) is **从格-conditional, not a 方位 judgment**, and encoding its `忌申` rated 庚金 — the very element 癸午's 经典 calls 必须庚辛为生身之本 — as 忌运 for ordinary charts. Both `大运喜`/`大运忌` there are deliberately empty; do not "restore" them from the raw source string.
 
-**流年 are lazy:** default request returns all 10 大运 fully analysed with empty `流年` lists (~62KB); pass `da_yun_index` to expand one decade (~146KB, of which the 岁运 layer is ~14KB). Every 流年 carries an empty `流月` seam for the future monthly layer. TypeScript interfaces: `apps/web/types/cyclesChart.ts`.
+**流年 are lazy:** default request returns all 10 大运 fully analysed with empty `流年` lists (~62KB); pass `da_yun_index` to expand one decade (~157KB for its 11 流年, of which the 岁运 layer is ~14KB). Every 流年 carries an empty `流月` seam for the future monthly layer. TypeScript interfaces: `apps/web/types/cyclesChart.ts`.
+
+**大运 and 流年 are TWO INDEPENDENT TIME AXES — never align one to the other.** A 大运 boundary is **individual**: the 起运 instant, then every 10 years on that anniversary (交运). A 流年 boundary is **universal**: 立春, the same instant for everyone alive. Nothing synchronises them, so a year straddling a 交运 is lived partly under each decade and **appears in BOTH decades' `流年` lists** with `交运年: true` — analysed once per decade against that decade's companion, which is the classical "read the 交运 year against both decades" for free. A decade therefore normally carries **11 流年, not 10**; only a 起运 landing exactly on 立春 gives a clean ten.
+
+This is why `DaYun.getLiuNian()` is **not** used: it groups years by calendar year counted off the decade's start year (1991-2000 for a decade actually running Nov 1991 → Nov 2001), silently snapping the individual axis onto the universal one. `cycles_orchestrator._overlapping_liu_nian_years` enumerates them instead. For the same reason a 大运 has no `开始年份`/`结束年份` — a Nov→Nov decade has no honest year-pair label; `起始`/`结束` carry the boundaries and `周期` is the display string.
+
+**Ages are ENDPOINT ages, and 虚岁 is 立春-anchored.** `开始虚岁`/`结束虚岁` are read at the period's own two boundaries, so a decade's `结束虚岁` equals the next decade's `开始虚岁` exactly as their instants coincide (7→17, 17→27 — not lunar-python's 7-16, a calendar-year artifact). `虚岁` counts 1 throughout the **立春-year** of birth and +1 at every 立春; lunar-python's `year - 出生年 + 1` (`DaYun.getStartAge`, inherited by `LiuNian.getAge`) agrees for anyone born after 立春 but is off by one **for life** for a January-born subject, whose birth 立春-year is the previous solar year. `周岁` is completed years lived, birthday-accurate — at 立春 2021 a subject born 1985-11-25 is **35** (虚岁 37), not the 36 that `年份 - 出生年` reports. Both ages are read at `max(period start, birth)`, so the birth year reports 虚 1 / 周 0 rather than a negative age.
+
+**All instants share the chart's (TST-shifted) frame** — the birth instant, `起运阳历`, every 节气 lunar-python reports, and every `起始`/`结束`. Callers comparing against a wall-clock `now` must convert first; never mix frames.
 
 **Caching rule (critical):** cycle timing (起运) depends on the exact birth instant, which `chart_key` deliberately excludes — **never cache cycle data under `chart_key`**. The response is deterministic per (birth fields, lat/lon, TST flag, gender, da_yun_index); cache at the Next.js layer per `profileId + daYunIndex` if needed. `chart_key` in the cycles response is for log correlation only. The `/api/cycles` route handler reads birth data from the profile record (owner-enforced), never from the client.
 

@@ -428,10 +428,35 @@ export interface TaiSui {
   说明: string;
 }
 
-/** One 流年 (annual pillar) entry. */
+/**
+ * One 流年 (annual pillar) entry.
+ *
+ * 流年 boundaries are UNIVERSAL — 立春, the same instant for everyone alive — whereas a
+ * 大运's are individual (its 起运 anniversary). The two axes never align, so a year near
+ * a 交运 is lived partly under each decade and appears in BOTH decades' 流年 lists with
+ * 交运年 === true, analysed once against each. See DaYunEntry.
+ */
 export interface LiuNianEntry {
   年份: number;
+  /**
+   * 立春 of 年份 — when this 干支 year actually begins. NOT January 1st: picking the
+   * "current" 流年 by calendar year is wrong from Jan 1 until ~Feb 4 every year.
+   *
+   * Same (TST-shifted) frame as every other instant in this response — convert before
+   * comparing against a wall-clock `now`.
+   */
+  起始: string;
+  /** 立春 of 年份 + 1, exclusive. */
+  结束: string;
+  /**
+   * This year's 立春 window is not wholly inside the enclosing 大运 — it straddles a
+   * 交运, so the year is shared with the neighbouring decade. On the pre-起运 stub the
+   * two partial years are cut by the birth instant and by 起运 instead.
+   */
+  交运年: boolean;
+  /** 虚岁 at 起始 — 立春-anchored (1 throughout the 立春-year of birth, +1 each 立春). */
   虚岁: number;
+  /** 周岁 at 起始 — completed years lived, birthday-accurate, NOT 年份 − 出生年. */
   周岁: number;
   干支: string;
   生肖: string;
@@ -454,14 +479,32 @@ export interface LiuNianEntry {
   流月: unknown[];
 }
 
-/** One 大运 (decade) entry. Index 0 is the pre-运 stub (干支 === ""). */
+/**
+ * One 大运 (decade) entry. Index 0 is the pre-运 stub (干支 === "").
+ *
+ * A decade's boundaries are INDIVIDUAL: it begins at the 起运 instant and every 10 years
+ * on that anniversary (交运), with no relation to 立春 or to the calendar. Decades are
+ * exactly contiguous — 结束 === the next entry's 起始, and 结束虚岁 === its 开始虚岁.
+ *
+ * There is deliberately no 开始年份/结束年份: a decade running Nov 1991 → Nov 2001 has no
+ * honest year-pair label. Use 起始/结束 for boundaries and 周期 for a display label.
+ */
 export interface DaYunEntry {
   序号: number;
   干支: string;
-  开始年份: number;
-  结束年份: number;
-  开始年龄: number;
-  结束年龄: number;
+  /** 交运 instant — 起运 + (序号 − 1) × 10 years. On the stub, the birth instant. */
+  起始: string;
+  /** The next 交运, exclusive. On the stub, 起运. */
+  结束: string;
+  /** 虚岁 at 起始 (立春-anchored). */
+  开始虚岁: number;
+  /** 虚岁 at 结束 — equals the next decade's 开始虚岁. */
+  结束虚岁: number;
+  /** 周岁 at 起始 — completed years lived, birthday-accurate. */
+  开始周岁: number;
+  /** 周岁 at 结束 — equals the next decade's 开始周岁. */
+  结束周岁: number;
+  /** Display label, 虚岁 endpoint-to-endpoint, e.g. "7-17岁". */
   周期: string;
   /** Present only on the index-0 pre-运 stub ("未行大运"). */
   阶段?: string;
@@ -471,7 +514,13 @@ export interface DaYunEntry {
   /** Headline 喜运/平运/忌运 for the decade. Absent on the index-0 pre-运 stub. */
   运势?: YunShi;
   五行动态?: CycleWuXing;
-  /** Populated only for the decade requested via da_yun_index. */
+  /**
+   * Populated only for the decade requested via da_yun_index.
+   *
+   * Normally ELEVEN entries, not ten: 交运 falls mid-立春-year at both ends, so the first
+   * and last are partial (交运年 === true) and are also carried by the neighbouring
+   * decade. Only a 起运 landing exactly on 立春 yields a clean ten.
+   */
   流年: LiuNianEntry[];
 }
 

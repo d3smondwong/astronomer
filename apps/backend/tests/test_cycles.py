@@ -203,11 +203,42 @@ class TestQiYunAndDaYun:
         da_yun = cycles["大运"]
         assert len(da_yun) == 10
         assert [d["干支"] for d in da_yun[1:]] == DESMOND_DA_YUN_GAN_ZHI
-        assert da_yun[1]["开始年份"] == 1991
-        assert da_yun[1]["周期"] == "7-16岁"
-        # decades are contiguous
-        for prev, cur in zip(da_yun[1:], da_yun[2:]):
-            assert cur["开始年份"] == prev["结束年份"] + 1
+        # A decade begins at the 起运 instant and every 10 years on that anniversary —
+        # the INDIVIDUAL axis. Nothing here is snapped to 立春 or to the calendar.
+        assert cycles["起运"]["起运阳历"] == "1991-11-04 16:14:27"
+        assert da_yun[1]["起始"] == "1991-11-04 16:14:27"
+        assert da_yun[1]["结束"] == "2001-11-04 16:14:27"
+        assert da_yun[1]["周期"] == "7-17岁"
+        # The stub runs birth → 起运, so the whole timeline starts at the birth instant.
+        assert da_yun[0]["起始"] == "1985-11-25 16:14:27"
+        assert da_yun[0]["结束"] == da_yun[1]["起始"]
+        # Contiguous in INSTANTS (not year arithmetic), and the endpoint ages follow.
+        for prev, cur in zip(da_yun, da_yun[1:]):
+            assert cur["起始"] == prev["结束"]
+            assert cur["开始虚岁"] == prev["结束虚岁"]
+            assert cur["开始周岁"] == prev["结束周岁"]
+
+    def test_da_yun_carries_no_year_pair_label(self, desmond_cycles):
+        """A Nov→Nov decade has no honest 开始年份/结束年份 — the fields are gone.
+
+        They were a calendar-year projection of an interval that does not respect the
+        calendar, and 2001 belonged to two decades under them without saying so.
+        """
+        cycles, _ = desmond_cycles
+        for d in cycles["大运"]:
+            assert "开始年份" not in d and "结束年份" not in d
+            assert "开始年龄" not in d and "结束年龄" not in d
+
+    def test_endpoint_ages_are_li_chun_anchored(self, desmond_cycles):
+        """虚岁 7→17, not lunar-python's calendar-year 7-16.
+
+        Desmond enters 丙戌 on 1991-11-04: 立春-year 1991 → 虚岁 7, and he is 5 (turns 6
+        that month) → 周岁 5. Ten years on he is 虚岁 17 / 周岁 15.
+        """
+        cycles, _ = desmond_cycles
+        d = cycles["大运"][1]
+        assert (d["开始虚岁"], d["结束虚岁"]) == (7, 17)
+        assert (d["开始周岁"], d["结束周岁"]) == (5, 15)
 
     def test_pre_yun_stub(self, desmond_cycles):
         cycles, _ = desmond_cycles
@@ -229,18 +260,84 @@ class TestLiuNian:
     def test_only_requested_decade_expanded(self, desmond_cycles):
         cycles, _ = desmond_cycles
         for d in cycles["大运"]:
-            expected = 10 if d["序号"] == 4 else 0
+            # ELEVEN, not ten: 交运 falls mid-立春-year at both ends of the decade.
+            expected = 11 if d["序号"] == 4 else 0
             assert len(d["流年"]) == expected
 
     def test_liu_nian_years_and_age(self, desmond_cycles):
         cycles, _ = desmond_cycles
         liu_nian = cycles["大运"][4]["流年"]
-        assert [ln["年份"] for ln in liu_nian] == list(range(2021, 2031))
+        assert [ln["年份"] for ln in liu_nian] == list(range(2021, 2032))
         first = liu_nian[0]
         assert first["干支"] == "辛丑"
         assert first["虚岁"] == 37
+        # 周岁 is completed years at 立春, not 年份 − 出生年: born 1985-11-25, he is 35 on
+        # 2021-02-03 and turns 36 that November. 37/35 is the coherent pair.
+        assert first["周岁"] == 35
         assert first["生肖"] == "牛"
         assert first["流月"] == []  # reserved seam
+
+    def test_liu_nian_bounds_are_li_chun_not_new_year(self, desmond_cycles):
+        """The universal axis. Picking the current 流年 by calendar year is wrong
+        from Jan 1 until ~Feb 4 — these instants are what make that decidable."""
+        cycles, _ = desmond_cycles
+        by_year = {ln["年份"]: ln for ln in cycles["大运"][4]["流年"]}
+        assert by_year[2021]["起始"] == "2021-02-03 22:58:48"
+        assert by_year[2021]["结束"] == "2022-02-04 04:50:47"
+        # Years abut exactly: each 立春 closes one year and opens the next.
+        years = cycles["大运"][4]["流年"]
+        for prev, cur in zip(years, years[1:]):
+            assert cur["起始"] == prev["结束"]
+
+    def test_jiao_yun_years_are_shared_by_both_decades(self, desmond_cycles):
+        """2021 and 2031 straddle a 交运, so they are partial in this decade.
+
+        The two axes never align, so the boundary years belong to two decades at once.
+        Expanding the neighbouring decade yields the same year analysed against THAT
+        companion — the classical "read the 交运 year against both decades".
+        """
+        cycles, _ = desmond_cycles
+        liu_nian = cycles["大运"][4]["流年"]
+        partial = {ln["年份"] for ln in liu_nian if ln["交运年"]}
+        assert partial == {2021, 2031}
+
+        decade = cycles["大运"][4]
+        for ln in liu_nian:
+            straddles = ln["起始"] < decade["起始"] or ln["结束"] > decade["结束"]
+            assert ln["交运年"] is straddles
+
+        # The same year, expanded under the PREVIOUS decade, is analysed there too.
+        neighbour, _ = calculate_cycles(**DESMOND, da_yun_index=3)
+        shared = [ln for ln in neighbour["大运"][3]["流年"] if ln["年份"] == 2021]
+        assert len(shared) == 1
+        assert shared[0]["交运年"] is True
+        assert shared[0]["干支"] == "辛丑"
+        # Same year, different companion → a genuinely different 岁运 reading.
+        assert shared[0]["岁运"]["大运态说明"] != liu_nian[0]["岁运"]["大运态说明"]
+
+    def test_pre_yun_stub_years_start_at_birth_not_li_chun(self):
+        """立春 1985 predates the birth instant, so ages there are read at birth —
+        otherwise the birth year reports 周岁 -1 for a person not yet born."""
+        cycles, _ = calculate_cycles(**DESMOND, da_yun_index=0)
+        stub = cycles["大运"][0]
+        assert [ln["年份"] for ln in stub["流年"]] == list(range(1985, 1992))
+        birth_year = stub["流年"][0]
+        assert birth_year["起始"] == "1985-02-04 05:11:47"  # the year's own 立春
+        assert (birth_year["虚岁"], birth_year["周岁"]) == (1, 0)
+        assert birth_year["交运年"] is True  # cut by birth, not by a 交运
+
+    def test_xu_sui_is_li_chun_anchored_for_a_january_birth(self):
+        """Born before 立春 → the birth 立春-year is the PREVIOUS solar year.
+
+        lunar-python derives 虚岁 as `year - 出生年 + 1`, which is off by one for life
+        for such a subject. Anchoring on 立春 fixes it.
+        """
+        jan = {**DESMOND, "birth_datetime": datetime(1985, 1, 20, 10, 0, 0)}
+        cycles, _ = calculate_cycles(**jan, da_yun_index=3)
+        by_year = {ln["年份"]: ln for ln in cycles["大运"][3]["流年"]}
+        # 立春-year of birth is 1984, so 立春-year 2009 is 2009 - 1984 + 1 = 26.
+        assert by_year[2009]["虚岁"] == 26
+        assert by_year[2009]["周岁"] == 24  # turned 24 on 1985+24 = 2009-01-20
 
     def test_tai_sui_relations(self, desmond_cycles):
         cycles, _ = desmond_cycles
