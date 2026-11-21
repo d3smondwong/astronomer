@@ -99,13 +99,17 @@ directly.
   commit.
 
 **Merging**
-- Open the PR only after the user approves; the PR description summarises every commit on the
-  branch. Merge into `main` only on the user's go-ahead, then delete the branch.
+- **The user's yes to a commit also approves shipping it:** commit, push the branch, open the PR
+  (its description summarises every commit on the branch), merge into `main`, delete the branch,
+  and sync local `main` — without asking again at each step.
+- Stop and ask instead if anything goes wrong after the yes: a failing check, a merge conflict, or
+  `main` having moved in a way that changes what was approved.
 
 **Never**
 - Force-push `main` or rewrite its history.
 - Commit directly to `main` — every change goes through a branch.
-- Commit, push, merge or deploy without asking the user first.
+- Commit without the user's yes (that yes covers push, PR and merge — see *Merging*).
+- Deploy without asking the user first.
 - Skip hooks (`--no-verify`).
 - Commit secrets or machine-local state: `.env`, `.env.local`, `.claude/settings.local.json`,
   `apps/web/emulator-data/`, Firebase debug logs.
