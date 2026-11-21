@@ -111,8 +111,10 @@ directly.
   `apps/web/emulator-data/`, Firebase debug logs.
 
 ## Known gaps (as of 2026-11)
-- **FastAPI does not verify the bearer token** that `fastApiClient.ts` sends. Fix before FastAPI is
-  reachable from anywhere but localhost.
+- **Bearer token is optional locally.** `apps/backend/security.py` enforces `FASTAPI_BEARER_TOKEN`
+  on every `/v1/chart/*` route when it is set (same value in repo-root `.env` and
+  `apps/web/.env.local`). Unset, it fails closed on Cloud Run (503) but allows local requests with
+  a warning — set the secret on any deployed environment.
 - Cycles UI: the profile page's Cycles tab is a "Coming Soon" placeholder; only
   `FavorableElementsCard` reads cycles `用神`.
 - No deployment config yet (no Dockerfile / `apphosting.yaml`); everything runs locally.
