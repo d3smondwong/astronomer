@@ -125,8 +125,14 @@ a structured `{group: [{point, explanation}]}` object for sections that define c
 
 ## Request headers
 Next.js sends `X-Request-Id`, `X-Chart-Key`, `X-User-Id`, `X-Profile-Id`; `bind_log_context` in
-`chart.py` binds them to log context vars (`apps/utils/logging.py`). It also sends
-`Authorization: Bearer $FASTAPI_BEARER_TOKEN` — **which the backend does not yet verify.**
+`chart.py` binds them to log context vars (`apps/utils/logging.py`).
+
+**Auth:** it also sends `Authorization: Bearer $FASTAPI_BEARER_TOKEN`, enforced router-wide by
+`require_bearer_token` (`apps/backend/security.py`) — any new `/v1/chart/*` route inherits it.
+Token set → 401 unless it matches (constant-time compare; auth runs before body validation).
+Token unset → 503 on Cloud Run (`K_SERVICE` present), allowed with a warning locally. `/health`
+stays unauthenticated for Cloud Run probes. The frontend maps 401/403 to a config error
+(`lib/errors.ts`), never a user-facing auth prompt.
 
 ## Firestore (written by Next.js only)
 | Collection | Key | Holds |

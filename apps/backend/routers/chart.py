@@ -26,6 +26,7 @@ from apps.backend.llm.llm_service import (
     LLMError,
 )
 from apps.backend.llm.section_registry import SECTION_REGISTRY
+from apps.backend.security import require_bearer_token
 from apps.utils.logging import (
     get_logger,
     request_id_var,
@@ -36,7 +37,13 @@ from apps.utils.logging import (
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/v1/chart", tags=["chart"])
+# Every /v1/chart/* route requires the shared service token (see apps/backend/security.py).
+# Router-level, so a new endpoint cannot be added without it. /health stays open in main.py.
+router = APIRouter(
+    prefix="/v1/chart",
+    tags=["chart"],
+    dependencies=[Depends(require_bearer_token)],
+)
 
 
 async def bind_log_context(
