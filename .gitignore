@@ -251,3 +251,7 @@ apps/web/profiles/
 # where one developer's own approvals accumulate — absolute home-directory paths and one-off
 # command grants that mean nothing on anyone else's machine.
 .claude/settings.local.json
+
+# Claude Code preview-server configs (browser pane dev servers). Machine-local: it points at
+# this machine's conda env interpreter by absolute path.
+.claude/launch.json
