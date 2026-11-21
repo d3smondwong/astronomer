@@ -104,6 +104,12 @@ directly.
   and sync local `main` — without asking again at each step.
 - Stop and ask instead if anything goes wrong after the yes: a failing check, a merge conflict, or
   `main` having moved in a way that changes what was approved.
+- **Merge commits describe the change, never the default `Merge pull request #N from …`.** Merge
+  with a merge commit (not squash) and set the subject and body explicitly:
+  `gh pr merge <N> --merge --delete-branch --subject "<what the PR does> (#N)" --body "<one line per commit>"`.
+  The subject follows the commit-message style; for a multi-commit PR it summarises the whole
+  branch (e.g. `chore: git housekeeping — ignore launch.json, descriptive merge titles (#7)`).
+  The body lists each commit's subject so `git log --first-parent main` reads as a changelog.
 
 **Never**
 - Force-push `main` or rewrite its history.
