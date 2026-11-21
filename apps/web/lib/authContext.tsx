@@ -126,8 +126,19 @@ export function AuthProvider({
   // ("have I refreshed yet?") and so was destroyed by a remount, re-arming the loop. This
   // ref only ever mirrors a prop — it is re-derived from server state on every render, so a
   // remount reinitialises it to the correct value rather than a blank one.
+  //
+  // Synced in an effect with NO dependency array, not during render: React may run a render
+  // and then discard it (concurrent rendering, Strict Mode), and a ref written there would
+  // hold a value from a render that never committed. Deliberately not keyed on
+  // [serverIdentity] either: syncSession() writes an optimistic value below, and every
+  // committed server re-render must overwrite it with the authoritative prop — even when the
+  // prop is unchanged (e.g. the refresh landed but the server still saw no cookie). A keyed
+  // effect would skip that case and leave the optimistic value stuck, suppressing every
+  // later router.refresh().
   const serverIdentityRef = useRef(serverIdentity);
-  serverIdentityRef.current = serverIdentity;
+  useEffect(() => {
+    serverIdentityRef.current = serverIdentity;
+  });
 
   /**
    * Last successful mint, so a repeat sync for the same identity can skip the round-trip.
