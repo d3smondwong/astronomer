@@ -44,6 +44,24 @@ This is why `DaYun.getLiuNian()` is **not** used: it groups years by calendar ye
 
 **All instants share the chart's (TST-shifted) frame** — the birth instant, `起运阳历`, every 节气 lunar-python reports, and every `起始`/`结束`. Callers comparing against a wall-clock `now` must convert first; never mix frames.
 
+## 小运 — the personal annual pillar, pre-起运 only (for now)
+
+《三命通会·论小运》: 「大运司十年之休咎，小运掌一岁之灾祥…补大运之不足」. **流年 is universal**
+(the calendar's year pillar, the same for everyone); **小运 is personal** — the **hour pillar**
+stepped one 干支 per 虚岁 (醉醒子's method, which the text endorses: 「尝试用之，屡验」), forward or
+backward by the same 阳男阴女 rule as the 大运. 大运 steps the month pillar per decade, 小运 the hour
+pillar per year.
+- **Computed in `cycles_orchestrator._xiao_yun_gan_zhi`, NOT `DaYun.getXiaoYun()`**: lunar-python
+  ages by `year - 出生年 + 1`, off by one for life for a January-born subject. 小运 steps on this
+  module's 立春-anchored 虚岁, so it always matches the 流年 entry it sits in.
+- **Scope: the pre-起运 stub's 流年 only** (「童限未交大运，专用此法」). The text runs 小运 for life,
+  but lifelong 小运 waits for 卷二·论小运's rules that weigh it against the 大运 (「大运虽吉，其小运
+  不通，未可便言吉利」) — without them a third annual verdict would contradict 运势.
+- **1×4 against the natal chart only.** It never interacts with the 流年 or a 大运: the text weighs
+  it against the 大运 as a verdict and runs it beside the 太岁, never 冲/合 between them.
+- **No 卷一 限 rules apply** (decision: 限 = 大运 + 流年); 小运's rules come from 论小运 and the 神煞
+  passages that name it (驿马, 天乙, 孤寡, 丧吊, 真鬼).
+
 ## Classical cycle rules (`cycles/interpretation_cycle_chart.py` → `古籍解读`)
 
 The cycle counterpart of `interaction_natal_chart.py`. Rules live **next to their chapter's

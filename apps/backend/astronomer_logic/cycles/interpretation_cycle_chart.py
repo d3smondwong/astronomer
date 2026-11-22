@@ -59,7 +59,9 @@ from apps.backend.data.san_ming_tong_hui_v1 import (
 
 CYCLE_PILLAR = "运柱"
 COMPANION_PILLAR = "大运"
-CYCLE_PERIODS = frozenset({"大运", "流年"})
+# 小运 is evaluated (pre-起运 years) but no rule lists it yet: 卷一's 限 rules are scoped to
+# 大运/流年 by decision, and 小运's own rules come from 卷二·论小运.
+CYCLE_PERIODS = frozenset({"大运", "流年", "小运"})
 
 # Condition types whose evaluator reads only 天干 / 地支 / 纳音 from the named pillar,
 # and therefore works on the slim transiting-pillar entry built below.
@@ -152,7 +154,7 @@ def get_cycle_interpretations(
     Args:
         ctx:          the request's NatalContext.
         cycle_stem/cycle_branch: the pillar being analysed.
-        cycle_label:  "大运" or "流年" — filters rules by 适用周期.
+        cycle_label:  "大运", "流年" or "小运" — filters rules by 适用周期.
         companion:    (stem, branch) of the enclosing 大运 for a 流年, else None.
 
     Returns:
