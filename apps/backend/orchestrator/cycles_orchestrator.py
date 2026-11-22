@@ -74,6 +74,9 @@ from apps.backend.astronomer_logic.cycles.cycle_pillars import (
 )
 from apps.backend.astronomer_logic.cycles.cycle_shen_sha import get_cycle_shen_sha
 from apps.backend.astronomer_logic.cycles.sui_yun import analyse_sui_yun
+from apps.backend.astronomer_logic.cycles.interpretation_cycle_chart import (
+    get_cycle_interpretations,
+)
 from apps.backend.astronomer_logic.cycles.cycle_wu_xing import (
     classify_with_transiting,
     get_cycle_wu_xing,
@@ -442,6 +445,15 @@ def _analyse_cycle_pillar(
             decade_pillar=decade.pillar if decade else None,
             decade_dynamics=decade.dynamics if decade else (),
             baseline=decade.baseline if decade else None,
+        ),
+        # Classical-text readings (三命通会 cycle rules). Always present: {} means the rules
+        # were evaluated and none fired. A 流年 rule may also reference its 大运.
+        "古籍解读": get_cycle_interpretations(
+            ctx,
+            cycle_stem,
+            cycle_branch,
+            cycle_label,
+            companion=decade.pillar if decade else None,
         ),
     }
     if sui_yun is not None:

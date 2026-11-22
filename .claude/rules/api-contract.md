@@ -89,10 +89,12 @@ class CyclesInput(BirthInput):
       "运势": { "评级": "喜运|平运|忌运", "依据": "...", "来源": "金不换|用神五行" },
       "五行动态": { "五行", "对日主", "引动" },
       // 五行[元素] = { 状态, 本命, 运基 (流年 only), 变化, 十神, 喜忌, 角色, 解读 }
+      "古籍解读": { "纳音格局": [ { "逻辑名称", "来源", "结论", "证据", "现代解读"?, "依据"?, "标注"? } ], ... },
+      // only groups with a match appear; {} = rules ran, none fired. See rules/bazi-cycles.md.
       "流年": [ { "年份", "起始", "结束", "交运年", "虚岁", "周岁", "干支", "生肖",
                  "运柱", "作用", "神煞",
                  "运势": { ..., "警示": ["岁运并临（重）：…"] },
-                 "五行动态",
+                 "五行动态", "古籍解读",
                  "岁运": { "关系总览": [...], "特殊组合": [ {"名称","级别","说明"} ],
                           "大运态": "交战|入局|被合绊|受冲|常态", "大运态说明": "...",
                           "大运制约": [ {"类型","组合明细","原强度","本年强度","起因","说明"} ],
@@ -102,6 +104,7 @@ class CyclesInput(BirthInput):
 }
 ```
 `岁运` is present on every 流年 EXCEPT the pre-起运 stub's (未行大运 — no decade to relate to).
+`古籍解读` is present on every 大运 except the index-0 stub, and on every 流年.
 `运势.警示` appears only when a 级别 "重" configuration fires.
 
 **流年 are lazy:** default request returns all 10 大运 fully analysed with empty `流年` lists
