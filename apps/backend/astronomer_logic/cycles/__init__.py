@@ -1,5 +1,5 @@
 """
-Cycle (岁运) analysis package — 大运 / 流年 (future 流月 / 流日).
+Cycle (岁运) analysis package — 大运 / 流年 / 小运 (no monthly layer, by decision).
 
 Each module analyses ONE transiting pillar against the 4 natal pillars
 (1×4 scan). Level-specific traversal (Yun/DaYun/LiuNian, ages, years)

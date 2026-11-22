@@ -129,6 +129,7 @@ directly.
 - Cycles UI: the profile page's Cycles tab is a "Coming Soon" placeholder; only
   `FavorableElementsCard` reads cycles `用神`.
 - No deployment config yet (no Dockerfile / `apphosting.yaml`); everything runs locally.
-- 流月/流日 not built (each 流年 carries an empty `流月: []` seam); no per-profile cycle cache yet.
+- 小运 covers the pre-起运 years only (lifelong waits for 卷二·论小运); 流月/流日 dropped by
+  decision (no classical basis); no per-profile cycle cache yet.
 - Deliberately not installed: `next-themes` (dark mode dormant), any toast library (no toasts),
   `lunar-javascript`. Check `package.json` / `requirements.txt` for versions.

@@ -99,12 +99,15 @@ class CyclesInput(BirthInput):
                           "大运态": "交战|入局|被合绊|受冲|常态", "大运态说明": "...",
                           "大运制约": [ {"类型","组合明细","原强度","本年强度","起因","说明"} ],
                           "警示": [...] },
-                 "太岁", "流月": [] } ] }
+                 "小运": { "干支", "运柱", "作用", "运势", "古籍解读" },  // pre-起运 years only
+                 "太岁" } ] }
   ]
 }
 ```
 `岁运` is present on every 流年 EXCEPT the pre-起运 stub's (未行大运 — no decade to relate to).
 `古籍解读` is present on every 大运 except the index-0 stub, and on every 流年.
+`小运` is present ONLY on the 流年 of the pre-起运 stub (`da_yun_index=0`) — the hour pillar
+stepped one 干支 per 虚岁 in the 大运's direction, scanned 1×4 against the natal chart.
 `运势.警示` appears only when a 级别 "重" configuration fires.
 
 **流年 are lazy:** default request returns all 10 大运 fully analysed with empty `流年` lists

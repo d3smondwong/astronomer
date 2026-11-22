@@ -461,6 +461,22 @@ export interface TaiSui {
  * a 交运 is lived partly under each decade and appears in BOTH decades' 流年 lists with
  * 交运年 === true, analysed once against each. See DaYunEntry.
  */
+/**
+ * 小运 for one pre-起运 year (《三命通会·论小运》, 醉醒子's method): the hour pillar stepped
+ * one 干支 per 虚岁, in the 大运's direction. Personal — two people born the same year
+ * share the 流年 but not the 小运. Scanned against the natal chart only (1×4); it never
+ * interacts with the 流年 or a 大运.
+ */
+export interface XiaoYun {
+  干支: string;
+  运柱: CyclePillar;
+  作用: CycleInteractions;
+  /** 喜运/平运/忌运 against the chart's 用神 — same reading as a 大运's 运势. */
+  运势: YunShi;
+  /** Empty until 卷二·论小运 is encoded (卷一's 限 rules are scoped to 大运/流年). */
+  古籍解读: CycleClassicalReadings;
+}
+
 export interface LiuNianEntry {
   年份: number;
   /**
@@ -502,8 +518,11 @@ export interface LiuNianEntry {
   太岁: TaiSui;
   /** Absent only on the pre-起运 years (未行大运 — no decade to relate to yet). */
   岁运?: SuiYun;
-  /** Reserved seam — always present, empty until the monthly layer ships. */
-  流月: unknown[];
+  /**
+   * Present ONLY on the pre-起运 years (童限 — 「童限未交大运，专用此法」). The personal
+   * annual pillar, stepped from the hour pillar; distinct from the universal 流年 above.
+   */
+  小运?: XiaoYun;
 }
 
 /**

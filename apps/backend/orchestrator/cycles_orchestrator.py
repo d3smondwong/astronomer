@@ -8,8 +8,8 @@ the 大运 via lunar-python's Yun/DaYun chain and runs the per-pillar cycle
 analysis (运柱 / 作用 / 神煞 / 五行动态) for each.
 
 流年 are computed lazily: only the decade selected by da_yun_index carries a
-populated 流年 list. Every 流年 entry carries an empty "流月" list — the
-reserved seam for the future monthly layer.
+populated 流年 list. There is no monthly (流月) layer, by decision: none of the
+classical texts the engine draws on reads cycles below the year.
 
 Timeline — TWO INDEPENDENT AXES, and conflating them is the classic error:
 
@@ -394,7 +394,7 @@ def _analyse_cycle_pillar(
         companion=companion,
     )
 
-    yun_shi = get_cycle_yun_shi(cycle_branch, ctx.yong_shen, cycle_stem)
+    yun_shi = get_cycle_yun_shi(cycle_branch, ctx.yong_shen, cycle_stem, cycle_label)
 
     sui_yun = None
     if decade:
@@ -488,6 +488,49 @@ def _tai_sui_check(liu_nian_branch: str, ctx: NatalContext) -> dict:
     }
 
 
+def _xiao_yun_gan_zhi(hour_gan_zhi: str, xu_sui: int, forward: bool) -> str:
+    """小运 for a given 虚岁 — 《三命通会·论小运》, 醉醒子's method.
+
+    「男女小运皆由时生而行之，逆顺亦以年定。如阳命阳年甲子时生堕地，即行乙丑，二岁丙寅，
+    一位一年」: start from the HOUR pillar and step one 干支 per year of age, forward or
+    backward by the same 阳男阴女 rule as the 大运. 虚岁 1 is therefore hour pillar ± 1.
+
+    Deliberately NOT lunar-python's DaYun.getXiaoYun(): it ages by `year - 出生年 + 1`,
+    which is off by one for life for anyone born before 立春 in January. Using this
+    module's 立春-anchored 虚岁 keeps 小运 aligned with the 流年 entry it sits in.
+    """
+    index = LunarUtil.getJiaZiIndex(hour_gan_zhi)
+    step = xu_sui if forward else -xu_sui
+    return LunarUtil.JIA_ZI[(index + step) % len(LunarUtil.JIA_ZI)]
+
+
+def _xiao_yun_block(gan_zhi: str, ctx: NatalContext) -> dict:
+    """The 小运 analysis for one pre-起运 year.
+
+    小运 is a PERSONAL annual pillar (stepped from the hour pillar), unlike the universal
+    流年. It meets the natal chart only (1×4): the text weighs it against the 大运 as a
+    verdict (「大运虽吉，其小运不通……」), never through 冲/合, and runs it beside the 太岁
+    rather than against it — so no companion, no 岁运 block.
+    """
+    stem, branch = gan_zhi[0], gan_zhi[1]
+    xun_kong = LunarUtil.getXunKong(gan_zhi)
+    pillar = build_cycle_pillar(stem, branch, xun_kong, ctx, "小运")
+    return {
+        "干支": gan_zhi,
+        "运柱": pillar,
+        "作用": get_cycle_interactions(
+            stem,
+            branch,
+            ctx,
+            cycle_label="小运",
+            cycle_xun_kong=xun_kong,
+            cycle_stem_rooting=pillar["天干"]["根基强度"],
+        ),
+        "运势": get_cycle_yun_shi(branch, ctx.yong_shen, stem, "小运"),
+        "古籍解读": get_cycle_interpretations(ctx, stem, branch, "小运"),
+    }
+
+
 def _liu_nian_entry(
     year: int,
     period: tuple[datetime, datetime],
@@ -495,6 +538,7 @@ def _liu_nian_entry(
     birth_li_chun_year: int,
     ctx: NatalContext,
     decade: _DecadeContext | None = None,
+    xiao_yun_seed: tuple[str, bool] | None = None,
 ) -> dict:
     """One fully-analysed 流年 entry (read 岁运并临 inside its `decade`).
 
@@ -505,6 +549,10 @@ def _liu_nian_entry(
     decade is None only for the pre-起运 stub (未行大运) — there is no 大运 yet, so the
     year acts on the natal chart alone (natal + 流年) with 变化 measured against birth,
     and carries no 岁运 block: there is nothing for it to relate to.
+
+    xiao_yun_seed = (hour 干支, 顺推?) is passed for those same pre-起运 years only and adds
+    a 小运 block — 「童限未交大运，专用此法」. Lifelong 小运 is deferred until 卷二·论小运
+    is encoded (it needs the rules that weigh 小运 against the 大运).
     """
     start, end = _li_chun(year), _li_chun(year + 1)
     period_start, period_end = period
@@ -514,7 +562,8 @@ def _liu_nian_entry(
     # every year but one: the birth year's 立春 predates birth, and measuring there would
     # report 周岁 -1 (and 虚岁 0) for a person not yet born.
     aged_at = max(start, birth)
-    return {
+    xu_sui = _xu_sui(birth_li_chun_year, aged_at)
+    entry = {
         "年份": year,
         "起始": start.strftime(_TS),
         "结束": end.strftime(_TS),
@@ -522,7 +571,7 @@ def _liu_nian_entry(
         # so the year is shared with the neighbouring decade and appears in both lists.
         # On the pre-起运 stub the two partial years are cut by birth and by 起运 instead.
         "交运年": start < period_start or end > period_end,
-        "虚岁": _xu_sui(birth_li_chun_year, aged_at),
+        "虚岁": xu_sui,
         "周岁": _zhou_sui(birth, aged_at),
         "干支": gan_zhi,
         "生肖": _BRANCH_SHENG_XIAO.get(branch, ""),
@@ -530,8 +579,11 @@ def _liu_nian_entry(
             stem, branch, LunarUtil.getXunKong(gan_zhi), ctx, "流年", decade=decade
         ),
         "太岁": _tai_sui_check(branch, ctx),
-        "流月": [],  # reserved seam for the future monthly layer
     }
+    if xiao_yun_seed is not None:
+        hour_gan_zhi, forward = xiao_yun_seed
+        entry["小运"] = _xiao_yun_block(_xiao_yun_gan_zhi(hour_gan_zhi, xu_sui, forward), ctx)
+    return entry
 
 
 def _liu_nian_list(
@@ -540,14 +592,16 @@ def _liu_nian_list(
     birth_li_chun_year: int,
     ctx: NatalContext,
     decade: _DecadeContext | None = None,
+    xiao_yun_seed: tuple[str, bool] | None = None,
 ) -> list[dict]:
     """Every 流年 overlapping `period`, each analysed inside `decade`.
 
     Normally ELEVEN entries: the two 交运 years are partial and are also carried by the
     neighbouring decade, where they are analysed again against THAT companion.
+    xiao_yun_seed is set only for the pre-起运 stub (see _liu_nian_entry).
     """
     return [
-        _liu_nian_entry(year, period, birth, birth_li_chun_year, ctx, decade)
+        _liu_nian_entry(year, period, birth, birth_li_chun_year, ctx, decade, xiao_yun_seed)
         for year in _overlapping_liu_nian_years(*period)
     ]
 
@@ -625,8 +679,11 @@ def calculate_cycles(
             # Its 流年 (birth → 起运) are still analysable when requested.
             stub = {**base, "阶段": "未行大运", "流年": []}
             if da_yun_index == 0:
+                # 童限: before the first 大运, each year also carries its 小运, stepped
+                # from the hour pillar in the 大运's direction.
                 stub["流年"] = _liu_nian_list(
-                    (start, end), birth_dt, birth_li_chun_year, ctx
+                    (start, end), birth_dt, birth_li_chun_year, ctx,
+                    xiao_yun_seed=(ctx.gans[3] + ctx.zhis[3], yun.isForward()),
                 )
             da_yun_entries.append(stub)
             continue
