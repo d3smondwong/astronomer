@@ -432,7 +432,11 @@ export interface CycleClassicalMatch {
   来源: string;
   /** The classical verdict (断语), verbatim. */
   结论: string;
-  /** Evidence from the matched conditions; 宫位 "运柱"/"大运" marks the cycle side. */
+  /**
+   * Evidence from the matched conditions. A cycle-side position is named by its period —
+   * "大运" / "流年" / "小运" (rules say "运柱"; the engine resolves it on output) — and a
+   * 流年's enclosing decade appears as "大运".
+   */
   证据: Record<string, unknown> | Record<string, unknown>[];
   现代解读?: string;
   /** The classical sentence licensing the rule for cycles, e.g. 「……限运同论」. */
@@ -473,7 +477,7 @@ export interface XiaoYun {
   作用: CycleInteractions;
   /** 喜运/平运/忌运 against the chart's 用神 — same reading as a 大运's 运势. */
   运势: YunShi;
-  /** Empty until 卷二·论小运 is encoded (卷一's 限 rules are scoped to 大运/流年). */
+  /** 卷一's 「限」 rules (限 = 大运 + 小运); 论小运's own rules arrive with 卷二. */
   古籍解读: CycleClassicalReadings;
 }
 

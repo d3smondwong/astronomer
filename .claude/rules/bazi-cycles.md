@@ -59,8 +59,8 @@ pillar per year.
   不通，未可便言吉利」) — without them a third annual verdict would contradict 运势.
 - **1×4 against the natal chart only.** It never interacts with the 流年 or a 大运: the text weighs
   it against the 大运 as a verdict and runs it beside the 太岁, never 冲/合 between them.
-- **No 卷一 限 rules apply** (decision: 限 = 大运 + 流年); 小运's rules come from 论小运 and the 神煞
-  passages that name it (驿马, 天乙, 孤寡, 丧吊, 真鬼).
+- **卷一's 「限」 rules apply** (限 = 大运 + 小运, see *Encoding decisions*); 小运's own rules come
+  from 论小运 and the 神煞 passages that name it (驿马, 天乙, 孤寡, 丧吊, 真鬼).
 
 ## Classical cycle rules (`cycles/interpretation_cycle_chart.py` → `古籍解读`)
 
@@ -70,7 +70,10 @@ natal rules**, in separate `*_cycle_predictions` lists (e.g. `san_ming_tong_hui_
 the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no evaluators of its own.
 - **Positions:** `运柱` = the pillar being analysed; `大运` = the enclosing decade (流年 rules
   only); `全局` / `年柱` / `月柱` … still mean the **natal** pillars — `全局` never matches a
-  transiting pillar, so a rule must name `运柱` explicitly.
+  transiting pillar, so a rule must name `运柱` explicitly. The engine runs once per pillar
+  (大运 / 流年 / 小运) and `适用周期` picks which runs a rule joins, so one `运柱` rule serves
+  several periods. `运柱` is rule vocabulary only: emitted evidence names the period instead
+  (`宫位: 小运`, not `宫位: 运柱`).
 - **Fields:** `适用周期` and `来源` are required; `依据` (the sentence licensing the cycle reading,
   e.g. 「限运同论」), `标注` (severity) and `编码说明` (an encoding departure from the literal text —
   data only, not emitted) are optional.
@@ -83,8 +86,11 @@ the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no e
   (`PENDING_MIGRATION` holds the 4 legacy rules in 卷五/卷六 and may only shrink); every rule can fire.
 
 **Encoding decisions (confirmed by the user):**
-- **限 / 限运 / 限数 → `适用周期: ["大运", "流年"]`** — 三命通会 reads 大运 together with 太岁/小运
-  (「大運雖吉，其小運不通，未可便言吉利」). 运 alone (运规, 运入, 风运) → `["大运"]`.
+- **限 / 限运 / 限数 → `适用周期: ["大运", "小运"]`** — in 三命通会 限 always names a **运** period:
+  大限 (the 大运), 童限 (the 小运 years), 大小运限 (both, set apart from the 太岁: 「太岁凶煞并临大小
+  运限」). 小限 never occurs, and the 太岁/流年 is never called a 限 — so 「限」 rules do NOT apply to
+  流年. (Revised 2026-11-23; the first reading had been 大运 + 流年.) 运 alone (运规, 运入, 风运) →
+  `["大运"]`.
 - **运规东南 (己巳) = 巽 = 辰巳 only**; **沈潜之乡 (己未) = 亥子丑** (北方水).
 - **A licensing clause reaches only as far as its grammar.** Read where the clause sits, not just
   that it exists: 金泊金's 「此金体薄，不能反源定夭，限运同论」 closes the **fire passage**, so only 平地

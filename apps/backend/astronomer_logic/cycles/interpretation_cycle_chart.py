@@ -59,8 +59,8 @@ from apps.backend.data.san_ming_tong_hui_v1 import (
 
 CYCLE_PILLAR = "运柱"
 COMPANION_PILLAR = "大运"
-# 小运 is evaluated (pre-起运 years) but no rule lists it yet: 卷一's 限 rules are scoped to
-# 大运/流年 by decision, and 小运's own rules come from 卷二·论小运.
+# 限 (限运 / 限数) means a 运 period — 大运 and 小运 — so 卷一's 限 rules list both. 流年 is a
+# valid period for rules that name the 太岁; none in 卷一 do.
 CYCLE_PERIODS = frozenset({"大运", "流年", "小运"})
 
 # Condition types whose evaluator reads only 天干 / 地支 / 纳音 from the named pillar,
@@ -111,12 +111,27 @@ def build_cycle_chart_context(
     )
 
 
-def _format_cycle_match(rule: dict, evidence: dict | list[dict]) -> dict:
+def _name_the_period(evidence, cycle_label: str):
+    """Replace the position name 运柱 with the period it stood for (大运 / 流年 / 小运).
+
+    运柱 is how a RULE addresses "the pillar under analysis" — one rule serves several
+    periods. In the OUTPUT that indirection only obscures: a reader (human or LLM) seeing an
+    evidence item on its own should read 宫位: 小运, not 宫位: 运柱. Values only; the
+    companion's 大运 label is already concrete and passes through unchanged.
+    """
+    if isinstance(evidence, dict):
+        return {k: _name_the_period(v, cycle_label) for k, v in evidence.items()}
+    if isinstance(evidence, list):
+        return [_name_the_period(v, cycle_label) for v in evidence]
+    return cycle_label if evidence == CYCLE_PILLAR else evidence
+
+
+def _format_cycle_match(rule: dict, evidence: dict | list[dict], cycle_label: str) -> dict:
     entry: dict = {
         "逻辑名称": rule["逻辑名称"],
         "来源": rule["来源"],
         "结论": rule["断语"],
-        "证据": evidence,
+        "证据": _name_the_period(evidence, cycle_label),
     }
     for optional in ("现代解读", "依据", "标注"):
         if optional in rule:
@@ -131,7 +146,7 @@ def _run(rules: list[dict], context: ChartContext, cycle_label: str) -> list[dic
             continue
         ok, evidence = evaluate_rule(rule, context)
         if ok:
-            matched.append(_format_cycle_match(rule, evidence))
+            matched.append(_format_cycle_match(rule, evidence, cycle_label))
     return matched
 
 
