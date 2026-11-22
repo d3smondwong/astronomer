@@ -59,8 +59,8 @@ from apps.backend.data.san_ming_tong_hui_v1 import (
 
 CYCLE_PILLAR = "运柱"
 COMPANION_PILLAR = "大运"
-# 小运 is evaluated (pre-起运 years) but no rule lists it yet: 卷一's 限 rules are scoped to
-# 大运/流年 by decision, and 小运's own rules come from 卷二·论小运.
+# 限 (限运 / 限数) means a 运 period — 大运 and 小运 — so 卷一's 限 rules list both. 流年 is a
+# valid period for rules that name the 太岁; none in 卷一 do.
 CYCLE_PERIODS = frozenset({"大运", "流年", "小运"})
 
 # Condition types whose evaluator reads only 天干 / 地支 / 纳音 from the named pillar,

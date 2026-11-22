@@ -473,7 +473,7 @@ export interface XiaoYun {
   作用: CycleInteractions;
   /** 喜运/平运/忌运 against the chart's 用神 — same reading as a 大运's 运势. */
   运势: YunShi;
-  /** Empty until 卷二·论小运 is encoded (卷一's 限 rules are scoped to 大运/流年). */
+  /** 卷一's 「限」 rules (限 = 大运 + 小运); 论小运's own rules arrive with 卷二. */
   古籍解读: CycleClassicalReadings;
 }
 

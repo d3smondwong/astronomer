@@ -205,10 +205,19 @@ class TestCycleEngine:
         assert "运_己巳_运规东南_方成材用" in _fired(ctx, "甲辰", "大运")
         assert "运_己巳_运规东南_方成材用" not in _fired(ctx, "甲辰", "流年")
 
-    def test_xian_yun_rules_apply_to_both_periods(self):
+    def test_xian_yun_rules_cover_da_yun_and_xiao_yun_not_liu_nian(self):
+        # 限 names a 运 period (大限, 童限, 大小运限) — never the 太岁.
         ctx = _ctx("丙辰")
         assert "运_丙辰_吉_限运逢癸亥_显荣" in _fired(ctx, "癸亥", "大运")
-        assert "运_丙辰_吉_限运逢癸亥_显荣" in _fired(ctx, "癸亥", "流年")
+        assert "运_丙辰_吉_限运逢癸亥_显荣" in _fired(ctx, "癸亥", "小运")
+        assert "运_丙辰_吉_限运逢癸亥_显荣" not in _fired(ctx, "癸亥", "流年")
+
+    def test_xian_rules_are_tagged_da_yun_and_xiao_yun(self):
+        for r in _all_cycle_rules():
+            if "流年" in r["适用周期"]:
+                pytest.fail(f"{r['逻辑名称']}: 卷一 has no 太岁 rule, so no rule may list 流年")
+            if "依据" in r or "限" in r["断语"]:
+                assert r["适用周期"] == ["大运", "小运"], r["逻辑名称"]
 
     def test_born_season_gate(self):
         assert "运_己未_春夏_运入沈潜之乡" in _fired(_ctx("己未", month="庚午"), "丙子")

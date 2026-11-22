@@ -57,7 +57,17 @@ class TestXiaoYunOnStubYears:
         block = years[0]["小运"]
         assert set(block) == {"干支", "运柱", "作用", "运势", "古籍解读"}
         assert block["运势"]["评级"] in {"喜运", "平运", "忌运"}
-        assert block["古籍解读"] == {}  # no 小运 rules until 卷二·论小运
+        assert block["古籍解读"] == {}  # 乙丑 year: no 卷一 「限」 rule covers it
+
+    def test_xian_rules_fire_on_xiao_yun(self):
+        # 1962-06-15 01:30, male → 年柱 壬寅 (金泊金). The 1963 小运 is 丙寅 炉中火: the
+        # 「限运同论」 fire rules fire on the 小运 (限 = 大运 + 小运) but not on the 流年.
+        _, years = _stub_years(datetime(1962, 6, 15, 1, 30), 1)
+        year = next(y for y in years if y["年份"] == 1963)
+        assert year["小运"]["干支"] == "丙寅"
+        fired = {m["逻辑名称"] for ms in year["小运"]["古籍解读"].values() for m in ms}
+        assert {"运_壬寅癸卯_夭_有火", "运_壬寅癸卯_忌_炉火"} <= fired
+        assert not year["古籍解读"]
 
     def test_meets_natal_chart_only(self):
         # 1×4: no 流年 / 大运 opponent ever appears in a 小运 interaction.
