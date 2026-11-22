@@ -5,6 +5,8 @@ paths:
   - "apps/backend/data/climate_data.py"
   - "apps/backend/data_models/cycles.py"
   - "apps/backend/tests/test_cycles.py"
+  - "apps/backend/tests/test_cycle_interpretation.py"
+  - "apps/backend/data/san_ming_tong_hui*.py"
   - "apps/web/types/cyclesChart.ts"
   - "apps/web/app/api/cycles/**"
 ---
@@ -42,6 +44,47 @@ This is why `DaYun.getLiuNian()` is **not** used: it groups years by calendar ye
 
 **All instants share the chart's (TST-shifted) frame** — the birth instant, `起运阳历`, every 节气 lunar-python reports, and every `起始`/`结束`. Callers comparing against a wall-clock `now` must convert first; never mix frames.
 
+## Classical cycle rules (`cycles/interpretation_cycle_chart.py` → `古籍解读`)
+
+The cycle counterpart of `interaction_natal_chart.py`. Rules live **next to their chapter's
+natal rules**, in separate `*_cycle_predictions` lists (e.g. `san_ming_tong_hui_v1.py` ›
+`volume_1_nayin_ge_ju_cycle_predictions`), and are encoded **chapter by chapter**. Same schema as
+the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no evaluators of its own.
+- **Positions:** `运柱` = the pillar being analysed; `大运` = the enclosing decade (流年 rules
+  only); `全局` / `年柱` / `月柱` … still mean the **natal** pillars — `全局` never matches a
+  transiting pillar, so a rule must name `运柱` explicitly.
+- **Fields:** `适用周期` and `来源` are required; `依据` (the sentence licensing the cycle reading,
+  e.g. 「限运同论」), `标注` (severity) and `编码说明` (an encoding departure from the literal text —
+  data only, not emitted) are optional.
+- **The 运柱 entry is slim** (天干/地支/纳音 only). Only `CYCLE_POSITION_TYPES` may target it, and
+  natal-side conditions are limited to `NATAL_POSITION_TYPES`: this context is built from
+  `NatalContext`, whose natal ten gods are RAW, so natal ten-god matching (which needs `偏官`) is
+  not available yet — widening either whitelist is a deliberate engine change.
+- **Guard tests** (`tests/test_cycle_interpretation.py`): every cycle list is wired into
+  `CYCLE_ANALYZERS`; every rule names a cycle position; natal lists gain no cycle positions
+  (`PENDING_MIGRATION` holds the 4 legacy rules in 卷五/卷六 and may only shrink); every rule can fire.
+
+**Encoding decisions (confirmed by the user):**
+- **限 / 限运 / 限数 → `适用周期: ["大运", "流年"]`** — 三命通会 reads 大运 together with 太岁/小运
+  (「大運雖吉，其小運不通，未可便言吉利」). 运 alone (运规, 运入, 风运) → `["大运"]`.
+- **运规东南 (己巳) = 巽 = 辰巳 only**; **沈潜之乡 (己未) = 亥子丑** (北方水).
+- **A licensing clause reaches only as far as its grammar.** Read where the clause sits, not just
+  that it exists: 金泊金's 「此金体薄，不能反源定夭，限运同论」 closes the **fire passage**, so only 平地
+  and the fire judgements (有火主夭 / 太阳 / 山下山头清水 / 炉火) get cycle rules; the 水/金/土
+  judgements after it stay natal-only. 山下火's 「限数喜忌，**俱**依此断」 is the section's last
+  sentence and says 俱, so the whole section extends.
+- **Within a licensed passage** the 运柱 supplies the partner 纳音/干支/branch; supporting
+  conditions (有木, 有山, 生秋月) stay natal. Rules that are natal-positional (日时见, 月令) are not
+  converted; a count can be met by natal + 运柱 together (风多, 无木多逢).
+- **No clause, no cycle rule.** A natal verdict in a section with no licensing clause (覆灯火 日时辰巳,
+  霹雳火 戊子逢丙寅, 山头火's 山木) is never encoded as a cycle rule.
+- **山 is the text's own list** where the text names it (山下火: 癸丑, 乙丑). The natal rules use a
+  broader 壬子/癸丑/庚子/辛丑; cycle rules do not inherit it.
+- **Encoding departures are documented, not hidden:** a rule whose conditions deviate from the
+  literal text carries `编码说明` (e.g. 山下火 「若无火无山」 encoded as 无**木**无山). `标注` stays
+  reserved for severity.
+- **Severe verdicts (夭, 死) stay verbatim** and carry `标注: "条件触发·非定论"` — never softened.
+
 ## Deferred, by design
 - **流月/流日:** every 流年 carries an empty `流月: []` seam. 流月 = one more orchestrator loop via
   `LiuNian.getLiuYue()`; 流日 has no lunar-python class — derive per date via
@@ -50,5 +93,7 @@ This is why `DaYun.getLiuNian()` is **not** used: it groups years by calendar ye
   共拱/拱会 virtual arches (need positional adjacency).
 - **Cycle 神煞 解读:** natal interpretation texts are pillar-positional prose; the LLM layer
   interprets cycle stars instead.
-- **Rule DSL:** `san_ming_tong_hui_v2.py` `requires_dynamic` rules could consume cycle data, but
-  the `位置.柱` vocabulary has no 大运/流年 values yet.
+- **Remaining chapters:** 卷一 is encoded. Next: 卷二 (论大运 / 论小运 / 论太岁 / 论岁运 — raw
+  text only today), then the ~53 natal rules whose 断语 carry 行运 clauses, and the 4
+  `PENDING_MIGRATION` rules in 卷五/卷六. Natal ten-god conditions need a relabelled natal view
+  first (see *Classical cycle rules* above).

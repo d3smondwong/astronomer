@@ -422,6 +422,31 @@ export interface CycleWuXing {
   }>;
 }
 
+/**
+ * One classical rule that fired for a cycle pillar (三命通会 cycle rules,
+ * apps/backend/astronomer_logic/cycles/interpretation_cycle_chart.py).
+ */
+export interface CycleClassicalMatch {
+  逻辑名称: string;
+  /** Chapter the rule encodes, e.g. "卷一·论纳音取象·金泊金". */
+  来源: string;
+  /** The classical verdict (断语), verbatim. */
+  结论: string;
+  /** Evidence from the matched conditions; 宫位 "运柱"/"大运" marks the cycle side. */
+  证据: Record<string, unknown> | Record<string, unknown>[];
+  现代解读?: string;
+  /** The classical sentence licensing the rule for cycles, e.g. 「……限运同论」. */
+  依据?: string;
+  /** Severity metadata, e.g. "条件触发·非定论" on verdicts such as 夭 (kept verbatim). */
+  标注?: string;
+}
+
+/**
+ * 古籍解读 for one cycle pillar: group (e.g. "纳音格局", "释六十甲子") → matches.
+ * Only groups with a match appear; {} means the rules ran and none fired.
+ */
+export type CycleClassicalReadings = Record<string, CycleClassicalMatch[]>;
+
 export interface TaiSui {
   /** "无" or joined relations e.g. "冲太岁、刑太岁". */
   关系: string;
@@ -472,6 +497,8 @@ export interface LiuNianEntry {
   /** Headline 喜运/平运/忌运 for the year — read alongside the 五行动态 detail. */
   运势: YunShi;
   五行动态: CycleWuXing;
+  /** Classical-text readings for the year; may reference the enclosing 大运. */
+  古籍解读: CycleClassicalReadings;
   太岁: TaiSui;
   /** Absent only on the pre-起运 years (未行大运 — no decade to relate to yet). */
   岁运?: SuiYun;
@@ -514,6 +541,8 @@ export interface DaYunEntry {
   /** Headline 喜运/平运/忌运 for the decade. Absent on the index-0 pre-运 stub. */
   运势?: YunShi;
   五行动态?: CycleWuXing;
+  /** Classical-text readings for the decade. Absent on the index-0 pre-运 stub. */
+  古籍解读?: CycleClassicalReadings;
   /**
    * Populated only for the decade requested via da_yun_index.
    *

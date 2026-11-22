@@ -51,7 +51,8 @@ These load automatically when you work on matching paths. For a cross-cutting qu
 touches their topic, read the file explicitly.
 - `bazi-natal.md` — 七杀→偏官, 格局 vs 强弱, 从格 gate, 仇神/闲神, 五神, 用神, 假化, Python style
 - `bazi-cycles.md` — 大运/流年/岁运: raw cycle ten gods, 1×4/1×5 scans, 神煞 anchors, 合 vs 冲,
-  运势, 方位表, independent time axes, ages, TST frame, deferred items
+  运势, 方位表, independent time axes, ages, TST frame, classical cycle rules (古籍解读) and
+  their encoding decisions, deferred items
 - `api-contract.md` — endpoint request/response shapes, caching, headers, Firestore collections
 - `frontend.md` — server/client boundary, styling and theming rules, error boundaries
 
