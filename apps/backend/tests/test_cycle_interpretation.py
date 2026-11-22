@@ -1,6 +1,7 @@
 """Cycle classical-rule engine (cycles/interpretation_cycle_chart.py) and the 卷一 cycle rules."""
 
 import importlib
+import json
 import itertools
 import re
 from datetime import datetime
@@ -235,6 +236,20 @@ class TestCycleEngine:
         match = out["纳音格局"][0]
         assert {"逻辑名称", "来源", "结论", "证据", "依据"} <= match.keys()
         assert match["依据"].endswith("限运同论。")
+
+    @pytest.mark.parametrize("label", ["大运", "小运"])
+    def test_evidence_names_the_period_not_yun_zhu(self, label):
+        out = engine.get_cycle_interpretations(_ctx("壬寅"), "戊", "戌", label)
+        match = next(m for m in out["纳音格局"] if m["逻辑名称"] == "运_壬寅癸卯_吉_平地木")
+        evidence = match["证据"]
+        assert label in json.dumps(evidence, ensure_ascii=False)
+        assert "运柱" not in json.dumps(out, ensure_ascii=False)
+
+    def test_period_naming_keeps_the_companion_and_natal_labels(self):
+        evidence = [{"宫位": "运柱", "组合": "戊戌"}, {"宫位": "大运"}, {"柱": "年柱", "匹配柱": ["运柱", "时柱"]}]
+        assert engine._name_the_period(evidence, "流年") == [
+            {"宫位": "流年", "组合": "戊戌"}, {"宫位": "大运"}, {"柱": "年柱", "匹配柱": ["流年", "时柱"]},
+        ]
 
     def test_nothing_fired_is_an_empty_dict(self):
         assert engine.get_cycle_interpretations(_ctx("甲子"), "甲", "子", "大运") == {}

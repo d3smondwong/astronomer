@@ -70,7 +70,10 @@ natal rules**, in separate `*_cycle_predictions` lists (e.g. `san_ming_tong_hui_
 the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no evaluators of its own.
 - **Positions:** `运柱` = the pillar being analysed; `大运` = the enclosing decade (流年 rules
   only); `全局` / `年柱` / `月柱` … still mean the **natal** pillars — `全局` never matches a
-  transiting pillar, so a rule must name `运柱` explicitly.
+  transiting pillar, so a rule must name `运柱` explicitly. The engine runs once per pillar
+  (大运 / 流年 / 小运) and `适用周期` picks which runs a rule joins, so one `运柱` rule serves
+  several periods. `运柱` is rule vocabulary only: emitted evidence names the period instead
+  (`宫位: 小运`, not `宫位: 运柱`).
 - **Fields:** `适用周期` and `来源` are required; `依据` (the sentence licensing the cycle reading,
   e.g. 「限运同论」), `标注` (severity) and `编码说明` (an encoding departure from the literal text —
   data only, not emitted) are optional.

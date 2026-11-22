@@ -432,7 +432,11 @@ export interface CycleClassicalMatch {
   来源: string;
   /** The classical verdict (断语), verbatim. */
   结论: string;
-  /** Evidence from the matched conditions; 宫位 "运柱"/"大运" marks the cycle side. */
+  /**
+   * Evidence from the matched conditions. A cycle-side position is named by its period —
+   * "大运" / "流年" / "小运" (rules say "运柱"; the engine resolves it on output) — and a
+   * 流年's enclosing decade appears as "大运".
+   */
   证据: Record<string, unknown> | Record<string, unknown>[];
   现代解读?: string;
   /** The classical sentence licensing the rule for cycles, e.g. 「……限运同论」. */
