@@ -71,7 +71,12 @@ _DOWNGRADE = {"喜运": "平运", "平运": "忌运", "忌运": "忌运"}
 
 
 def _apply_stem(
-    rating: str, reason: str, cycle_stem: str, cycle_branch: str, yong_shen: dict
+    rating: str,
+    reason: str,
+    cycle_stem: str,
+    cycle_branch: str,
+    yong_shen: dict,
+    subject: str = "运",
 ) -> tuple[str, str]:
     """Adjust a BRANCH-derived 运势 by the cycle STEM — via 盖头 / 截脚.
 
@@ -101,6 +106,8 @@ def _apply_stem(
 
     NOT applied to a structural 破格 (化气 复根) — a shattered structure is not repaired by a
     friendly stem, so that verdict stays absolute.
+
+    subject names the pillar in the prose ("运" for a 大运, else "流年" / "小运").
     """
     stem_el = _STEM_ELEMENT.get(cycle_stem, "") if cycle_stem else ""
     branch_el = _BRANCH_MAIN_ELEMENT.get(cycle_branch, "")
@@ -113,13 +120,13 @@ def _apply_stem(
 
     # 截脚 — the branch controls the stem, so the stem has no legs to stand on.
     if branch_el and _CONTROLS.get(branch_el) == stem_el:
-        return rating, reason + f"；运干{cycle_stem}({stem_el}·{verdict})为支所克，截脚无力，不改其断"
+        return rating, reason + f"；{subject}干{cycle_stem}({stem_el}·{verdict})为支所克，截脚无力，不改其断"
 
     gai_tou = bool(branch_el and _CONTROLS.get(stem_el) == branch_el)
     if verdict == "忌":
         note = "盖头克支" if gai_tou else "透干为忌"
-        return _DOWNGRADE[rating], reason + f"；运干{cycle_stem}({stem_el}){note}，降一等"
-    return _UPGRADE[rating], reason + f"；运干{cycle_stem}({stem_el})为用神所喜，升一等"
+        return _DOWNGRADE[rating], reason + f"；{subject}干{cycle_stem}({stem_el}){note}，降一等"
+    return _UPGRADE[rating], reason + f"；{subject}干{cycle_stem}({stem_el})为用神所喜，升一等"
 
 # 藏干 tiers, in table order — 本气 / 中气 / 余气.
 _ROOT_TIERS = ("本气", "中气", "余气")
@@ -153,9 +160,9 @@ def _substantive_root(branch: str, element: str) -> tuple[str, str] | None:
 
 
 def get_cycle_yun_shi(
-    cycle_branch: str, yong_shen: dict, cycle_stem: str = ""
+    cycle_branch: str, yong_shen: dict, cycle_stem: str = "", cycle_label: str = "大运"
 ) -> dict:
-    """运势 — the holistic 喜运/平运/忌运 verdict for ONE 大运/流年 pillar.
+    """运势 — the holistic 喜运/平运/忌运 verdict for ONE 大运/流年/小运 pillar.
 
     This is the headline the per-element 五行动态 breakdown cannot give: five elements
     each move their own way, so "is this decade good?" needs a single call. It is a
@@ -190,7 +197,13 @@ def get_cycle_yun_shi(
     whether the chart stands. 正格 charts stay branch-only by design — the 金不换 表 is a
     方位 (direction) table, and directions are branches; reading stems into it would invent
     data the table does not have.
+
+    cycle_label only words the 依据: a 大运 reads "运支 … 大运喜用方位" as before; a 流年 or
+    小运 names itself ("流年支…", "小运支…") and calls the table by its source (金不换), since
+    the 大运喜/大运忌 lists are a 运 direction table being applied to an annual pillar.
     """
+    subject = "运" if cycle_label == "大运" else cycle_label
+    table = "大运" if cycle_label == "大运" else "金不换"
     ge_ju = yong_shen.get("格局", "正格")
     if ge_ju != "正格":
         detail = yong_shen.get("格局详情", {})
@@ -215,7 +228,7 @@ def get_cycle_yun_shi(
                 return {
                     "评级": "忌运",
                     "依据": (
-                        f"{name}：运支{cycle_branch}藏{stem}({orig}·{tier})，"
+                        f"{name}：{subject}支{cycle_branch}藏{stem}({orig}·{tier})，"
                         f"日元复根，化神反化破格"
                     ),
                     "来源": "化气破格",
@@ -224,8 +237,10 @@ def get_cycle_yun_shi(
         element = _BRANCH_MAIN_ELEMENT.get(cycle_branch, "")
         combined = yong_shen.get("五行", {}).get(element, {}).get("综合", "平")
         rating = _RATING_BY_YONG_SHEN.get(combined, "平运")
-        reason = f"{name}不取方位表，依运支{cycle_branch}本气{element}为格局所{combined}"
-        rating, reason = _apply_stem(rating, reason, cycle_stem, cycle_branch, yong_shen)
+        reason = f"{name}不取方位表，依{subject}支{cycle_branch}本气{element}为格局所{combined}"
+        rating, reason = _apply_stem(
+            rating, reason, cycle_stem, cycle_branch, yong_shen, subject
+        )
         return {"评级": rating, "依据": reason, "来源": "从格用神"}
 
     xi = yong_shen.get("大运喜", [])
@@ -233,23 +248,25 @@ def get_cycle_yun_shi(
 
     if xi or ji:  # chart is curated — the table owns the BRANCH direction
         if cycle_branch in xi:
-            rating, reason = "喜运", f"运支{cycle_branch}属大运喜用方位"
+            rating, reason = "喜运", f"{subject}支{cycle_branch}属{table}喜用方位"
         elif cycle_branch in ji:
-            rating, reason = "忌运", f"运支{cycle_branch}属大运忌避方位"
+            rating, reason = "忌运", f"{subject}支{cycle_branch}属{table}忌避方位"
         else:
-            rating, reason = "平运", f"运支{cycle_branch}不在大运喜忌方位之内"
+            rating, reason = "平运", f"{subject}支{cycle_branch}不在{table}喜忌方位之内"
         # …and the STEM is judged against the 用神. The 方位表 is silent on stems because 方位
         # IS a branch concept — but a 大运 is a 干支 pair and both act (运以支为重，天干为辅).
         # Treating the table's silence as "stems are irrelevant" left half the pillar unread.
-        rating, reason = _apply_stem(rating, reason, cycle_stem, cycle_branch, yong_shen)
+        rating, reason = _apply_stem(
+            rating, reason, cycle_stem, cycle_branch, yong_shen, subject
+        )
         return {"评级": rating, "依据": reason, "来源": "金不换"}
 
     # Uncurated chart — read the branch's own qi against the chart-fixed 用神.
     element = _BRANCH_MAIN_ELEMENT.get(cycle_branch, "")
     combined = yong_shen.get("五行", {}).get(element, {}).get("综合", "平")
     rating = _RATING_BY_YONG_SHEN.get(combined, "平运")
-    reason = f"方位表未载，依运支{cycle_branch}本气{element}为用神所{combined}"
-    rating, reason = _apply_stem(rating, reason, cycle_stem, cycle_branch, yong_shen)
+    reason = f"方位表未载，依{subject}支{cycle_branch}本气{element}为用神所{combined}"
+    rating, reason = _apply_stem(rating, reason, cycle_stem, cycle_branch, yong_shen, subject)
     return {"评级": rating, "依据": reason, "来源": "用神五行"}
 
 

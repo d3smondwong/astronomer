@@ -209,6 +209,9 @@ class _Engine:
         self.b = cycle_branch
         self.ctx = ctx
         self.label = cycle_label
+        # 形态 prefix. 岁运 is the umbrella for 大运/流年 (the 岁 and the 运); a 小运 is
+        # neither, so its relations are named for it (小运冲, 小运克 …).
+        self.form = "小运" if cycle_label == "小运" else "岁运"
         self.companion = companion
         self.items: list[dict] = []
         # 反吟/伏吟-dominated opponent indices (pass 1)
@@ -298,7 +301,7 @@ class _Engine:
             if self.s == g and self.b == z:
                 self._register(
                     "伏吟", "pillar", {i},
-                    形态="岁运伏吟",
+                    形态=f"{self.form}伏吟",
                     组合明细=pillar_detail,
                     备注=(
                         f"伏吟：干支皆同，{self.opp_keys[i]}被{self.label}"
@@ -392,7 +395,7 @@ class _Engine:
                 if self.s != g:
                     self._register(
                         "伏吟(支)", "branch", {i},
-                        形态="岁运支伏",
+                        形态=f"{self.form}支伏",
                         组合明细=detail,
                         备注=f"{self.label}支与{self.opp_keys[i]}支重逢，该支之事重现",
                     )
@@ -406,7 +409,7 @@ class _Engine:
             # 六冲 (skip when the same pillar is a whole-pillar 反吟)
             if clash_map.get(self.b) == z and stem_clashes.get(self.s) != g:
                 fields: dict = {
-                    "形态": "岁运冲",
+                    "形态": f"{self.form}冲",
                     "组合明细": detail,
                     "根基": self._root_detail(i),
                 }
@@ -444,9 +447,9 @@ class _Engine:
                 )
 
             if harm_map.get(self.b) == z:
-                self._register("六害", "branch", {i}, 形态="岁运害", 组合明细=detail)
+                self._register("六害", "branch", {i}, 形态=f"{self.form}害", 组合明细=detail)
             if break_map.get(self.b) == z:
-                self._register("六破", "branch", {i}, 形态="岁运破", 组合明细=detail)
+                self._register("六破", "branch", {i}, 形态=f"{self.form}破", 组合明细=detail)
             if z in hidden_stem_he.get(self.b, set()):
                 self._register("暗合", "branch", {i}, 组合明细=detail)
 
@@ -568,7 +571,7 @@ class _Engine:
             if stem_clashes.get(self.s) == g and clash_map.get(self.b) != self.opp_zhis[i]:
                 self._register(
                     "天干冲", "stem", {i},
-                    形态="岁运冲",
+                    形态=f"{self.form}冲",
                     组合明细=detail,
                     根基=root,
                     主动方="相互",
@@ -578,7 +581,7 @@ class _Engine:
                 controller = self.label if (self.s, g) in stem_controls else self.opp_keys[i]
                 self._register(
                     "天干克", "stem", {i},
-                    形态="岁运克",
+                    形态=f"{self.form}克",
                     组合明细=detail,
                     根基=root,
                     主动方=controller,
@@ -605,7 +608,7 @@ class _Engine:
                     )
                     self._register(
                         "干支透合", "stem", {i},
-                        形态="岁运引动",
+                        形态=f"{self.form}引动",
                         组合明细={self.label: self.s, self.opp_keys[i]: z},
                         藏干详情={
                             "藏干": h_stem,
@@ -789,7 +792,7 @@ class _Engine:
             if item["类型"] in ("天干克", "天干冲"):
                 apply_lock(item, "STEM_天干合")
             elif item["类型"] == "干支透合" and (
-                item.get("形态") == "岁运引动" or item["_opp"] & locked_opp
+                item.get("形态") == f"{self.form}引动" or item["_opp"] & locked_opp
             ):
                 apply_lock(item, "STEM_天干合")
 

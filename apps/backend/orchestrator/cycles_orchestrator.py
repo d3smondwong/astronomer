@@ -394,7 +394,7 @@ def _analyse_cycle_pillar(
         companion=companion,
     )
 
-    yun_shi = get_cycle_yun_shi(cycle_branch, ctx.yong_shen, cycle_stem)
+    yun_shi = get_cycle_yun_shi(cycle_branch, ctx.yong_shen, cycle_stem, cycle_label)
 
     sui_yun = None
     if decade:
@@ -526,7 +526,7 @@ def _xiao_yun_block(gan_zhi: str, ctx: NatalContext) -> dict:
             cycle_xun_kong=xun_kong,
             cycle_stem_rooting=pillar["天干"]["根基强度"],
         ),
-        "运势": get_cycle_yun_shi(branch, ctx.yong_shen, stem),
+        "运势": get_cycle_yun_shi(branch, ctx.yong_shen, stem, "小运"),
         "古籍解读": get_cycle_interpretations(ctx, stem, branch, "小运"),
     }
 

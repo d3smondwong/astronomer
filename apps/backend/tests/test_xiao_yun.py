@@ -68,6 +68,31 @@ class TestXiaoYunOnStubYears:
                 assert not {"流年", "大运"} & set(item["组合明细"])
 
 
+class TestPillarLabels:
+    """Prose names the pillar it describes: 小运 relations are not 岁运 relations."""
+
+    def test_xiao_yun_forms_are_named_for_it(self):
+        _, years = _stub_years(datetime(1985, 11, 25, 17, 7), 1)
+        forms = {i.get("形态", "") for y in years for i in y["小运"]["作用"]["柱位动态"]}
+        assert any(f.startswith("小运") for f in forms)
+        assert not any(f.startswith("岁运") for f in forms)
+
+    def test_yun_shi_reason_names_each_pillar(self):
+        data, _ = calculate_cycles(datetime(1985, 11, 25, 17, 7), *SINGAPORE, 1, True, da_yun_index=2)
+        decade = data["大运"][2]
+        assert decade["运势"]["依据"].startswith("运支")  # 大运 wording unchanged
+        assert decade["流年"][0]["运势"]["依据"].startswith("流年支")
+        _, years = _stub_years(datetime(1985, 11, 25, 17, 7), 1)
+        reason = years[0]["小运"]["运势"]["依据"]
+        assert reason.startswith("小运支") and "大运" not in reason
+
+    def test_liu_nian_forms_keep_sui_yun(self):
+        data, _ = calculate_cycles(datetime(1985, 11, 25, 17, 7), *SINGAPORE, 1, True, da_yun_index=2)
+        forms = {i.get("形态", "") for y in data["大运"][2]["流年"] for i in y["作用"]["柱位动态"]}
+        assert any(f.startswith("岁运") for f in forms)
+        assert not any(f.startswith("小运") for f in forms)
+
+
 class TestXiaoYunScope:
     @pytest.mark.parametrize("da_yun_index", [1, 2])
     def test_absent_once_the_first_da_yun_starts(self, da_yun_index):
