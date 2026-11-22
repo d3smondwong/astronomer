@@ -104,10 +104,9 @@ the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no e
 - **Severe verdicts (夭, 死) stay verbatim** and carry `标注: "条件触发·非定论"` — never softened.
 
 ## Deferred, by design
-- **流月/流日:** every 流年 carries an empty `流月: []` seam. 流月 = one more orchestrator loop via
-  `LiuNian.getLiuYue()`; 流日 has no lunar-python class — derive per date via
-  `Lunar.getDayInGanZhiExact2()`.
-- **Dropped on user decision:** 九星能量, 方位分析, 五黄煞 (feng-shui almanac, not chart analysis);
+- **Dropped on user decision:** 流月 / 流日 — none of the classical texts in the library (三命通会,
+  渊海子平, 子平真诠, 滴天髓, 穷通宝鉴) reads cycles below the year; only modern practice does. Do
+  not re-propose. Also 九星能量, 方位分析, 五黄煞 (feng-shui almanac, not chart analysis);
   共拱/拱会 virtual arches (need positional adjacency).
 - **Cycle 神煞 解读:** natal interpretation texts are pillar-positional prose; the LLM layer
   interprets cycle stars instead.

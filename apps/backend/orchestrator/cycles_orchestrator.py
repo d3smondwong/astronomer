@@ -8,8 +8,8 @@ the 大运 via lunar-python's Yun/DaYun chain and runs the per-pillar cycle
 analysis (运柱 / 作用 / 神煞 / 五行动态) for each.
 
 流年 are computed lazily: only the decade selected by da_yun_index carries a
-populated 流年 list. Every 流年 entry carries an empty "流月" list — the
-reserved seam for the future monthly layer.
+populated 流年 list. There is no monthly (流月) layer, by decision: none of the
+classical texts the engine draws on reads cycles below the year.
 
 Timeline — TWO INDEPENDENT AXES, and conflating them is the classic error:
 
@@ -579,7 +579,6 @@ def _liu_nian_entry(
             stem, branch, LunarUtil.getXunKong(gan_zhi), ctx, "流年", decade=decade
         ),
         "太岁": _tai_sui_check(branch, ctx),
-        "流月": [],  # reserved seam for the future monthly layer
     }
     if xiao_yun_seed is not None:
         hour_gan_zhi, forward = xiao_yun_seed

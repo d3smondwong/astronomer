@@ -275,7 +275,7 @@ class TestLiuNian:
         # 2021-02-03 and turns 36 that November. 37/35 is the coherent pair.
         assert first["周岁"] == 35
         assert first["生肖"] == "牛"
-        assert first["流月"] == []  # reserved seam
+        assert "流月" not in first  # dropped: no classical basis below the year
 
     def test_liu_nian_bounds_are_li_chun_not_new_year(self, desmond_cycles):
         """The universal axis. Picking the current 流年 by calendar year is wrong

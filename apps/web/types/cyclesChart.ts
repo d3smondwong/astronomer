@@ -523,8 +523,6 @@ export interface LiuNianEntry {
    * annual pillar, stepped from the hour pillar; distinct from the universal 流年 above.
    */
   小运?: XiaoYun;
-  /** Reserved seam — always present, empty until the monthly layer ships. */
-  流月: unknown[];
 }
 
 /**

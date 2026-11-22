@@ -1,5 +1,5 @@
 """
-运柱 Cycle Pillar Enrichment — shared by 大运 / 流年 (future 流月).
+运柱 Cycle Pillar Enrichment — shared by 大运 / 流年 / 小运.
 
 Builds the per-pillar analysis block for a single transiting (cycle) pillar,
 mirroring the natal 四柱实体 per-pillar shape so the frontend can reuse its
@@ -332,7 +332,7 @@ def build_cycle_pillar(
         cycle_xun_kong: the cycle pillar's own void pair from
                         DaYun/LiuNian.getXunKong() (e.g. "午未")
         ctx:            NatalContext from build_natal_context()
-        cycle_label:    "大运" | "流年" (future "流月") — used in rooting labels
+        cycle_label:    "大运" | "流年" | "小运" — used in rooting labels
                         and 空亡 descriptions.
         companion:      the enclosing 大运, when this pillar is a 流年. Feeds the
                         制化 annotation (a 大运 食神 tames a 流年 七杀) and 岁运互空.
