@@ -138,9 +138,9 @@ the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no e
   its abstraction. `sui_yun.py` follows it (phase 2b): 羊刃 (branch = the 日干's 羊刃) or 七煞 (stem
   or branch 本气) → 级别 重; 财/官/印 by the stem → 轻 (吉 wording); anything else → 中 (no verdict).
   《喜忌篇》「岁运并临，灾殃立至」 is said of 劫财阳刃 — it is quoted only on the 重 case.
-- **Natal-rule gaps found** (to fix separately, not via cycle rules): the 论地支 natal rules never
-  check the branch they describe; the 巳 and 酉 rules require a 月支 that contradicts their own
-  subject; the 未 rule uses 日支.
+- **论地支 natal and cycle rules share one reading** (fixed 2026-11-24): both gate on 月支
+  (「今当以月提为主」), count 「日时…多/重」 the same way, and carry the same 编码说明 prefix —
+  see `bazi-natal.md`. `tests/test_di_zhi_month_subject.py` fires both versions on one chart.
 
 **卷二 phase 2b decisions — 论太岁 + 总论岁运 (confirmed 2026-11-24):** one list,
 `volume_2_tai_sui_cycle_predictions`, output group `论太岁` (each rule's `来源` names its section).
