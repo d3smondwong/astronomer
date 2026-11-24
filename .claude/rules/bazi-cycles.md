@@ -75,12 +75,15 @@ the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no e
   several periods. `运柱` is rule vocabulary only: emitted evidence names the period instead
   (`宫位: 小运`, not `宫位: 运柱`).
 - **Fields:** `适用周期` and `来源` are required; `依据` (the sentence licensing the cycle reading,
-  e.g. 「限运同论」), `标注` (severity) and `编码说明` (an encoding departure from the literal text —
-  data only, not emitted) are optional.
-- **The 运柱 entry is slim** (天干/地支/纳音 only). Only `CYCLE_POSITION_TYPES` may target it, and
-  natal-side conditions are limited to `NATAL_POSITION_TYPES`: this context is built from
-  `NatalContext`, whose natal ten gods are RAW, so natal ten-god matching (which needs `偏官`) is
-  not available yet — widening either whitelist is a deliberate engine change.
+  e.g. 「限运同论」), `标注` (severity) and `编码说明` (how the rule reads an ambiguous or departing
+  passage — emitted with the match so the interpretive choice is visible) are optional.
+- **What a rule can see.** Natal pillars come from `NatalContext.rule_si_zhu` — the natal pipeline's
+  七杀→偏官 / 食神→伤官 relabels applied, so natal 煞 conditions list `["七杀", "偏官"]`
+  (`natal_si_zhu` stays raw for 制化). The 运柱 carries 天干/地支 + 五行, **RAW** ten gods (天干 +
+  藏干 tiers — no adjacency, so never relabelled), `十二长生 {日干, 自坐}` and 纳音; its computed
+  神煞 and interactions are passed in (`组合明细` key renamed to `运柱`, natal strength floor
+  applied). `CYCLE_POSITION_TYPES` / `NATAL_POSITION_TYPES` whitelist what each side may use —
+  widening either is a deliberate engine change.
 - **Guard tests** (`tests/test_cycle_interpretation.py`): every cycle list is wired into
   `CYCLE_ANALYZERS`; every rule names a cycle position; natal lists gain no cycle positions
   (`PENDING_MIGRATION` holds the 4 legacy rules in 卷五/卷六 and may only shrink); every rule can fire.
@@ -109,6 +112,29 @@ the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no e
   reserved for severity.
 - **Severe verdicts (夭, 死) stay verbatim** and carry `标注: "条件触发·非定论"` — never softened.
 
+**卷二 decisions (confirmed 2026-11-23):**
+- **Directions:** 东 寅卯辰, 南 巳午未, 西 申酉戌, 北 亥子丑; 东南 = 寅–未, 西北 = 申–丑 (己巳 「在巽」
+  stays the 辰巳 special case).
+- **A 运's ten god is its BRANCH 本气** (大运重地支). The branch sets the decade's ground and decides the
+  verdict; the stem is a secondary modifier read *through* the branch, never a verdict of its own
+  (「在干兼用地支之神，在支则弃天干之物」). So 壬午 judges 印 by 午 — 印欲运旺 can fire, but the stem's 财
+  never adds the opposite 印不欲运衰. The stem's god stays visible in the entry's `运柱`. The decade is
+  read as one unit — no 前五年/后五年 split.
+- **论大运's unnamed wants** are encoded as classes, each with its `编码说明`: 煞欲运**制** = 食神 +
+  伤官 (食神 primary); 煞不欲运**助** = 财; 财欲运**扶** = 食伤; 财不欲运**劫** = 比劫; 印欲运**旺** =
+  官杀 + 印 (官杀 primary); 印不欲运**衰** = 财; 官欲运**生** = 财; 官不欲运**伤** = 伤官.
+- **Tamed vs untamed 煞 matters where the text's concern does.** 煞欲运制 matches only an untamed natal
+  `七杀` — a tamed `偏官` meeting more 制 is 制伏太过 (总论岁运, phase 2b). 煞不欲运助 matches both.
+- **论地支 passages describe each branch as its month** (辰建季春, 午月, 酉建八月) → subject = 月支.
+- **Not encoded / deferred:** 原有灾 (「灾」 undefined); the 运元 passages (疏通 / 归宿 / 晦息 unpinned;
+  only 沉潜 = 亥子丑 is confirmed); 得气深浅 timing; 「太岁持之」; 日年相并 (verdict depends on social
+  standing); 「太岁当头立…重丧」.
+- **岁运并临:** 论太岁's ten-god split (「独羊刃、七煞为凶，财、官、印绶亦吉」) is the rule; 喜忌 is only
+  its abstraction. `sui_yun.py` still gates 级别 on 喜忌 — reconciling it is part of phase 2b.
+- **Natal-rule gaps found** (to fix separately, not via cycle rules): the 论地支 natal rules never
+  check the branch they describe; the 巳 and 酉 rules require a 月支 that contradicts their own
+  subject; the 未 rule uses 日支.
+
 ## Deferred, by design
 - **Dropped on user decision:** 流月 / 流日 — none of the classical texts in the library (三命通会,
   渊海子平, 子平真诠, 滴天髓, 穷通宝鉴) reads cycles below the year; only modern practice does. Do
@@ -116,7 +142,6 @@ the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no e
   共拱/拱会 virtual arches (need positional adjacency).
 - **Cycle 神煞 解读:** natal interpretation texts are pillar-positional prose; the LLM layer
   interprets cycle stars instead.
-- **Remaining chapters:** 卷一 is encoded. Next: 卷二 (论大运 / 论小运 / 论太岁 / 论岁运 — raw
-  text only today), then the ~53 natal rules whose 断语 carry 行运 clauses, and the 4
-  `PENDING_MIGRATION` rules in 卷五/卷六. Natal ten-god conditions need a relabelled natal view
-  first (see *Classical cycle rules* above).
+- **Remaining chapters:** 卷一 and 卷二 phase 2a (论大运 + the 论地支 / 十干 大运 clauses) are
+  encoded. Next: 卷二 2b (论太岁 + 总论岁运, with the 岁运并临 reconciliation), 2c (论小运), then
+  the other volumes' 行运-clause natal rules and the 4 `PENDING_MIGRATION` rules in 卷五/卷六.

@@ -34,22 +34,43 @@ PENDING_MIGRATION = {
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 
-def _pillar(gz: str) -> dict:
-    return {"天干": {"天干": gz[0]}, "地支": {"地支": gz[1]}, "纳音": LunarUtil.NAYIN[gz]}
+def _pillar(gz: str, day_stem: str) -> dict:
+    """A natal pillar in the 四柱实体 shape, ten gods relative to day_stem (raw — no relabel)."""
+    stem, branch = gz[0], gz[1]
+    hidden = {
+        tier: {"天干": h, "十神": LunarUtil.SHI_SHEN.get(day_stem + h, "无"), "五行": LunarUtil.WU_XING_GAN[h]}
+        for tier, h in zip(("本气", "中气", "余气"), LunarUtil.ZHI_HIDE_GAN.get(branch, []))
+    }
+    return {
+        "天干": {"天干": stem, "五行": LunarUtil.WU_XING_GAN[stem], "十神": LunarUtil.SHI_SHEN.get(day_stem + stem, "日主")},
+        "地支": {"地支": branch, "五行": LunarUtil.WU_XING_ZHI[branch]},
+        "藏干": hidden,
+        "纳音": LunarUtil.NAYIN[gz],
+    }
 
 
-def _ctx(year: str, month: str = "甲子", day: str = "甲子", hour: str = "甲子", gender: int = 1):
+def _ctx(year: str, month: str = "甲子", day: str = "甲子", hour: str = "甲子",
+         gender: int = 1, dm_strength: str = "中和"):
     """A NatalContext stand-in carrying only what build_cycle_chart_context reads."""
+    d = day[0]
+    si_zhu = {"年柱": _pillar(year, d), "月柱": _pillar(month, d), "日柱": _pillar(day, d), "时柱": _pillar(hour, d)}
+    si_zhu["日柱"]["天干"]["十神"] = "日主"
     return SimpleNamespace(
-        natal_si_zhu={"年柱": _pillar(year), "月柱": _pillar(month), "日柱": _pillar(day), "时柱": _pillar(hour)},
+        natal_si_zhu=si_zhu,
+        rule_si_zhu=si_zhu,
+        day_stem=d,
+        effective_day_stem=d,
+        dm_strength=dm_strength,
         gender=gender,
         natal_five_elements={},
         lunar_birthday=None,
     )
 
 
-def _fired(ctx, cycle_gz: str, label: str = "大运", companion=None) -> set[str]:
-    out = engine.get_cycle_interpretations(ctx, cycle_gz[0], cycle_gz[1], label, companion)
+def _fired(ctx, cycle_gz: str, label: str = "大运", companion=None, shen_sha=None, interactions=None) -> set[str]:
+    out = engine.get_cycle_interpretations(
+        ctx, cycle_gz[0], cycle_gz[1], label, companion, shen_sha=shen_sha, interactions=interactions
+    )
     return {m["逻辑名称"] for matches in out.values() for m in matches}
 
 
@@ -153,18 +174,30 @@ class TestCycleRuleData:
         assert offenders <= PENDING_MIGRATION, offenders - PENDING_MIGRATION
 
     def test_every_rule_can_fire(self):
-        # Brute force: catches typo'd 干支/branches that would make a rule dead.
+        # Brute force over natal charts × every 运: catches typo'd 干支/branches/ten gods that
+        # would make a rule dead. Rules reading the 运柱's 神煞 / interactions need those facts
+        # supplied, so they are exercised by targeted tests (TestVolume2a) instead.
         months = [ALL_JIA_ZI[i] for i in range(12)]  # one per branch
+        days = ["甲子", "丙寅", "戊辰", "庚午", "壬申", "乙丑", "丁卯", "己巳", "辛未", "癸酉"]
         day_hours = [
             ("甲子", "甲子"), ("戊辰", "丙寅"), ("壬子", "庚子"), ("丙寅", "丁卯"),
             ("甲申", "甲申"), ("庚寅", "甲子"), ("癸丑", "甲子"),
-        ]
-        pending = {r["逻辑名称"]: r for r in _all_cycle_rules()}
+        ] + [(d, h) for d in days for h in ("丙午", "庚申", "壬子")]
+        needs_facts = {"神煞", "交互"}
+        pending = {
+            r["逻辑名称"]: r for r in _all_cycle_rules()
+            if not {leaf["判定目标"]["类型"] for leaf in _leaves(r["判定逻辑"])} & needs_facts
+        }
         for r in list(pending.values()):
-            years = r["判定逻辑"][0]["判定目标"]["值"]
-            label = r["适用周期"][0]
-            for year, month, (day, hour), cycle in itertools.product(years, months, day_hours, ALL_JIA_ZI):
-                ctx = engine.build_cycle_chart_context(_ctx(year, month, day, hour), cycle[0], cycle[1])
+            first = r["判定逻辑"][0]
+            year_led = first.get("位置", {}).get("柱") == "年柱" and first["判定目标"]["类型"] == "特定组合"
+            years = first["判定目标"]["值"] if year_led else ["甲子", "丙午"]
+            for year, month, (day, hour), strength, cycle in itertools.product(
+                years, months, day_hours, ("中和", "弱"), ALL_JIA_ZI
+            ):
+                ctx = engine.build_cycle_chart_context(
+                    _ctx(year, month, day, hour, dm_strength=strength), cycle[0], cycle[1]
+                )
                 if evaluate_rule(r, ctx)[0]:
                     pending.pop(r["逻辑名称"])
                     break
@@ -243,7 +276,7 @@ class TestCycleEngine:
         match = next(m for m in out["纳音格局"] if m["逻辑名称"] == "运_壬寅癸卯_吉_平地木")
         evidence = match["证据"]
         assert label in json.dumps(evidence, ensure_ascii=False)
-        assert "运柱" not in json.dumps(out, ensure_ascii=False)
+        assert "运柱" not in json.dumps([m["证据"] for ms in out.values() for m in ms], ensure_ascii=False)
 
     def test_period_naming_keeps_the_companion_and_natal_labels(self):
         evidence = [{"宫位": "运柱", "组合": "戊戌"}, {"宫位": "大运"}, {"柱": "年柱", "匹配柱": ["运柱", "时柱"]}]
@@ -252,7 +285,12 @@ class TestCycleEngine:
         ]
 
     def test_nothing_fired_is_an_empty_dict(self):
-        assert engine.get_cycle_interpretations(_ctx("甲子"), "甲", "子", "大运") == {}
+        # A 小运 run reaches only 卷一's 「限」 rules; none covers a 甲子 year.
+        assert engine.get_cycle_interpretations(_ctx("甲子"), "甲", "子", "小运") == {}
+
+    def test_only_groups_with_matches_appear(self):
+        out = engine.get_cycle_interpretations(_ctx("甲子"), "甲", "子", "大运")
+        assert all(matches for matches in out.values())
 
     def test_rejects_unknown_period(self):
         with pytest.raises(ValueError):
@@ -347,3 +385,129 @@ class TestOrchestratorWiring:
         expected = [d["干支"] for d in data["大运"][1:] if d["干支"] in ("戊戌", "己亥")]
         assert expected, "fixture chart must run a 戊戌/己亥 decade"
         assert hits == expected
+
+
+class TestVolume2a:
+    """卷二 phase 2a: 论大运 and the 论地支 / 十干 大运 clauses (all 适用周期 ["大运"])."""
+
+    def test_yuan_you_guan_xing_guan_yun(self):
+        # 甲 day: 辛 = 正官. Natal year 辛酉 + 大运 癸酉 (酉 本气 辛) → 原有官，行官运发官.
+        assert "论大运_原有官_行官运发官" in _fired(_ctx("辛酉"), "癸酉")
+        assert "论大运_原有官_行官运发官" not in _fired(_ctx("甲子"), "癸酉")
+
+    def test_sha_wants_control_only_while_untamed(self):
+        # 甲 day: 庚 = 七杀, 丙 = 食神, 戊 = 偏财. 「煞欲运制」 is about an UNCONTROLLED 煞; a natal
+        # 七杀 already relabelled 偏官 is controlled, so more 制 is 制伏太过 (phase 2b), not 吉.
+        # 运 癸巳: 巳 本气 丙 = 食神.
+        ctx = _ctx("庚午")
+        assert "论大运_煞欲运制" in _fired(ctx, "癸巳")
+        ctx.rule_si_zhu["年柱"]["天干"]["十神"] = "偏官"
+        assert "论大运_煞欲运制" not in _fired(ctx, "癸巳")
+
+    def test_sha_dislikes_help_whether_tamed_or_not(self):
+        # 「煞不欲运助」 (财生煞) is a risk for the 煞 as a star — tamed or not.
+        ctx = _ctx("庚午")
+        assert "论大运_煞不欲运助" in _fired(ctx, "戊辰")
+        ctx.rule_si_zhu["年柱"]["天干"]["十神"] = "偏官"
+        assert "论大运_煞不欲运助" in _fired(ctx, "戊辰")
+
+    def test_branch_ben_qi_decides_and_the_stem_adds_no_verdict(self):
+        # 大运重地支. 戊 day, natal 丁 正印. 运 壬午: stem 壬 偏财, 午 本气 丁 正印 — the 印 side
+        # fires; the stem's 财 does not add the opposite 「印不欲运衰」.
+        fired = _fired(_ctx("丁卯", day="戊辰"), "壬午")
+        assert "论大运_印欲运旺" in fired
+        assert "论大运_印不欲运衰" not in fired
+        # A stem-only match no longer fires: 运 丙寅 for a 庚 七杀 chart has 食神 only in its stem.
+        assert "论大运_煞欲运制" not in _fired(_ctx("庚午"), "丙寅")
+
+    def test_yun_pillar_carries_raw_ten_gods(self):
+        # The 运柱 still exposes its stem's god (the modifier) alongside the branch's.
+        pillar = engine.build_cycle_chart_context(_ctx("庚午"), "丙", "寅").pillars["运柱"]
+        assert pillar["天干"]["十神"] == "食神"
+        assert pillar["藏干"]["本气"]["十神"] == "比肩"
+
+    def test_shi_er_chang_sheng_death_stage_is_tagged(self):
+        # 甲 is 绝 at 申.
+        out = engine.get_cycle_interpretations(_ctx("甲子"), "庚", "申", "大运")
+        match = next(m for m in out["论大运"] if m["逻辑名称"] == "论大运_运临死绝")
+        assert match["标注"] == "条件触发·非定论"
+        assert "骨肉死丧" in match["结论"]
+
+    def test_hua_gai_and_tian_yi_need_the_stars(self):
+        ctx = _ctx("甲子")
+        assert "论大运_运逢华盖" not in _fired(ctx, "甲辰")
+        assert "论大运_运逢华盖" in _fired(ctx, "甲辰", shen_sha=[{"名称": "华盖", "来源": "年支"}])
+        assert "论大运_运逢贵人" in _fired(ctx, "甲辰", shen_sha=[{"名称": "夜天乙贵人", "来源": "日干"}])
+
+    def test_liu_he_reads_the_cycle_interactions(self):
+        six_he = [{"类型": "六合", "组合明细": {"大运": "丑", "日柱": "子"}, "强度": "显著影响"}]
+        out = engine.get_cycle_interpretations(_ctx("甲子"), "乙", "丑", "大运", interactions=six_he)
+        match = next(m for m in out["论大运"] if m["逻辑名称"] == "论大运_运逢六合")
+        assert "运柱" not in json.dumps(match["证据"], ensure_ascii=False)
+        weak = [{**six_he[0], "强度": "轻微"}]  # below the natal material-strength floor
+        assert "论大运_运逢六合" not in _fired(_ctx("甲子"), "乙丑", interactions=weak)
+
+    def test_weak_day_master_wants_seal_or_peer(self):
+        assert "论大运_身弱_运引旺乡" in _fired(_ctx("甲子", dm_strength="弱"), "壬子")
+        assert "论大运_身弱_运引旺乡" not in _fired(_ctx("甲子", dm_strength="中和"), "壬子")
+
+    def test_di_zhi_subject_is_the_month_branch(self):
+        assert "论地支_午月_运行东南_身强" in _fired(_ctx("甲子", month="庚午"), "甲寅")
+        assert "论地支_午月_运入西北_休囚" in _fired(_ctx("甲子", month="庚午"), "庚申")
+        assert "论地支_午月_运行东南_身强" not in _fired(_ctx("甲子", day="庚午"), "甲寅")
+
+    def test_jia_day_dislikes_the_west(self):
+        assert "十干_甲日_运不喜西方" in _fired(_ctx("甲子"), "壬申")
+        assert "十干_甲日_运不喜西方" not in _fired(_ctx("甲子", day="乙丑"), "壬申")
+
+    def test_volume_2a_rules_are_da_yun_only(self):
+        for name, rules in engine.CYCLE_ANALYZERS:
+            if name in ("论大运", "论干支"):
+                assert all(r["适用周期"] == ["大运"] for r in rules)
+        assert not {n for n in _fired(_ctx("辛酉"), "辛未", "流年") if n.startswith(("论大运", "论地支", "十干"))}
+
+    def test_real_chart_decades_get_volume_2a_readings(self):
+        data, _ = calculate_cycles(datetime(1985, 11, 25, 17, 7), 1.35, 103.8, 1, True)
+        decades = data["大运"][1:]
+        assert any("论大运" in d["古籍解读"] for d in decades)
+        evidence = [m["证据"] for d in decades for ms in d["古籍解读"].values() for m in ms]
+        assert "运柱" not in json.dumps(evidence, ensure_ascii=False)  # prose may name the 运柱 block
+
+
+class TestNatalRelabelParity:
+    """rule_si_zhu repeats the natal pipeline's 七杀→偏官 / 食神→伤官 passes in a second place
+    (cycles_orchestrator._build_context). If either copy changes, the cycle rules would read
+    natal ten gods differently from /natal — this pins them together. The charts are chosen so
+    both relabels actually occur (four with a 偏官, three with a 食神→伤官)."""
+
+    CHARTS = [
+        (datetime(1965, 3, 7, 23, 27), 0), (datetime(1973, 8, 8, 13, 55), 1),
+        (datetime(1989, 12, 2, 8, 9), 0), (datetime(1988, 8, 20, 11, 48), 0),
+        (datetime(1956, 3, 20, 20, 24), 0), (datetime(1984, 1, 28, 12, 5), 1),
+        (datetime(2005, 5, 12, 17, 12), 1),
+    ]
+
+    @staticmethod
+    def _gods(si_zhu: dict) -> dict:
+        return {
+            p: (si_zhu[p]["天干"]["十神"], tuple(t["十神"] for t in si_zhu[p]["藏干"].values()))
+            for p in ("年柱", "月柱", "日柱", "时柱")
+        }
+
+    def test_rule_view_matches_natal_and_raw_view_stays_raw(self):
+        from apps.backend.orchestrator.astronomer_data_orchestrator import (
+            calculate_natal_chart,
+            get_lunar_birthday,
+        )
+        from apps.backend.orchestrator.cycles_orchestrator import _build_context
+
+        relabelled = 0
+        for birth, gender in self.CHARTS:
+            natal, _ = calculate_natal_chart(birth, 1.35, 103.8, gender, True)
+            lunar = get_lunar_birthday(birth, 1.35, 103.8, True)
+            ctx = _build_context(lunar.getEightChar(), gender, lunar)
+            assert self._gods(ctx.rule_si_zhu) == self._gods(natal["四柱实体"]), birth
+            raw = self._gods(ctx.natal_si_zhu)
+            assert "偏官" not in json.dumps(raw, ensure_ascii=False), birth
+            relabelled += raw != self._gods(ctx.rule_si_zhu)
+        assert relabelled == len(self.CHARTS)  # every fixture exercises a relabel
