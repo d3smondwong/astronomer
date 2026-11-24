@@ -170,6 +170,8 @@ Each <condition> is a leaf or a nested block:
 
   "计数_五行"
     { "类型": "计数_五行", "五行": [str], "阈值": int, "比较": "≥"|"≤"|"=" }
+    # counts visible stems + branches; 位置.柱 scopes the pillars (default all four, e.g.
+    # ["日柱", "时柱"] for 「日时…多」), 位置.部分 "天干" | "地支" restricts to one layer.
 
   "空亡计数"
     { "类型": "空亡计数", "阈值": int, "比较": "≥"|"≤"|"=" }
@@ -2267,20 +2269,24 @@ def eval_wu_xing_ke_same_pillar(
 
 
 def eval_wu_xing_count(
-    ctx: ChartContext, _pos: dict, target: dict
+    ctx: ChartContext, pos: dict, target: dict
 ) -> tuple[bool, dict]:
+    """计数_五行: visible stems + branches of the wanted elements on the scoped pillars.
+
+    位置.柱 scopes the pillars (default 全局 = the four natal pillars); 位置.部分 "天干" or
+    "地支" counts one layer only (default both), as the 五行 presence condition does.
+    """
     wanted = set(target.get("五行", []))
     if not wanted:
         return False, {}
     threshold: int = target.get("阈值", 0)
     comparator: str = target.get("比较", "≥")
+    bu_fen = pos.get("部分")
+    layers = ("天干",) if bu_fen == "天干" else ("地支",) if bu_fen == "地支" else ("天干", "地支")
     count = 0
-    for p in _ALL_PILLARS:
+    for p in _resolve_pillars(pos.get("柱")):
         pillar = ctx.pillars.get(p, {})
-        if pillar.get("天干", {}).get("五行") in wanted:
-            count += 1
-        if pillar.get("地支", {}).get("五行") in wanted:
-            count += 1
+        count += sum(1 for layer in layers if pillar.get(layer, {}).get("五行") in wanted)
     ok = _compare_threshold(count, threshold, comparator)
     return (ok, {"五行计数": sorted(wanted), "计数": count}) if ok else (False, {})
 
@@ -2311,21 +2317,22 @@ def eval_wu_xing_count_diff(
 
 
 def eval_di_zhi_count(
-    ctx: ChartContext, _pos: dict, target: dict
+    ctx: ChartContext, pos: dict, target: dict
 ) -> tuple[bool, dict]:
-    """计数_地支: count how many of the four pillars carry a branch in 值.
+    """计数_地支: count how many of the scoped pillars carry a branch in 值.
 
     Schema: { "类型": "计数_地支", "值": ["戌", "亥"], "阈值": 3, "比较": "≥" }
 
-    Each pillar contributes at most 1 to the count (its branch).
-    Useful for grading 天罗/地网 severity by occurrence count.
+    Each pillar contributes at most 1 to the count (its branch). 位置.柱 scopes the pillars
+    (default 全局 = the four natal pillars). Useful for grading 天罗/地网 severity by
+    occurrence count, or 「土重堆埋」.
     """
     wanted: set[str] = set(target.get("值", []))
     threshold: int = target.get("阈值", 0)
     comparator: str = target.get("比较", "≥")
     count = 0
     matched: list[str] = []
-    for p in _ALL_PILLARS:
+    for p in _resolve_pillars(pos.get("柱")):
         branch = ctx.pillars.get(p, {}).get("地支", {}).get("地支")
         if branch in wanted:
             count += 1
