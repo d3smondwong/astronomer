@@ -36,7 +36,9 @@ What the context carries
   {日干, 自坐} and 纳音.
 * The 运柱's 神煞 (ctx.shen_sha["运柱"]) and its interactions (ctx.interactions), passed
   in from the already-computed cycle layers, with the pillar's own label in 组合明细
-  renamed to 运柱 so the natal 交互 evaluator can address it.
+  (and as a directional item's 主动方) renamed to 运柱 so the natal 交互 evaluator can
+  address it. ctx.interactions holds ONLY the 运柱's interactions, so a 交互 condition
+  scoped to a natal pillar reads "between the 运柱 and that pillar" (交互 @日柱 = 岁/运 vs 日).
 * 日主强弱 from NatalContext.dm_strength.
 
 CYCLE_POSITION_TYPES / NATAL_POSITION_TYPES whitelist the condition types a rule may
@@ -66,6 +68,7 @@ from apps.backend.data.san_ming_tong_hui_v1 import (
 from apps.backend.data.san_ming_tong_hui_v2 import (
     volume_2_da_yun_cycle_predictions,
     volume_2_gan_zhi_cycle_predictions,
+    volume_2_tai_sui_cycle_predictions,
 )
 
 CYCLE_PILLAR = "运柱"
@@ -76,8 +79,10 @@ CYCLE_PERIODS = frozenset({"大运", "流年", "小运"})
 
 # Condition types that may target the 运柱 / 大运 — each reads only fields the transiting
 # entry carries (天干/地支/五行/十神/藏干/十二长生/纳音), or its 神煞 / interactions.
+# 计数_神煞 counts the 运柱's own stars (「诸凶煞并临」); 交互 may filter by 主动方 (运克岁).
 CYCLE_POSITION_TYPES = frozenset({
-    "特定组合", "天干值", "地支值", "纳音五行", "五行", "十神", "十二长生", "神煞", "交互",
+    "特定组合", "天干值", "地支值", "纳音五行", "五行", "十神", "十二长生", "神煞", "计数_神煞",
+    "交互",
 })
 
 # Natal-side condition types usable from a cycle rule. Ten gods read rule_si_zhu (偏官-aware).
@@ -140,7 +145,10 @@ def _as_rule_interactions(interactions: list[dict], cycle_label: str) -> list[di
             (CYCLE_PILLAR if k == cycle_label else k): v
             for k, v in item.get("组合明细", {}).items()
         }
-        out.append({**item, "组合明细": combo})
+        renamed = {**item, "组合明细": combo}
+        if item.get("主动方") == cycle_label:  # a directional item's actor is a position too
+            renamed["主动方"] = CYCLE_PILLAR
+        out.append(renamed)
     return out
 
 
@@ -229,6 +237,7 @@ CYCLE_ANALYZERS: list[tuple[str, list[dict]]] = [
     ("纳音格局", volume_1_nayin_ge_ju_cycle_predictions),
     ("论大运", volume_2_da_yun_cycle_predictions),
     ("论干支", volume_2_gan_zhi_cycle_predictions),
+    ("论太岁", volume_2_tai_sui_cycle_predictions),  # 论太岁 + 总论岁运 (each rule names its 来源)
 ]
 
 

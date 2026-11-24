@@ -93,6 +93,12 @@ def _positions(leaf) -> list[str]:
     return [zhu] if isinstance(zhu, str) else list(zhu)
 
 
+def _reads_cycle(leaf) -> bool:
+    """Does this condition read the transiting pillar? A 交互 always does: a cycle context
+    holds only the 运柱's own interactions, so 交互 @日柱 means 'between the 运柱 and 日柱'."""
+    return bool(set(_positions(leaf)) & CYCLE_POSITIONS) or leaf["判定目标"]["类型"] == "交互"
+
+
 # ── rule-data structure ──────────────────────────────────────────────────────
 
 
@@ -120,18 +126,13 @@ class TestCycleRuleData:
     def test_every_rule_names_a_cycle_position(self):
         # A cycle rule that never touches 运柱/大运 is a natal rule in the wrong list.
         for r in _all_cycle_rules():
-            used = {p for leaf in _leaves(r["判定逻辑"]) for p in _positions(leaf)}
-            assert used & CYCLE_POSITIONS, r["逻辑名称"]
+            assert any(_reads_cycle(leaf) for leaf in _leaves(r["判定逻辑"])), r["逻辑名称"]
 
     def test_condition_types_are_supported(self):
         for r in _all_cycle_rules():
             for leaf in _leaves(r["判定逻辑"]):
                 kind = leaf["判定目标"]["类型"]
-                allowed = (
-                    engine.CYCLE_POSITION_TYPES
-                    if set(_positions(leaf)) & CYCLE_POSITIONS
-                    else engine.NATAL_POSITION_TYPES
-                )
+                allowed = engine.CYCLE_POSITION_TYPES if _reads_cycle(leaf) else engine.NATAL_POSITION_TYPES
                 assert kind in allowed, f"{r['逻辑名称']}: {kind} on {_positions(leaf)}"
 
     def test_condition_values_are_valid(self):
@@ -183,7 +184,7 @@ class TestCycleRuleData:
             ("甲子", "甲子"), ("戊辰", "丙寅"), ("壬子", "庚子"), ("丙寅", "丁卯"),
             ("甲申", "甲申"), ("庚寅", "甲子"), ("癸丑", "甲子"),
         ] + [(d, h) for d in days for h in ("丙午", "庚申", "壬子")]
-        needs_facts = {"神煞", "交互"}
+        needs_facts = {"神煞", "计数_神煞", "交互"}
         pending = {
             r["逻辑名称"]: r for r in _all_cycle_rules()
             if not {leaf["判定目标"]["类型"] for leaf in _leaves(r["判定逻辑"])} & needs_facts
@@ -193,7 +194,7 @@ class TestCycleRuleData:
             year_led = first.get("位置", {}).get("柱") == "年柱" and first["判定目标"]["类型"] == "特定组合"
             years = first["判定目标"]["值"] if year_led else ["甲子", "丙午"]
             for year, month, (day, hour), strength, cycle in itertools.product(
-                years, months, day_hours, ("中和", "弱"), ALL_JIA_ZI
+                years, months, day_hours, ("中和", "弱", "旺"), ALL_JIA_ZI
             ):
                 ctx = engine.build_cycle_chart_context(
                     _ctx(year, month, day, hour, dm_strength=strength), cycle[0], cycle[1]
@@ -248,8 +249,10 @@ class TestCycleEngine:
 
     def test_xian_rules_are_tagged_da_yun_and_xiao_yun(self):
         for r in _all_cycle_rules():
+            if not r["来源"].startswith("卷一"):
+                continue  # 卷二 names the 太岁 itself (论太岁 / 总论岁运)
             if "流年" in r["适用周期"]:
-                pytest.fail(f"{r['逻辑名称']}: 卷一 has no 太岁 rule, so no rule may list 流年")
+                pytest.fail(f"{r['逻辑名称']}: 卷一 has no 太岁 rule, so no 卷一 rule may list 流年")
             if "依据" in r or "限" in r["断语"]:
                 assert r["适用周期"] == ["大运", "小运"], r["逻辑名称"]
 
@@ -511,3 +514,124 @@ class TestNatalRelabelParity:
             assert "偏官" not in json.dumps(raw, ensure_ascii=False), birth
             relabelled += raw != self._gods(ctx.rule_si_zhu)
         assert relabelled == len(self.CHARTS)  # every fixture exercises a relabel
+
+
+# ── 卷二 phase 2b: 论太岁 + 总论岁运 ──────────────────────────────────────────
+
+
+def _ix(kind: str, partner: str, cycle_part: str, partner_part: str, label: str = "流年", **extra) -> dict:
+    """One cycle interaction in the shape cycle_interactions emits."""
+    return {"类型": kind, "组合明细": {label: cycle_part, partner: partner_part}, "强度": "强势主流", **extra}
+
+
+class TestVolume2b:
+    """甲子 natal pillars unless stated: 日主 甲 (阳), branches 子 (癸 正印) — no 财, 官杀 or 食伤."""
+
+    def test_sui_shang_ri_gan_reads_the_year_stem(self):
+        fired = _fired(_ctx("甲子"), "庚午", "流年")
+        assert "论太岁_岁伤日干" in fired
+        assert not {n for n in fired if n.startswith("论太岁_日犯岁君")}
+
+    def test_ri_fan_sui_jun_yang_heavy_yin_light(self):
+        assert {"论太岁_日犯岁君_阳干"} <= _fired(_ctx("甲子"), "戊辰", "流年")
+        yin = _fired(_ctx("乙丑", day="乙丑"), "己巳", "流年")
+        assert "论太岁_日犯岁君_阴干" in yin and "论太岁_日犯岁君_阳干" not in yin
+
+    def test_ri_fan_you_jiu_from_natal_or_da_yun(self):
+        assert "论太岁_日犯岁君_有救" in _fired(_ctx("庚申"), "戊辰", "流年")
+        assert "论太岁_日犯岁君_有救" in _fired(_ctx("甲子"), "戊辰", "流年", companion=("庚", "申"))
+        assert "论太岁_日犯岁君_有救" not in _fired(_ctx("甲子"), "戊辰", "流年", companion=("甲", "子"))
+
+    def test_ri_fan_you_qing_needs_a_third_stem(self):
+        month_he = [_ix("天干合", "月柱", "戊", "癸")]
+        assert "论太岁_日犯岁君_有情" in _fired(_ctx("甲子"), "戊辰", "流年", interactions=month_he)
+        day_he = [_ix("天干合", "日柱", "己", "甲")]  # the 日干's own 合 is 晦气, not 有情
+        assert "论太岁_日犯岁君_有情" not in _fired(_ctx("甲子"), "己巳", "流年", interactions=day_he)
+
+    def test_ri_fan_tian_yue_de_exemption(self):
+        assert "论太岁_日犯岁君_天月德" in _fired(_ctx("甲子", month="丁卯"), "戊辰", "流年")  # 卯月 月德 甲
+        assert "论太岁_日犯岁君_天月德" not in _fired(_ctx("甲子", month="丙子"), "戊辰", "流年")  # 子月 月德 壬
+
+    def test_tian_yue_de_table_matches_natal_shen_sha(self):
+        from apps.backend.astronomer_logic.natal_shen_sha import month_earthly_branches_shens as month
+        rule = next(r for r in _all_cycle_rules() if r["逻辑名称"] == "论太岁_日犯岁君_天月德")
+        table = {
+            pair["判定逻辑"][0]["判定目标"]["值"][0]: set(pair["判定逻辑"][1]["判定目标"]["值"])
+            for pair in rule["判定逻辑"][1]["判定逻辑"]
+        }
+        stems = set("甲乙丙丁戊己庚辛壬癸")
+        expected = {z: {month["月德贵人"][z]} | ({month["天德贵人"][z]} & stems) for z in "子丑寅卯辰巳午未申酉戌亥"}
+        assert table == expected
+
+    def test_tai_xiong_needs_a_strong_unchecked_day_master(self):
+        assert "论太岁_日犯岁君_太凶" in _fired(_ctx("甲子", dm_strength="旺"), "戊辰", "流年")
+        assert "论太岁_日犯岁君_太凶" not in _fired(_ctx("甲子"), "戊辰", "流年")
+        assert "论太岁_日犯岁君_太凶" not in _fired(_ctx("庚申", dm_strength="旺"), "戊辰", "流年")  # 官杀 制
+
+    def test_xiong_sha_escalation_needs_two_stars_and_tai_xiong(self):
+        two = [{"名称": "白虎", "来源": "年支"}, {"名称": "吊客", "来源": "年支"}]
+        strong = _ctx("甲子", dm_strength="旺")
+        assert "论太岁_日犯岁君_凶煞并临" in _fired(strong, "戊辰", "流年", shen_sha=two)
+        assert "论太岁_日犯岁君_凶煞并临" not in _fired(strong, "戊辰", "流年", shen_sha=two[:1])
+        assert "论太岁_日犯岁君_凶煞并临" not in _fired(_ctx("甲子"), "戊辰", "流年", shen_sha=two)
+
+    def test_zhen_tai_sui_and_its_clash(self):
+        fu_yin = _ix("伏吟", "年柱", "甲子", "甲子")
+        assert "论太岁_真太岁" in _fired(_ctx("甲子"), "甲子", "流年", interactions=[fu_yin])
+        clash = _ix("六冲", "日柱", "子", "午")
+        fired = _fired(_ctx("甲子", day="甲午"), "甲子", "流年", interactions=[fu_yin, clash])
+        assert {"论太岁_真太岁", "论太岁_真太岁_刑冲战克"} <= fired
+
+    def test_zheng_tai_sui_is_fan_yin_with_the_day(self):
+        fired = _fired(_ctx("甲子", day="癸巳"), "丁亥", "流年", interactions=[_ix("反吟", "日柱", "丁亥", "癸巳")])
+        assert {"论太岁_征太岁", "总论岁运_返吟"} <= fired
+
+    @pytest.mark.parametrize("year,stars,expected", [
+        ("庚申", [], "凶"),                                       # 庚 七杀
+        ("丁卯", [{"名称": "羊刃", "来源": "日干"}], "凶"),       # 卯 = 甲's 羊刃
+        ("癸卯", [{"名称": "羊刃", "来源": "日干"}], "凶"),       # 癸 正印 but 羊刃 — 独羊刃七煞为凶
+        ("己巳", [], "吉"),                                       # 己 正财
+        ("丙寅", [], None),                                       # 丙 食神 — no verdict
+    ])
+    def test_sui_yun_bing_lin_ten_god_split(self, year, stars, expected):
+        fu_yin = _ix("伏吟", "大运", year, year)
+        fired = _fired(_ctx("甲子"), year, "流年", companion=(year[0], year[1]), shen_sha=stars, interactions=[fu_yin])
+        xiong, ji = "论太岁_岁运并临_羊刃七煞" in fired, "论太岁_岁运并临_财官印" in fired
+        assert (xiong, ji) == (expected == "凶", expected == "吉")
+
+    def test_tai_sui_ke_shi_reads_the_hour(self):
+        fired = _fired(_ctx("甲子"), "庚午", "流年", interactions=[_ix("天干克", "时柱", "庚", "甲", 主动方="流年")])
+        assert "论太岁_太岁克时" in fired
+
+    @pytest.mark.parametrize("label", ["大运", "流年"])
+    def test_chong_yue_and_ya_ri_apply_to_both_periods(self, label):
+        chong = _ix("六冲", "月柱", "午", "子", label=label)
+        fu = _ix("伏吟", "日柱", "甲子", "甲子", label=label)
+        fired = _fired(_ctx("甲子"), "甲午", label, interactions=[chong, fu])
+        assert {"总论岁运_岁运冲月", "总论岁运_伏吟"} <= fired
+
+    def test_yun_gan_cai_needs_no_wealth_in_the_branches(self):
+        assert "总论岁运_支无财运干是财" in _fired(_ctx("甲子"), "戊辰", "大运")
+        assert "总论岁运_支无财运干是财" not in _fired(_ctx("甲子", hour="甲戌"), "戊辰", "大运")  # 戌藏戊
+
+    def test_yun_gan_sha_and_guan(self):
+        assert "总论岁运_支无煞运干是煞" in _fired(_ctx("甲子"), "庚午", "流年")
+        assert "总论岁运_原无官星运干官星" in _fired(_ctx("甲子"), "辛未", "大运")
+        assert "总论岁运_原无官星运干官星" not in _fired(_ctx("辛酉"), "辛未", "大运")  # 年干 正官
+
+    def test_hui_qi_direction(self):
+        yang = _fired(_ctx("甲子"), "己巳", "流年", interactions=[_ix("天干合", "日柱", "己", "甲")])
+        assert "总论岁运_晦气_日干合岁" in yang and "总论岁运_晦气_岁合日干" not in yang
+        yin = _fired(_ctx("甲子", day="己巳"), "甲子", "流年", interactions=[_ix("天干合", "日柱", "甲", "己")])
+        assert "总论岁运_晦气_岁合日干" in yin and "总论岁运_晦气_日干合岁" not in yin
+        hour = _fired(_ctx("甲子"), "己巳", "流年", interactions=[_ix("天干合", "时柱", "己", "甲")])
+        assert "总论岁运_晦气_时干合岁" in hour
+
+    def test_yun_ke_sui_and_its_mitigation(self):
+        ke = [_ix("天干克", "大运", "甲", "庚", 主动方="大运")]
+        assert "总论岁运_运克岁" in _fired(_ctx("甲子"), "甲子", "流年", companion=("庚", "申"), interactions=ke)
+        horse = [{"名称": "驿马", "来源": "年支"}]
+        fired = _fired(_ctx("甲子"), "甲子", "流年", companion=("庚", "申"), shen_sha=horse, interactions=ke)
+        assert {"总论岁运_运克岁", "总论岁运_运克岁_贵人禄马解"} <= fired  # 稍吉 reduces, never replaces
+        sui_ke_yun = [_ix("天干克", "大运", "庚", "甲", 主动方="流年")]
+        assert "总论岁运_运克岁" not in _fired(_ctx("甲子"), "庚午", "流年", companion=("甲", "子"), interactions=sui_ke_yun)

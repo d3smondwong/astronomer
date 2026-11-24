@@ -180,6 +180,8 @@ Each <condition> is a leaf or a nested block:
     { "类型": "交互", "值": [str], "形态"?: str }
     # 值: interaction types, e.g. ["天干合"]
     # 形态 (optional): filter by sub-form, e.g. "化气格", "合绊 - 妒合"
+    # 主动方 (optional): the acting pillar of a directional item (天干克), e.g. "大运" —
+    #   lets a cycle rule tell 运克岁 from 岁克运. Items without a 主动方 never match it.
 
   "交互_无"
     { "类型": "交互_无", "值": [str] }
@@ -1163,12 +1165,15 @@ def eval_interaction(ctx: ChartContext, pos: dict, target: dict) -> tuple[bool, 
     strength_explicit = "强度" in target
     wanted_strength: set = set(target["强度"]) if strength_explicit else set(_DEFAULT_INTERACTION_STRENGTH)
     wanted_element: str | None = target.get("元素")  # optional filter, e.g. "金" for a specific bureau
+    wanted_actor: str | None = target.get("主动方")  # optional: the acting pillar of a directional item
     pillar_spec = pos.get("柱")
 
     def _item_matches(item: dict) -> bool:
         if item.get("类型") not in wanted:
             return False
         if wanted_form and item.get("形态") != wanted_form:
+            return False
+        if wanted_actor and item.get("主动方") != wanted_actor:
             return False
         if item.get("强度") not in wanted_strength:
             return False
@@ -1192,6 +1197,8 @@ def eval_interaction(ctx: ChartContext, pos: dict, target: dict) -> tuple[bool, 
     for item in ctx.interactions:
         if _item_matches(item) and _interaction_matches_pillars(item, pillars_to_check):
             ev = {"交互类型": item.get("类型"), "涉及柱": pillars_to_check}
+            if wanted_actor:
+                ev["主动方"] = wanted_actor
             if wanted_form:
                 ev["形态"] = item.get("形态")
             if strength_explicit:
@@ -1343,8 +1350,10 @@ def eval_ten_god_count_diff(ctx: ChartContext, pos: dict, target: dict) -> tuple
 
 
 def eval_shen_sha_count(
-    ctx: ChartContext, _pos: dict, target: dict
+    ctx: ChartContext, pos: dict, target: dict
 ) -> tuple[bool, dict]:
+    """计数_神煞: how many listed stars sit on the scoped pillars (位置.柱; default 全局 = the
+    four natal pillars). A cycle rule scopes it to 运柱 to count the transiting pillar's stars."""
     wanted = set(target.get("神煞", []))
     if not wanted:
         return False, {}
@@ -1353,7 +1362,7 @@ def eval_shen_sha_count(
     comparator: str = target.get("比较", "≥")
     count = sum(
         1
-        for p in _ALL_PILLARS
+        for p in _resolve_pillars(pos.get("柱"))
         for star in ctx.shen_sha.get(p, [])
         if star.get("名称") in wanted
         and (not shen_sha_sources or star.get("来源") in shen_sha_sources)
