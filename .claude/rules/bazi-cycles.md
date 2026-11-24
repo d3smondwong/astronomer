@@ -78,7 +78,8 @@ the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no e
   e.g. 「限运同论」), `标注` (severity) and `编码说明` (how the rule reads an ambiguous or departing
   passage — emitted with the match so the interpretive choice is visible) are optional.
 - **What a rule can see.** Natal pillars come from `NatalContext.rule_si_zhu` — the natal pipeline's
-  七杀→偏官 / 食神→伤官 relabels applied, so natal 煞 conditions list `["七杀", "偏官"]`
+  七杀→偏官 / 食神→伤官 relabels applied, so a natal 煞 condition picks its label by what the text
+  describes (see `bazi-natal.md`: star → both, uncontrolled → `七杀`, controlled → `偏官`)
   (`natal_si_zhu` stays raw for 制化). The 运柱 carries 天干/地支 + 五行, **RAW** ten gods (天干 +
   藏干 tiers — no adjacency, so never relabelled), `十二长生 {日干, 自坐}` and 纳音; its computed
   神煞 and interactions are passed in (`组合明细` key renamed to `运柱`, natal strength floor

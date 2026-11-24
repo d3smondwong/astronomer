@@ -261,9 +261,9 @@ def apply_qi_sha_transformation(
     si_zhu[pillar]["七杀化偏官"] = {"天干": "食神克七杀", "本气": "印化杀"}.
 
     Note for rule authors (san_ming_tong_hui_v*.py): a tamed 七杀 is stored as
-    the literal ten-god string "偏官", not "七杀". Any 十神 count/match condition
-    meant to catch 正官/七杀 must also list "偏官" or it will undercount charts
-    with tamed killings.
+    the literal ten-god string "偏官", not "七杀". Pick the label by what the
+    rule's text describes: the 煞 as a star → ["七杀", "偏官"]; an uncontrolled
+    煞 → "七杀" only; a controlled 煞 → "偏官". See .claude/rules/bazi-natal.md.
     """
     occurrences = _ten_god_occurrences(ten_gods, "七杀")
     if not occurrences:

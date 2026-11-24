@@ -14,7 +14,16 @@ uncertain, ask the user rather than guess.
 
 Use the `lunar-python` library if a mapping or function is available.
 
-**七杀 → 偏官 transformation:** `apply_qi_sha_transformation()` in `apps/backend/astronomer_logic/ten_gods.py` relabels individual 七杀 occurrences to the distinct stored ten-god string `"偏官"` when a classical taming condition is met (食神制杀, 印化杀, etc.). Different 七杀 in the same chart can end up tamed or not independently. Any rule condition (`san_ming_tong_hui_v*.py`) that counts or matches on `["正官", "七杀"]` must also include `"偏官"`, or it will silently undercount charts with tamed killings.
+**七杀 → 偏官 transformation:** `apply_qi_sha_transformation()` in `apps/backend/astronomer_logic/ten_gods.py` relabels individual 七杀 occurrences to the distinct stored ten-god string `"偏官"` when a classical taming condition is met (食神制杀, 印化杀, etc.). Different 七杀 in the same chart can end up tamed or not independently. **`七杀` = an untamed 煞, `偏官` = a tamed one** — keep the relabel (152 rules, mostly 卷五, match `偏官` alone and depend on it).
+
+**Which label a rule matches is decided by what its 断语's own condition describes — not by the star in the abstract.** Defaults:
+- **The 煞 as a star** (带煞, 逢煞, 七煞性, 财生煞, a 煞 count, the 官杀 set) → `["七杀", "偏官"]`.
+- **An uncontrolled 煞** (无制, 攻身, 鬼, 弃命从煞, 官煞混杂无去留) → `["七杀"]` only. E.g. `勾绞_有鬼`: 鬼 = 「煞若克身」, and its pair `勾绞_无鬼` reads 「无煞攻身」.
+- **A controlled 煞** (有制, 制伏, 化, 合) → `["偏官"]`, or both labels when the rule tests the 制 itself (`食神_制煞`: a 食神-tamed 煞 is relabelled, so 七杀 alone would miss the very case it describes).
+- **格-purity absence lists** — check whether the text grants a 去留 exception. **官 purity has one** (「有物去煞留官者，即以正官论」, 「化煞为官方是吉」) → keep `七杀` only (正气官星格, 卷四's 正官-month 「忌七煞伤官」). **日贵 has none** (「遇财官印食则吉，值煞刃冲刑则凶」) → list both.
+- **Do not let two rules give opposite verdicts on one 煞:** `食神_见官煞` (「官煞显露，食神格破」) stays `七杀` only, because a 食神-tamed 煞 is `食神_制煞`'s subject.
+
+Known approximation: the relabel triggers are not identical to the text's 去 — 食神克七杀 and 阳刃合杀 are 去, but 身旺制煞 is closer to 身强敌煞. When adding 七杀/偏官 rules, compare fires with and without the relabel — a 七杀-only rule that loses most of its fires is usually mislabelled.
 
 **格局 decides where 喜忌 come from — 强弱 does NOT:** `astronomer_logic/ge_ju.py` classifies every chart as 正格 / 从财格 / 从杀格 / 从儿格 / 从势格 / 专旺格 / 化气格 *before* `yong_shen.py` computes 喜忌. For 正格 → 调候 + 扶抑. For everything else the **structure** dictates 喜忌 and **调候 is not applied**: a surrendered day master follows its dominant force, so 印比 — which 扶抑 would call 喜 for a weak DM — are in fact **忌** (they 破格). Same 强弱, inverted verdict. Never infer 从格 from 强弱: **极弱 does NOT imply 从格** (a weak-but-rooted chart wants support).
 
