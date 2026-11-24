@@ -82,11 +82,15 @@ the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no e
   describes (see `bazi-natal.md`: star → both, uncontrolled → `七杀`, controlled → `偏官`)
   (`natal_si_zhu` stays raw for 制化). The 运柱 carries 天干/地支 + 五行, **RAW** ten gods (天干 +
   藏干 tiers — no adjacency, so never relabelled), `十二长生 {日干, 自坐}` and 纳音; its computed
-  神煞 and interactions are passed in (`组合明细` key renamed to `运柱`, natal strength floor
-  applied). `CYCLE_POSITION_TYPES` / `NATAL_POSITION_TYPES` whitelist what each side may use —
-  widening either is a deliberate engine change.
+  神煞 and interactions are passed in (`组合明细` key and a directional item's `主动方` renamed to
+  `运柱`, natal strength floor applied). `CYCLE_POSITION_TYPES` / `NATAL_POSITION_TYPES` whitelist
+  what each side may use — widening either is a deliberate engine change.
+- **A `交互` condition always reads the transiting pillar.** The context holds only the 运柱's own
+  interactions, so `交互 @日柱` means "between the 运柱 and 日柱" and `交互 @大运` (流年 rules)
+  "between the year and its decade". `主动方` picks the actor of a directional item (`天干克`:
+  `"大运"` = 运克岁, `"运柱"` = 岁克运). `计数_神煞 @运柱` counts the 运柱's own stars.
 - **Guard tests** (`tests/test_cycle_interpretation.py`): every cycle list is wired into
-  `CYCLE_ANALYZERS`; every rule names a cycle position; natal lists gain no cycle positions
+  `CYCLE_ANALYZERS`; every rule reads a cycle position (a `交互` counts); natal lists gain no cycle positions
   (`PENDING_MIGRATION` holds the 4 legacy rules in 卷五/卷六 and may only shrink); every rule can fire.
 
 **Encoding decisions (confirmed by the user):**
@@ -136,6 +140,38 @@ the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no e
   check the branch they describe; the 巳 and 酉 rules require a 月支 that contradicts their own
   subject; the 未 rule uses 日支.
 
+**卷二 phase 2b decisions — 论太岁 + 总论岁运 (confirmed 2026-11-24):** one list,
+`volume_2_tai_sui_cycle_predictions`, output group `论太岁` (each rule's `来源` names its section).
+- **岁用天元，运用地支.** A 流年 rule reads the 流年 **stem's** ten god (the 2a branch-本气 rule is
+  the 运 half). 总论岁运's 运干 rules (支无财/支无煞 + 运干, 原无官星 + 运干官星) are the text's own
+  exception: there the 运's stem decides, for 大运 and 流年 alike.
+- **日犯岁君 = the 流年 stem is the 日主's 财; 岁伤日干 = it is the 日主's 官杀.** 阳干 日主 重, 阴干 轻.
+  Mitigations: 有救 (natal or 大运 官杀 controls the 日干 — 「制伏纯粹」 not graded); 有情 (a 年/月/时
+  stem or the 大运 stem 合s the 流年 stem — the text's own example's 癸 is 甲's 正印, so 「壬以癸妹配戊」 is
+  an analogy, not a constraint; the 日干's own 合 is 晦气); 天月德 = the 日干 **itself** is the birth
+  month's 天德 or 月德 stem (天德-as-branch months give only 月德; table pinned to `natal_shen_sha`).
+- **太凶** = 日犯岁君 + 日主 旺/极旺 + no natal 官杀 + no natal 食伤 (「无金局制木、火局焚木」 read as
+  presence). **凶煞并临** rides on 太凶 only, with ≥2 listed stars on the 流年 — a **calibration**, not a
+  reading: 「诸」 sets no floor, and ≥1 fired on 68% of 日犯岁君 years. 咸池 is 桃花's classical name.
+- **岁运 vs 日 per period.** 返吟/伏吟/冲月 fire in each period's own run; a combined 岁运-vs-日 返吟 is
+  only possible when 大运 == 流年 (天克地冲 pairs are one-to-one).
+- **岁运并临 = full-pillar 伏吟** (干支皆同); 吉 needs a 财官印 stem and NOT 羊刃/本气七杀 (「独」).
+- **运克岁** = `天干克` with `主动方: 大运`; **贵人禄马解** = 天乙/禄神/驿马 on the 流年 itself, emitted
+  beside 运克岁 as a reduction (稍吉), never instead of it.
+- **太岁克时** = stem 克 or 天克地冲 with the 时柱, either way; branch-only 克 is not detectable. 断语
+  scoped to 子女 (时柱 = 子位).
+- **晦气**: 日干 阳 = 日干合太岁 (主动, 重); 日干 阴 = 太岁合日干 (被动, 轻); 时干合 also 晦气. The 阴阳
+  test is the computation, the initiative is the classical reason.
+- **原无官星** reads 「当生天元，或支中原无官星」 as **both** stems and branches lacking 正官.
+- **Deferred, each with what it waits for:** mitigations of 日犯岁君 — 「太岁是用神则无咎」 (喜忌 not
+  visible to cycle rules), 「天冲地击，柱中原有，流年再遇，亦无大咎」 (natal interactions not visible),
+  「凡行好运…为福轻；行不好运及脱财官运…为祸重」 (大运 运势 not visible; 脱财官运 ambiguous);
+  「八字有救无虞」 for 运克岁 (a natal-to-大运 relation, 救 undefined); 太岁入宅 「岁在日前五辰而遇合」 and
+  「岁位近者灾重，远者灾轻」 (branch offset — the 日干近/时干远 reading is rejected, it contradicts the
+  text's only example); 「天元有正官」 and 「偏官制伏太过」 in the 官星 clause; 凶煞 not computed for
+  cycles (宅墓, 死符, 官符, 暴败, 天厄, 大耗). **已发/未发** (「大要知已发未发」) governs the whole 总论岁运
+  severity scale and is not encodable (social standing), like 日年相并.
+
 ## Deferred, by design
 - **Dropped on user decision:** 流月 / 流日 — none of the classical texts in the library (三命通会,
   渊海子平, 子平真诠, 滴天髓, 穷通宝鉴) reads cycles below the year; only modern practice does. Do
@@ -143,6 +179,6 @@ the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no e
   共拱/拱会 virtual arches (need positional adjacency).
 - **Cycle 神煞 解读:** natal interpretation texts are pillar-positional prose; the LLM layer
   interprets cycle stars instead.
-- **Remaining chapters:** 卷一 and 卷二 phase 2a (论大运 + the 论地支 / 十干 大运 clauses) are
-  encoded. Next: 卷二 2b (论太岁 + 总论岁运, with the 岁运并临 reconciliation), 2c (论小运), then
-  the other volumes' 行运-clause natal rules and the 4 `PENDING_MIGRATION` rules in 卷五/卷六.
+- **Remaining chapters:** 卷一 and 卷二 phases 2a (论大运 + the 论地支 / 十干 大运 clauses) and 2b
+  (论太岁 + 总论岁运) are encoded. Next: 2c (论小运), then the other volumes' 行运-clause natal rules
+  and the 4 `PENDING_MIGRATION` rules in 卷五/卷六.

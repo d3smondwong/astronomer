@@ -90,7 +90,8 @@ class CyclesInput(BirthInput):
       "五行动态": { "五行", "对日主", "引动" },
       // 五行[元素] = { 状态, 本命, 运基 (流年 only), 变化, 十神, 喜忌, 角色, 解读 }
       "古籍解读": { "纳音格局": [ { "逻辑名称", "来源", "结论", "证据", "现代解读"?, "依据"?, "标注"?, "编码说明"? } ], ... },
-      // only groups with a match appear; {} = rules ran, none fired. See rules/bazi-cycles.md.
+      // only groups with a match appear; {} = rules ran, none fired. Groups: 释六十甲子, 纳音格局,
+      //   论大运, 论干支, 论太岁 (论太岁 + 总论岁运 — mostly 流年 rules). See rules/bazi-cycles.md.
       "流年": [ { "年份", "起始", "结束", "交运年", "虚岁", "周岁", "干支", "生肖",
                  "运柱", "作用", "神煞",
                  "运势": { ..., "警示": ["岁运并临（重）：…"] },

@@ -68,6 +68,7 @@ from apps.backend.data.san_ming_tong_hui_v1 import (
 from apps.backend.data.san_ming_tong_hui_v2 import (
     volume_2_da_yun_cycle_predictions,
     volume_2_gan_zhi_cycle_predictions,
+    volume_2_tai_sui_cycle_predictions,
 )
 
 CYCLE_PILLAR = "运柱"
@@ -236,6 +237,7 @@ CYCLE_ANALYZERS: list[tuple[str, list[dict]]] = [
     ("纳音格局", volume_1_nayin_ge_ju_cycle_predictions),
     ("论大运", volume_2_da_yun_cycle_predictions),
     ("论干支", volume_2_gan_zhi_cycle_predictions),
+    ("论太岁", volume_2_tai_sui_cycle_predictions),  # 论太岁 + 总论岁运 (each rule names its 来源)
 ]
 
 
