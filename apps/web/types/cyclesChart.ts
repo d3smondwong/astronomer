@@ -443,6 +443,11 @@ export interface CycleClassicalMatch {
   依据?: string;
   /** Severity metadata, e.g. "条件触发·非定论" on verdicts such as 夭 (kept verbatim). */
   标注?: string;
+  /**
+   * How the rule reads an ambiguous or departing passage, e.g. which ten gods 「制」煞 covers.
+   * Shown so a reader can see the interpretive choice behind the match.
+   */
+  编码说明?: string;
 }
 
 /**

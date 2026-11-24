@@ -34,22 +34,43 @@ PENDING_MIGRATION = {
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 
-def _pillar(gz: str) -> dict:
-    return {"天干": {"天干": gz[0]}, "地支": {"地支": gz[1]}, "纳音": LunarUtil.NAYIN[gz]}
+def _pillar(gz: str, day_stem: str) -> dict:
+    """A natal pillar in the 四柱实体 shape, ten gods relative to day_stem (raw — no relabel)."""
+    stem, branch = gz[0], gz[1]
+    hidden = {
+        tier: {"天干": h, "十神": LunarUtil.SHI_SHEN.get(day_stem + h, "无"), "五行": LunarUtil.WU_XING_GAN[h]}
+        for tier, h in zip(("本气", "中气", "余气"), LunarUtil.ZHI_HIDE_GAN.get(branch, []))
+    }
+    return {
+        "天干": {"天干": stem, "五行": LunarUtil.WU_XING_GAN[stem], "十神": LunarUtil.SHI_SHEN.get(day_stem + stem, "日主")},
+        "地支": {"地支": branch, "五行": LunarUtil.WU_XING_ZHI[branch]},
+        "藏干": hidden,
+        "纳音": LunarUtil.NAYIN[gz],
+    }
 
 
-def _ctx(year: str, month: str = "甲子", day: str = "甲子", hour: str = "甲子", gender: int = 1):
+def _ctx(year: str, month: str = "甲子", day: str = "甲子", hour: str = "甲子",
+         gender: int = 1, dm_strength: str = "中和"):
     """A NatalContext stand-in carrying only what build_cycle_chart_context reads."""
+    d = day[0]
+    si_zhu = {"年柱": _pillar(year, d), "月柱": _pillar(month, d), "日柱": _pillar(day, d), "时柱": _pillar(hour, d)}
+    si_zhu["日柱"]["天干"]["十神"] = "日主"
     return SimpleNamespace(
-        natal_si_zhu={"年柱": _pillar(year), "月柱": _pillar(month), "日柱": _pillar(day), "时柱": _pillar(hour)},
+        natal_si_zhu=si_zhu,
+        rule_si_zhu=si_zhu,
+        day_stem=d,
+        effective_day_stem=d,
+        dm_strength=dm_strength,
         gender=gender,
         natal_five_elements={},
         lunar_birthday=None,
     )
 
 
-def _fired(ctx, cycle_gz: str, label: str = "大运", companion=None) -> set[str]:
-    out = engine.get_cycle_interpretations(ctx, cycle_gz[0], cycle_gz[1], label, companion)
+def _fired(ctx, cycle_gz: str, label: str = "大运", companion=None, shen_sha=None, interactions=None) -> set[str]:
+    out = engine.get_cycle_interpretations(
+        ctx, cycle_gz[0], cycle_gz[1], label, companion, shen_sha=shen_sha, interactions=interactions
+    )
     return {m["逻辑名称"] for matches in out.values() for m in matches}
 
 
@@ -347,3 +368,42 @@ class TestOrchestratorWiring:
         expected = [d["干支"] for d in data["大运"][1:] if d["干支"] in ("戊戌", "己亥")]
         assert expected, "fixture chart must run a 戊戌/己亥 decade"
         assert hits == expected
+
+
+class TestNatalRelabelParity:
+    """rule_si_zhu repeats the natal pipeline's 七杀→偏官 / 食神→伤官 passes in a second place
+    (cycles_orchestrator._build_context). If either copy changes, the cycle rules would read
+    natal ten gods differently from /natal — this pins them together. The charts are chosen so
+    both relabels actually occur (four with a 偏官, three with a 食神→伤官)."""
+
+    CHARTS = [
+        (datetime(1965, 3, 7, 23, 27), 0), (datetime(1973, 8, 8, 13, 55), 1),
+        (datetime(1989, 12, 2, 8, 9), 0), (datetime(1988, 8, 20, 11, 48), 0),
+        (datetime(1956, 3, 20, 20, 24), 0), (datetime(1984, 1, 28, 12, 5), 1),
+        (datetime(2005, 5, 12, 17, 12), 1),
+    ]
+
+    @staticmethod
+    def _gods(si_zhu: dict) -> dict:
+        return {
+            p: (si_zhu[p]["天干"]["十神"], tuple(t["十神"] for t in si_zhu[p]["藏干"].values()))
+            for p in ("年柱", "月柱", "日柱", "时柱")
+        }
+
+    def test_rule_view_matches_natal_and_raw_view_stays_raw(self):
+        from apps.backend.orchestrator.astronomer_data_orchestrator import (
+            calculate_natal_chart,
+            get_lunar_birthday,
+        )
+        from apps.backend.orchestrator.cycles_orchestrator import _build_context
+
+        relabelled = 0
+        for birth, gender in self.CHARTS:
+            natal, _ = calculate_natal_chart(birth, 1.35, 103.8, gender, True)
+            lunar = get_lunar_birthday(birth, 1.35, 103.8, True)
+            ctx = _build_context(lunar.getEightChar(), gender, lunar)
+            assert self._gods(ctx.rule_si_zhu) == self._gods(natal["四柱实体"]), birth
+            raw = self._gods(ctx.natal_si_zhu)
+            assert "偏官" not in json.dumps(raw, ensure_ascii=False), birth
+            relabelled += raw != self._gods(ctx.rule_si_zhu)
+        assert relabelled == len(self.CHARTS)  # every fixture exercises a relabel

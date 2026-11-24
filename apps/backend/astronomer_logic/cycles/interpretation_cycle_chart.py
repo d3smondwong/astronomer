@@ -26,19 +26,25 @@ CONDITION_EVALUATORS. Nothing is redefined here. What this module adds:
     标注     (optional) — severity metadata, e.g. "条件触发·非定论" on verdicts such as
                           夭, which are kept verbatim and never softened.
 
-Supported condition types
--------------------------
-The transiting pillar entry carries 天干 / 地支 / 纳音 only (no ten gods, 藏干, 神煞),
-so only condition types that read those fields may target 运柱 / 大运 — see
-CYCLE_POSITION_TYPES. Natal-side conditions (全局, 年柱 …) may use the natal
-evaluators that read 天干 / 地支 / 纳音 / counts; anything needing natal ten gods is
-deferred: this context is built from NatalContext, whose ten gods are deliberately RAW
-(no 七杀→偏官 relabel), so ten-god matching on the natal side would break the
-「natal-side matching requires 偏官」 rule. tests/test_cycle_interpretation.py enforces
-both whitelists.
+What the context carries
+------------------------
+* Natal pillars from NatalContext.rule_si_zhu — the natal pipeline's 七杀→偏官 /
+  食神→伤官 relabels applied, so natal-side ten-god matching follows bazi-natal.md
+  (natal 煞 rules list ["七杀", "偏官"]). natal_si_zhu stays raw for 制化.
+* The 运柱 (and a 流年's 大运): 天干 / 地支 with 五行, RAW ten gods (天干 + 藏干 tiers —
+  a transiting pillar has no adjacency, so it is never relabelled), 十二长生
+  {日干, 自坐} and 纳音.
+* The 运柱's 神煞 (ctx.shen_sha["运柱"]) and its interactions (ctx.interactions), passed
+  in from the already-computed cycle layers, with the pillar's own label in 组合明细
+  renamed to 运柱 so the natal 交互 evaluator can address it.
+* 日主强弱 from NatalContext.dm_strength.
+
+CYCLE_POSITION_TYPES / NATAL_POSITION_TYPES whitelist the condition types a rule may
+use on each side; tests/test_cycle_interpretation.py enforces them.
 
 Public gateway: get_cycle_interpretations(ctx, cycle_stem, cycle_branch, cycle_label,
-                                          companion=None) -> dict
+                                          companion=None, shen_sha=None,
+                                          interactions=None) -> dict
 """
 
 from __future__ import annotations
@@ -52,6 +58,7 @@ from apps.backend.astronomer_logic.interaction_natal_chart import (
     evaluate_rule,
 )
 from apps.backend.astronomer_logic.natal_interactions import branch_elements
+from apps.backend.astronomer_logic.twelve_life_stages import _self_seated_stage
 from apps.backend.data.san_ming_tong_hui_v1 import (
     volume_1_60_jia_zi_cycle_predictions,
     volume_1_nayin_ge_ju_cycle_predictions,
@@ -63,23 +70,74 @@ COMPANION_PILLAR = "大运"
 # valid period for rules that name the 太岁; none in 卷一 do.
 CYCLE_PERIODS = frozenset({"大运", "流年", "小运"})
 
-# Condition types whose evaluator reads only 天干 / 地支 / 纳音 from the named pillar,
-# and therefore works on the slim transiting-pillar entry built below.
-CYCLE_POSITION_TYPES = frozenset({"特定组合", "天干值", "地支值", "纳音五行"})
+# Condition types that may target the 运柱 / 大运 — each reads only fields the transiting
+# entry carries (天干/地支/五行/十神/藏干/十二长生/纳音), or its 神煞 / interactions.
+CYCLE_POSITION_TYPES = frozenset({
+    "特定组合", "天干值", "地支值", "纳音五行", "五行", "十神", "十二长生", "神煞", "交互",
+})
 
-# Natal-side condition types usable from a cycle rule: they read natal 天干 / 地支 / 纳音
-# (or counts over them), which NatalContext carries faithfully.
-NATAL_POSITION_TYPES = frozenset({"特定组合", "天干值", "地支值", "纳音五行", "计数_纳音五行"})
+# Natal-side condition types usable from a cycle rule. Ten gods read rule_si_zhu (偏官-aware).
+NATAL_POSITION_TYPES = frozenset({
+    "特定组合", "天干值", "地支值", "纳音五行", "计数_纳音五行", "五行", "计数_五行",
+    "十神", "十神_无", "日主强弱",
+})
+
+# Natal strength floor for interactions, as the natal engine applies (轻微/极弱 excluded).
+_MATERIAL_STRENGTH = frozenset({"强势主流", "显著影响", "中等衰减"})
 
 
-def _transiting_pillar(stem: str, branch: str) -> dict:
-    """A cycle pillar in the natal 四柱实体 shape, limited to what the whitelisted
-    evaluators read (天干.天干 / 地支.地支 / 纳音)."""
+_HIDE_TIERS = ("本气", "中气", "余气")
+
+
+def _transiting_pillar(stem: str, branch: str, ctx: NatalContext) -> dict:
+    """A cycle pillar in the natal 四柱实体 shape.
+
+    Ten gods are RAW (LunarUtil.SHI_SHEN against the effective day stem, as
+    build_cycle_pillar does): the 七杀→偏官 / 食神→伤官 relabels are adjacency-based and a
+    transiting pillar has no adjacency. 十二长生.日干 uses the RAW day stem, matching
+    build_cycle_pillar.
+    """
+    day = ctx.effective_day_stem
+    hidden = {
+        tier: {
+            "天干": h,
+            "十神": LunarUtil.SHI_SHEN.get(day + h, "无"),
+            "五行": get_stem_element(h),
+        }
+        for tier, h in zip(_HIDE_TIERS, LunarUtil.ZHI_HIDE_GAN.get(branch, []))
+    }
     return {
-        "天干": {"天干": stem, "五行": get_stem_element(stem)},
+        "天干": {
+            "天干": stem,
+            "五行": get_stem_element(stem),
+            "十神": LunarUtil.SHI_SHEN.get(day + stem, "无"),
+        },
         "地支": {"地支": branch, "五行": branch_elements.get(branch, "")},
+        "藏干": hidden,
+        "十二长生": {
+            "日干": _self_seated_stage(ctx.day_stem, branch),
+            "自坐": _self_seated_stage(stem, branch),
+        },
         "纳音": LunarUtil.NAYIN.get(stem + branch, ""),
     }
+
+
+def _as_rule_interactions(interactions: list[dict], cycle_label: str) -> list[dict]:
+    """The pillar's own 柱位动态, re-keyed for the natal 交互 evaluator.
+
+    The cycle engine keys the analysed pillar by its period (大运/流年/小运); rules address
+    it as 运柱. A 流年's companion keeps its 大运 key, which is also its position name here.
+    """
+    out = []
+    for item in interactions:
+        if item.get("强度") not in _MATERIAL_STRENGTH:
+            continue
+        combo = {
+            (CYCLE_PILLAR if k == cycle_label else k): v
+            for k, v in item.get("组合明细", {}).items()
+        }
+        out.append({**item, "组合明细": combo})
+    return out
 
 
 def build_cycle_chart_context(
@@ -87,26 +145,34 @@ def build_cycle_chart_context(
     cycle_stem: str,
     cycle_branch: str,
     companion: tuple[str, str] | None = None,
+    shen_sha: list[dict] | None = None,
+    interactions: list[dict] | None = None,
+    cycle_label: str = "大运",
 ) -> ChartContext:
     """Natal pillars + 运柱 (+ 大运 for a 流年) in one ChartContext.
 
     Args:
-        ctx:          the request's NatalContext.
+        ctx:          the request's NatalContext (needs rule_si_zhu).
         cycle_stem/cycle_branch: the pillar being analysed.
         companion:    (stem, branch) of the enclosing 大运 when the pillar is a 流年;
-                      None for a 大运 (a decade has no enclosing pillar).
+                      None for a 大运 or 小运.
+        shen_sha:     the pillar's computed 神煞 ([{名称, 来源}, …]), if any.
+        interactions: the pillar's computed 柱位动态, if any.
+        cycle_label:  the pillar's period — its 组合明细 key is renamed to 运柱.
     """
-    pillars = dict(ctx.natal_si_zhu)
-    pillars[CYCLE_PILLAR] = _transiting_pillar(cycle_stem, cycle_branch)
+    if ctx.rule_si_zhu is None:
+        raise ValueError("NatalContext.rule_si_zhu is required for classical cycle rules")
+    pillars = dict(ctx.rule_si_zhu)
+    pillars[CYCLE_PILLAR] = _transiting_pillar(cycle_stem, cycle_branch, ctx)
     if companion is not None:
-        pillars[COMPANION_PILLAR] = _transiting_pillar(*companion)
+        pillars[COMPANION_PILLAR] = _transiting_pillar(*companion, ctx)
     return ChartContext(
         gender="男" if ctx.gender == 1 else "女",
         pillars=pillars,
-        shen_sha={},
-        interactions=[],
+        shen_sha={CYCLE_PILLAR: list(shen_sha or [])},
+        interactions=_as_rule_interactions(interactions or [], cycle_label),
         five_elements=ctx.natal_five_elements,
-        day_master={},
+        day_master={"强弱": ctx.dm_strength},
         lunar_birthday=ctx.lunar_birthday,
     )
 
@@ -120,7 +186,10 @@ def _name_the_period(evidence, cycle_label: str):
     companion's 大运 label is already concrete and passes through unchanged.
     """
     if isinstance(evidence, dict):
-        return {k: _name_the_period(v, cycle_label) for k, v in evidence.items()}
+        return {
+            (cycle_label if k == CYCLE_PILLAR else k): _name_the_period(v, cycle_label)
+            for k, v in evidence.items()
+        }
     if isinstance(evidence, list):
         return [_name_the_period(v, cycle_label) for v in evidence]
     return cycle_label if evidence == CYCLE_PILLAR else evidence
@@ -133,7 +202,7 @@ def _format_cycle_match(rule: dict, evidence: dict | list[dict], cycle_label: st
         "结论": rule["断语"],
         "证据": _name_the_period(evidence, cycle_label),
     }
-    for optional in ("现代解读", "依据", "标注"):
+    for optional in ("现代解读", "依据", "标注", "编码说明"):
         if optional in rule:
             entry[optional] = rule[optional]
     return entry
@@ -163,6 +232,8 @@ def get_cycle_interpretations(
     cycle_branch: str,
     cycle_label: str,
     companion: tuple[str, str] | None = None,
+    shen_sha: list[dict] | None = None,
+    interactions: list[dict] | None = None,
 ) -> dict:
     """Classical-text readings for one cycle pillar.
 
@@ -171,6 +242,8 @@ def get_cycle_interpretations(
         cycle_stem/cycle_branch: the pillar being analysed.
         cycle_label:  "大运", "流年" or "小运" — filters rules by 适用周期.
         companion:    (stem, branch) of the enclosing 大运 for a 流年, else None.
+        shen_sha:     the pillar's computed 神煞 entries ({名称, 来源}), if any.
+        interactions: the pillar's computed 柱位动态 (作用), if any.
 
     Returns:
         {group: [match, ...]} holding only groups with at least one match. An empty dict
@@ -178,7 +251,9 @@ def get_cycle_interpretations(
     """
     if cycle_label not in CYCLE_PERIODS:
         raise ValueError(f"cycle_label must be one of {sorted(CYCLE_PERIODS)}, got {cycle_label!r}")
-    context = build_cycle_chart_context(ctx, cycle_stem, cycle_branch, companion)
+    context = build_cycle_chart_context(
+        ctx, cycle_stem, cycle_branch, companion, shen_sha, interactions, cycle_label
+    )
     result: dict[str, list[dict]] = {}
     for group, rules in CYCLE_ANALYZERS:
         matched = _run(rules, context, cycle_label)

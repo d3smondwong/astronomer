@@ -111,6 +111,10 @@ class NatalContext:
     lunar_birthday: object                 # lunar_python Lunar object (土旺用事); may be None
     natal_five_elements: dict              # natal-only 旺衰 baseline: {element: {"状态": ...}}
     yong_shen: dict                        # get_yong_shen() verdict (调候 + 扶抑), chart-fixed
+    # The natal pillars with the natal pipeline's 七杀→偏官 / 食神→伤官 relabels applied —
+    # the view classical cycle rules match NATAL ten gods against (bazi-natal.md: natal-side
+    # matching needs 偏官). natal_si_zhu stays raw: the 制化 annotation needs raw labels.
+    rule_si_zhu: dict | None = None
 
 
 def build_natal_context(
@@ -124,6 +128,7 @@ def build_natal_context(
     natal_interactions: dict,
     lunar_birthday,
     natal_five_elements: dict,
+    rule_si_zhu: dict | None = None,
 ) -> NatalContext:
     """
     Assemble the NatalContext from already-computed natal module outputs.
@@ -189,6 +194,7 @@ def build_natal_context(
         natal_interactions=natal_interactions,
         lunar_birthday=lunar_birthday,
         natal_five_elements=natal_five_elements,
+        rule_si_zhu=rule_si_zhu,
         # 用神 is chart-fixed. It carries 格局 (正格/从格/专旺/化气), which decides whether 喜忌
         # come from 扶抑+调候 or from the surrendered structure — so it needs the day-master
         # foundations, the 力量-bearing 五行 map, and the interactions.

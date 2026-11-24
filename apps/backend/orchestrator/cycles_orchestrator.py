@@ -53,6 +53,7 @@ deliberately excludes — cycle responses must NOT be cached under chart_key.
 The chart_key returned here is for log correlation only.
 """
 
+import copy
 import json
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -100,6 +101,8 @@ from apps.backend.astronomer_logic.natal_five_elements import (
 from apps.backend.astronomer_logic.natal_interactions import get_natal_interactions
 from apps.backend.astronomer_logic.ten_gods import (
     apply_heavenlystem_tranformation_tengods,
+    apply_qi_sha_transformation,
+    apply_shi_shen_transformation,
     get_ten_gods,
 )
 from apps.backend.astronomer_logic.twelve_life_stages import get_twelve_life_stages
@@ -341,8 +344,16 @@ def _build_context(bazi, gender: int, lunar_birthday=None) -> NatalContext:
         si_zhu, natal_interactions_data, lunar_birthday=lunar_birthday
     ).classify_all(include_strength=True)["五行"]
 
-    # NOTE: 七杀→偏官 / 食神→伤官 relabeling is deliberately NOT applied here —
+    # NOTE: 七杀→偏官 / 食神→伤官 relabeling is deliberately NOT applied to si_zhu —
     # the 制化 annotation in build_cycle_pillar needs raw natal god labels.
+    # Classical cycle rules, however, match natal ten gods the way the natal engine does
+    # (natal-side matching needs 偏官), so they get a separately relabelled copy — the
+    # same two passes, in the same order, as calculate_natal_chart.
+    relabelled_gods, rule_si_zhu = apply_qi_sha_transformation(
+        copy.deepcopy(ten_gods), copy.deepcopy(si_zhu), day_master_data
+    )
+    _, rule_si_zhu = apply_shi_shen_transformation(relabelled_gods, rule_si_zhu)
+
     return build_natal_context(
         bazi,
         gender,
@@ -354,6 +365,7 @@ def _build_context(bazi, gender: int, lunar_birthday=None) -> NatalContext:
         natal_interactions=natal_interactions_data,
         lunar_birthday=lunar_birthday,
         natal_five_elements=natal_five_elements,
+        rule_si_zhu=rule_si_zhu,
     )
 
 
@@ -424,12 +436,13 @@ def _analyse_cycle_pillar(
         if sui_yun["警示"]:
             yun_shi = {**yun_shi, "警示": sui_yun["警示"]}
 
+    shen_sha = get_cycle_shen_sha_interpretations(
+        get_cycle_shen_sha(cycle_stem, cycle_branch, ctx, companion), cycle_label
+    )
     entry = {
         "运柱": pillar,
         "作用": interactions,
-        "神煞": get_cycle_shen_sha_interpretations(
-            get_cycle_shen_sha(cycle_stem, cycle_branch, ctx, companion), cycle_label
-        ),
+        "神煞": shen_sha,
         # Headline 喜运/平运/忌运 for the period — read it against the 五行动态 detail below.
         # The stem is passed for 非正格 charts: a 忌 stem attacks a fragile structure directly
         # (透干破格) and drags the verdict down a step. 正格 charts remain branch-only — the
@@ -454,6 +467,8 @@ def _analyse_cycle_pillar(
             cycle_branch,
             cycle_label,
             companion=decade.pillar if decade else None,
+            shen_sha=shen_sha,
+            interactions=interactions["柱位动态"],
         ),
     }
     if sui_yun is not None:
@@ -515,19 +530,22 @@ def _xiao_yun_block(gan_zhi: str, ctx: NatalContext) -> dict:
     stem, branch = gan_zhi[0], gan_zhi[1]
     xun_kong = LunarUtil.getXunKong(gan_zhi)
     pillar = build_cycle_pillar(stem, branch, xun_kong, ctx, "小运")
+    interactions = get_cycle_interactions(
+        stem,
+        branch,
+        ctx,
+        cycle_label="小运",
+        cycle_xun_kong=xun_kong,
+        cycle_stem_rooting=pillar["天干"]["根基强度"],
+    )
     return {
         "干支": gan_zhi,
         "运柱": pillar,
-        "作用": get_cycle_interactions(
-            stem,
-            branch,
-            ctx,
-            cycle_label="小运",
-            cycle_xun_kong=xun_kong,
-            cycle_stem_rooting=pillar["天干"]["根基强度"],
-        ),
+        "作用": interactions,
         "运势": get_cycle_yun_shi(branch, ctx.yong_shen, stem, "小运"),
-        "古籍解读": get_cycle_interpretations(ctx, stem, branch, "小运"),
+        "古籍解读": get_cycle_interpretations(
+            ctx, stem, branch, "小运", interactions=interactions["柱位动态"]
+        ),
     }
 
 
