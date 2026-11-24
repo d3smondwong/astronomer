@@ -38,6 +38,8 @@ ALWAYS present — an empty 大运制约 must read as "the decade acts normally"
 
 from copy import deepcopy
 
+from lunar_python.util import LunarUtil
+
 from apps.backend.astronomer_logic.cycles.cycle_interactions import (
     apply_lock,
     cap,
@@ -45,7 +47,7 @@ from apps.backend.astronomer_logic.cycles.cycle_interactions import (
 )
 from apps.backend.astronomer_logic.cycles.cycle_pillars import NatalContext
 from apps.backend.astronomer_logic.day_master_strength import get_stem_element
-from apps.backend.astronomer_logic.natal_interactions import branch_elements
+from apps.backend.astronomer_logic.natal_shen_sha import day_stem_only_shens
 
 _DA_YUN = "大运"
 _LIU_NIAN = "流年"
@@ -72,9 +74,28 @@ def _layer_of(itype: str) -> str:
     return "branch"
 
 
-def _verdict(element: str, ctx: NatalContext) -> str:
-    """喜 / 忌 / 平 for an element, per the chart's 用神."""
-    return ctx.yong_shen.get("五行", {}).get(element, {}).get("综合", "平")
+# 岁运并临 — 论太岁: 「独羊刃、七煞为凶，财、官、印绶亦吉」. The ten-god split IS the rule; 喜忌 is
+# only its abstraction and cannot replace it (a 喜用 七杀 doubling is still 七煞).
+_BING_LIN_JI = frozenset({"正财", "偏财", "正官", "正印", "偏印"})
+
+
+def _bing_lin_reading(stem: str, branch: str, ctx: NatalContext) -> tuple[str, str]:
+    """(级别, the classical reason) for a 岁运并临 on stem+branch.
+
+    七煞 by the stem or the branch 本气; 羊刃 when the branch is the 日干's 羊刃 (yang day
+    stems only, as the natal 神煞 table has it); 财官印 by the stem (岁用天元).
+    """
+    day = ctx.effective_day_stem
+    stem_god = LunarUtil.SHI_SHEN.get(day + stem, "")
+    ben_qi = LunarUtil.ZHI_HIDE_GAN.get(branch, [""])[0]
+    ben_god = LunarUtil.SHI_SHEN.get(day + ben_qi, "")
+    if day_stem_only_shens["羊刃"].get(ctx.day_stem) == branch:
+        return "重", f"所临{branch}为日干之羊刃，论太岁「独羊刃、七煞为凶」"
+    if "七杀" in (stem_god, ben_god):
+        return "重", "所临为七煞，论太岁「独羊刃、七煞为凶」"
+    if stem_god in _BING_LIN_JI:
+        return "轻", f"所临岁干为{stem_god}，论太岁「财、官、印绶亦吉」，吉力叠加"
+    return "中", f"所临岁干为{stem_god}，原文于此无断，惟岁运同气，其力专而成败皆速"
 
 
 def _joined(detail: dict) -> str:
@@ -97,49 +118,35 @@ def _name_configurations(
     """特殊组合 — the named 岁运 patterns, each {名称, 级别, 说明}.
 
     级别: 重 (a genuine event trigger) | 中 | 轻. Severity is NOT read off the pattern
-    alone — 岁运并临 is gated on 喜忌, because a decade and year that repeat a 喜用 干支
-    double a favourable force rather than doubling a calamity.
+    alone — 岁运并临 follows 论太岁's ten-god split (羊刃/七煞 凶, 财官印 吉), not 喜忌.
+    Quotes are 《三命通会》 verbatim; anything not in the text is plain prose.
     """
     specials: list[dict] = []
     by_type: dict[str, list[dict]] = {}
     for it in items:
         by_type.setdefault(it["类型"], []).append(it)
 
-    # 岁运并临 — 流年干支 == 大运干支. 《三命通会》「岁运并临，灾殃立至」, but the classics are
-    # describing a 忌神 doubling itself. Same 干支, inverted verdict, depending on 喜忌.
+    # 岁运并临 — 流年干支 == 大运干支. 《喜忌篇》「岁运并临，灾殃立至」 is said of 劫财阳刃, and
+    # 论太岁 gives the full split: 「独羊刃、七煞为凶，财、官、印绶亦吉」.
     if by_type.get("伏吟"):
-        stem_el = get_stem_element(da_yun_gz[0])
-        branch_el = branch_elements.get(da_yun_gz[1], "")
-        verdicts = {_verdict(e, ctx) for e in (stem_el, branch_el) if e}
-        if "忌" in verdicts:
-            specials.append({
-                "名称": "岁运并临",
-                "级别": "重",
-                "说明": (
-                    f"流年{liu_nian_gz}与大运{da_yun_gz}干支全同，岁运并临。"
-                    f"所临{stem_el}{branch_el}为命局忌神，忌神叠加而力倍，"
-                    f"古谓「岁运并临，灾殃立至」，主此年事机剧烈，宜守不宜进"
-                ),
-            })
-        else:
-            specials.append({
-                "名称": "岁运并临",
-                "级别": "中",
-                "说明": (
-                    f"流年{liu_nian_gz}与大运{da_yun_gz}干支全同，岁运并临。"
-                    f"所临{stem_el}{branch_el}非忌，喜用叠临则力量倍增，"
-                    f"不作灾咎论 — 惟其气过专，成败皆速"
-                ),
-            })
+        level, reason = _bing_lin_reading(da_yun_gz[0], da_yun_gz[1], ctx)
+        specials.append({
+            "名称": "岁运并临",
+            "级别": level,
+            "说明": (
+                f"流年{liu_nian_gz}与大运{da_yun_gz}干支全同，岁运并临。{reason}"
+                + ("；《喜忌篇》「岁运并临，灾殃立至」，此年宜守不宜进" if level == "重" else "")
+            ),
+        })
 
-    # 岁运反吟 — 天克地冲. 「岁运交战，凡事不宁」.
+    # 岁运反吟 — 天克地冲. 论太岁: 太岁如君，大运如臣，「若值刑战，其年则凶」.
     if by_type.get("反吟"):
         specials.append({
             "名称": "岁运反吟",
             "级别": "重",
             "说明": (
                 f"流年{liu_nian_gz}与大运{da_yun_gz}天克地冲，岁运反吟。"
-                f"岁运交战，凡事不宁，主此年变动剧烈、旧局崩解"
+                f"太岁如君，大运如臣，君臣「若值刑战，其年则凶」，主此年变动剧烈、旧局崩解"
             ),
         })
 
@@ -157,15 +164,15 @@ def _name_configurations(
         })
 
     # 岁运相冲 — 支冲 without the stem half (a full 天克地冲 is 反吟, named above).
-    # 「岁运冲战」: the decade's branch and the year's are at odds. A major trigger in its
-    # own right — but note it BINDS nothing (see _derive_locks).
+    # 总论岁运: 「大运不宜与太岁相克相冲」. A major trigger in its own right — but note it
+    # BINDS nothing (see _derive_locks).
     if by_type.get("六冲") and not by_type.get("反吟"):
         specials.append({
             "名称": "岁运相冲",
             "级别": "中",
             "说明": (
-                f"流年支{liu_nian_gz[1]}与大运支{da_yun_gz[1]}相冲，岁运冲战。"
-                f"冲则动 — 主此年动荡、迁移、变革，旧事被冲开；"
+                f"流年支{liu_nian_gz[1]}与大运支{da_yun_gz[1]}相冲。"
+                f"总论岁运：「大运不宜与太岁相克相冲」。冲则动 — 主此年动荡、迁移、变革，旧事被冲开；"
                 f"惟冲而不绊，大运作用于命局如常"
             ),
         })
@@ -186,7 +193,7 @@ def _name_configurations(
                 "级别": "重",
                 "说明": (
                     f"大运干{da_yun_gz[0]}克流年干{liu_nian_gz[0]}，臣犯君。"
-                    f"古谓「运犯岁君，灾殃必重」，主此年触犯时势、逆势而动者受挫"
+                    f"总论岁运：「尤忌运克岁，与日犯同，主破耗丧事」，此年慎防破耗"
                 ),
             })
         elif actor == _LIU_NIAN:
@@ -195,7 +202,7 @@ def _name_configurations(
                 "级别": "轻",
                 "说明": (
                     f"流年干{liu_nian_gz[0]}克大运干{da_yun_gz[0]}，君临臣。"
-                    f"岁能伤运，运不能伤岁 — 此为顺，其咎轻，主时势压人而非人犯时势"
+                    f"太岁如君，大运如臣，上治其下为顺，其咎轻，主时势压人而非人犯时势"
                 ),
             })
 
@@ -385,7 +392,7 @@ def analyse_sui_yun(
         interactions:         the year's 1×5 output from get_cycle_interactions
                               (must have been run WITH a CompanionPillar).
         decade_dynamics:      the decade's 柱位动态 (decade-level, vs the natal chart).
-        ctx:                  NatalContext — supplies 用神 for the 喜忌 gate.
+        ctx:                  NatalContext — supplies the day stem for 岁运并临's ten-god split.
 
     Returns:
         (岁运 block, this year's re-resolved decade dynamics).

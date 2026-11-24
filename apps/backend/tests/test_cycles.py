@@ -947,16 +947,20 @@ class TestSuiYunInteractions:
         assert "岁运并临" in named(block)
         assert block["大运态"] == "交战"
 
-    def test_sui_yun_bing_lin_severity_is_gated_on_xi_ji(self):
-        """「岁运并临，灾殃立至」 describes a 忌神 doubling itself. A 喜用 干支 repeating
-        doubles a FAVOURABLE force — same pattern, different verdict."""
-        ctx = self.ctx()
-        _, block, _ = sui_yun_scan(ctx, "庚寅", "庚寅")
+    @pytest.mark.parametrize("pillar,level", [
+        ("甲寅", "重"),  # 甲 = 戊's 七杀 — 「独羊刃、七煞为凶」
+        ("丙午", "重"),  # 午 = 戊's 羊刃 (丙 is 偏印, but the 刃 decides)
+        ("癸亥", "轻"),  # 癸 = 正财 — 「财、官、印绶亦吉」
+        ("乙卯", "轻"),  # 乙 = 正官
+        ("庚申", "中"),  # 庚 = 食神 — the text gives no verdict
+    ])
+    def test_sui_yun_bing_lin_follows_the_ten_god_split(self, pillar, level):
+        """论太岁: 「独羊刃、七煞为凶，财、官、印绶亦吉」 — the ten-god split is the rule,
+        not 喜忌 (戊 day master throughout)."""
+        _, block, _ = sui_yun_scan(self.ctx(), pillar, pillar)
         bing_lin = next(s for s in block["特殊组合"] if s["名称"] == "岁运并临")
-        stem_verdict = ctx.yong_shen["五行"]["金"]["综合"]
-        branch_verdict = ctx.yong_shen["五行"]["木"]["综合"]
-        expected = "重" if "忌" in {stem_verdict, branch_verdict} else "中"
-        assert bing_lin["级别"] == expected
+        assert bing_lin["级别"] == level
+        assert bool(block["警示"]) == (level == "重")
 
     def test_sui_yun_fan_yin(self):
         """岁运反吟 — 天克地冲 between the two transiting pillars. 岁运交战."""

@@ -135,7 +135,9 @@ the natal rules, evaluated by the natal `evaluate_rule` — the engine adds no e
   only 沉潜 = 亥子丑 is confirmed); 得气深浅 timing; 「太岁持之」; 日年相并 (verdict depends on social
   standing); 「太岁当头立…重丧」.
 - **岁运并临:** 论太岁's ten-god split (「独羊刃、七煞为凶，财、官、印绶亦吉」) is the rule; 喜忌 is only
-  its abstraction. `sui_yun.py` still gates 级别 on 喜忌 — reconciling it is part of phase 2b.
+  its abstraction. `sui_yun.py` follows it (phase 2b): 羊刃 (branch = the 日干's 羊刃) or 七煞 (stem
+  or branch 本气) → 级别 重; 财/官/印 by the stem → 轻 (吉 wording); anything else → 中 (no verdict).
+  《喜忌篇》「岁运并临，灾殃立至」 is said of 劫财阳刃 — it is quoted only on the 重 case.
 - **Natal-rule gaps found** (to fix separately, not via cycle rules): the 论地支 natal rules never
   check the branch they describe; the 巳 and 酉 rules require a 月支 that contradicts their own
   subject; the 未 rule uses 日支.
