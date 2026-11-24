@@ -63,6 +63,10 @@ from apps.backend.data.san_ming_tong_hui_v1 import (
     volume_1_60_jia_zi_cycle_predictions,
     volume_1_nayin_ge_ju_cycle_predictions,
 )
+from apps.backend.data.san_ming_tong_hui_v2 import (
+    volume_2_da_yun_cycle_predictions,
+    volume_2_gan_zhi_cycle_predictions,
+)
 
 CYCLE_PILLAR = "运柱"
 COMPANION_PILLAR = "大运"
@@ -223,6 +227,8 @@ def _run(rules: list[dict], context: ChartContext, cycle_label: str) -> list[dic
 CYCLE_ANALYZERS: list[tuple[str, list[dict]]] = [
     ("释六十甲子", volume_1_60_jia_zi_cycle_predictions),
     ("纳音格局", volume_1_nayin_ge_ju_cycle_predictions),
+    ("论大运", volume_2_da_yun_cycle_predictions),
+    ("论干支", volume_2_gan_zhi_cycle_predictions),
 ]
 
 
